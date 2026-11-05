@@ -798,20 +798,35 @@
             document.getElementById('cameraInput').click();
         }
         
+        function compressImage(dataUrl) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const maxW = 1280;
+                    const scale = Math.min(1, maxW / img.width);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                };
+                img.onerror = () => resolve(dataUrl);
+                img.src = dataUrl;
+            });
+        }
+
         document.getElementById('cameraInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
-            if (file && currentPhotoId) {
-                // 파일을 base64로 변환 (나중에 저장용)
+            const photoId = currentPhotoId;
+            if (file && photoId) {
                 const reader = new FileReader();
-                reader.onload = (ev) => {
-                    state.photoData[currentPhotoId] = ev.target.result;
+                reader.onload = async (ev) => {
+                    state.photoData[photoId] = await compressImage(ev.target.result);
+                    state.photos[photoId] = true;
+                    renderChecklist();
+                    if (navigator.vibrate) navigator.vibrate(50);
                 };
                 reader.readAsDataURL(file);
-                
-                state.photos[currentPhotoId] = true;
-                renderChecklist();
-                
-                if (navigator.vibrate) navigator.vibrate(50);
             }
             e.target.value = '';
         });
@@ -828,9 +843,9 @@
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
         
         // 구글 시트에 데이터 전송
-        async function sendToGoogleSheet(record) {
+        async function sendToGoogleSheet(record, photos) {
             try {
-                const response = await fetch(GOOGLE_SHEET_URL, {
+                await fetch(GOOGLE_SHEET_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: {
@@ -848,10 +863,10 @@
                         maker: record.maker || '',
                         gps: record.gps ? `${record.gps.lat}, ${record.gps.lng}` : '',
                         memo: record.memo || '',
-                        address: record.address || ''
+                        address: record.address || '',
+                        photos: photos
                     })
                 });
-                console.log('구글 시트 전송 완료');
                 return true;
             } catch (error) {
                 console.error('구글 시트 전송 실패:', error);
@@ -863,6 +878,9 @@
         document.getElementById('completeZoneBtn').addEventListener('click', async () => {
             const zone = state.selectedZone;
             const memo = document.getElementById('memoInput').value.trim();
+            const btn = document.getElementById('completeZoneBtn');
+            btn.disabled = true;
+            btn.textContent = '사진 업로드 중...';
             
             const record = {
                 station: state.station,
@@ -881,9 +899,17 @@
                 city: state.city,
                 address: STATION_DATA[state.region][state.city][state.station].address
             };
+
+            const photos = photoTypes
+                .filter((p) => state.photoData[p.id])
+                .map((p) => ({
+                    id: p.id,
+                    label: p.label,
+                    name: `${p.id}.jpg`,
+                    data: state.photoData[p.id]
+                }));
             
-            // 구글 시트에 전송
-            sendToGoogleSheet(record);
+            await sendToGoogleSheet(record, photos);
             
             state.completedZones.push(record);
             state.allHistory.push(record);
@@ -903,11 +929,11 @@
             document.getElementById('inspectScreen').classList.add('hidden');
             document.getElementById('selectScreen').classList.remove('hidden');
             
-            // 거점 목록 갱신
             const data = STATION_DATA[state.region][state.city][state.station];
             renderZones(data.zones);
+            btn.textContent = '이 거점 점검 완료';
             
-            alert('✅ 점검 완료! 기록이 저장되었습니다.\n(구글 시트에도 자동 기록됨)');
+            alert('점검 완료. 기록과 사진이 구글 드라이브에 저장됩니다.');
         });
         
         // 뒤로가기
