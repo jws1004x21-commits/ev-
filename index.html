@@ -824,8 +824,43 @@
             document.getElementById('requiredWarning').classList.toggle('hidden', allDone);
         }
         
+        // 구글 시트 연동 URL
+        const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
+        
+        // 구글 시트에 데이터 전송
+        async function sendToGoogleSheet(record) {
+            try {
+                const response = await fetch(GOOGLE_SHEET_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        date: record.date,
+                        time: record.time,
+                        inspector: record.inspector,
+                        region: record.region,
+                        city: record.city,
+                        station: record.station,
+                        zone: `거점${record.zoneIndex}: ${record.zoneName}`,
+                        chargers: record.chargers,
+                        maker: record.maker || '',
+                        gps: record.gps ? `${record.gps.lat}, ${record.gps.lng}` : '',
+                        memo: record.memo || '',
+                        address: record.address || ''
+                    })
+                });
+                console.log('구글 시트 전송 완료');
+                return true;
+            } catch (error) {
+                console.error('구글 시트 전송 실패:', error);
+                return false;
+            }
+        }
+        
         // 점검 완료
-        document.getElementById('completeZoneBtn').addEventListener('click', () => {
+        document.getElementById('completeZoneBtn').addEventListener('click', async () => {
             const zone = state.selectedZone;
             const memo = document.getElementById('memoInput').value.trim();
             
@@ -846,6 +881,9 @@
                 city: state.city,
                 address: STATION_DATA[state.region][state.city][state.station].address
             };
+            
+            // 구글 시트에 전송
+            sendToGoogleSheet(record);
             
             state.completedZones.push(record);
             state.allHistory.push(record);
@@ -869,7 +907,7 @@
             const data = STATION_DATA[state.region][state.city][state.station];
             renderZones(data.zones);
             
-            alert('✅ 점검 완료! 기록이 저장되었습니다.');
+            alert('✅ 점검 완료! 기록이 저장되었습니다.\n(구글 시트에도 자동 기록됨)');
         });
         
         // 뒤로가기
