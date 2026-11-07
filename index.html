@@ -382,7 +382,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v3.3</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v3.4</div>
     </div>
 
     <div class="container">
@@ -928,7 +928,7 @@
         }
 
         async function uploadPhotoNow(item) {
-            if (!item.data || item.uploaded) return;
+            if (item.cancelled || !item.data || item.uploaded) return;
             item.uploading = true;
             item.failed = false;
             renderChecklist();
@@ -940,6 +940,14 @@
                     filename: item.filename,
                     data: item.data
                 });
+                if (item.cancelled) {
+                    await postGoogle({
+                        action: 'deletePhoto',
+                        ...currentLocationFields(),
+                        filename: item.filename
+                    });
+                    return;
+                }
                 item.uploaded = true;
                 item.uploading = false;
                 item.data = null;
@@ -995,9 +1003,19 @@
         });
 
         function deletePhoto(photoId, index) {
+            const item = photosOf(photoId)[index];
+            if (!item) return;
+            item.cancelled = true;
             photosOf(photoId).splice(index, 1);
             closeLightbox();
             renderChecklist();
+            if (item.filename) {
+                postGoogle({
+                    action: 'deletePhoto',
+                    ...currentLocationFields(),
+                    filename: item.filename
+                }).catch(() => {});
+            }
         }
 
         function openLightbox(photoId, index) {

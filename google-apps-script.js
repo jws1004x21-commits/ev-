@@ -34,6 +34,10 @@ function doPost(e) {
       return json_({ ok: true, url: saved.url, folderUrl: saved.folderUrl });
     }
 
+    if (action === 'deletePhoto') {
+      return json_({ ok: true, deleted: deletePhoto_(data) });
+    }
+
     var folder = ensureZoneFolder_(data);
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     ensureHeader_(sheet);
@@ -82,6 +86,19 @@ function ensureHeader_(sheet) {
     ]);
     sheet.getRange(1, 1, 1, 14).setFontWeight('bold');
   }
+}
+
+function deletePhoto_(data) {
+  var folder = ensureZoneFolder_(data);
+  var name = sanitize_(data.filename || '');
+  if (!name) return 0;
+  var files = folder.getFilesByName(name);
+  var count = 0;
+  while (files.hasNext()) {
+    files.next().setTrashed(true);
+    count++;
+  }
+  return count;
 }
 
 function savePhoto_(data) {
