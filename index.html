@@ -424,7 +424,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v3.6</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v3.7</div>
     </div>
 
     <div class="container">
@@ -575,7 +575,9 @@
                     </div>
                     <button class="btn btn-secondary" onclick="testGoogleLink()">구글 연결 테스트</button>
                     <button class="btn btn-secondary" onclick="retryPendingUploads()">대기 중인 구글 업로드 재시도</button>
+                    <button class="btn btn-primary" onclick="runAutoTest()">🧪 아무 사진으로 자동 테스트</button>
                     <div class="upload-status" id="googleTestStatus"></div>
+                    <div id="autoTestResults" style="margin-top:12px;font-size:13px;"></div>
                 </div>
             </div>
 
@@ -748,6 +750,7 @@
             if (w.inspector && !state.inspector) state.inspector = w.inspector;
             fillLocationSelects();
             document.getElementById('memoInput').value = w.memo || '';
+            inspectZoneKey = currentZoneKey();
             if (w.inspecting || totalPhotoCount() > 0) {
                 showInspectScreen();
             }
@@ -1096,11 +1099,19 @@
             document.getElementById('startBtn').disabled = false;
         }
 
+        let inspectZoneKey = '';
+
+        function currentZoneKey() {
+            return [state.station, state.selectedZone && state.selectedZone.id, state.selectedZoneIdx].join('|');
+        }
+
         document.getElementById('startBtn').addEventListener('click', () => {
-            if (totalPhotoCount() === 0) {
+            const key = currentZoneKey();
+            if (key !== inspectZoneKey || totalPhotoCount() === 0) {
                 state.photoData = {};
                 photoTypes.forEach(p => { state.photoData[p.id] = []; });
                 document.getElementById('memoInput').value = '';
+                inspectZoneKey = key;
             }
             document.getElementById('uploadStatus').textContent = '';
             showInspectScreen();
@@ -1592,6 +1603,128 @@
             state.inspector = document.getElementById('inspectorName').value.trim();
             saveState();
             alert('설정이 저장되었습니다.');
+        }
+
+        function makeTestPhoto(label) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 960;
+            canvas.height = 720;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#0f2a4a';
+            ctx.fillRect(0, 0, 960, 720);
+            ctx.fillStyle = '#4ade80';
+            ctx.fillRect(0, 0, 960, 16);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 42px sans-serif';
+            ctx.fillText(label, 40, 120);
+            ctx.font = '28px sans-serif';
+            ctx.fillText('자동 테스트 사진', 40, 180);
+            ctx.fillText(new Date().toLocaleString(), 40, 230);
+            ctx.fillText(state.inspector || '점검자 미설정', 40, 280);
+            ctx.font = '22px sans-serif';
+            ctx.fillText('전압/저항 숫자처럼 확대해서 보이는지 확인용', 40, 360);
+            return canvas.toDataURL('image/jpeg', 0.8);
+        }
+
+        function probeGoogleVersion() {
+            return new Promise((resolve) => {
+                const cb = 'evProbe_' + Date.now();
+                let script;
+                const timer = setTimeout(() => {
+                    cleanup();
+                    resolve({ ok: false, reason: '응답 없음 (스크립트 구버전이거나 미배포)' });
+                }, 8000);
+                function cleanup() {
+                    clearTimeout(timer);
+                    try { delete window[cb]; } catch (e) {}
+                    if (script && script.parentNode) script.parentNode.removeChild(script);
+                }
+                window[cb] = (data) => {
+                    cleanup();
+                    resolve({ ok: true, data });
+                };
+                script = document.createElement('script');
+                script.src = GOOGLE_SHEET_URL + '?callback=' + cb;
+                script.onerror = () => {
+                    cleanup();
+                    resolve({ ok: false, reason: '스크립트 로드 실패' });
+                };
+                document.body.appendChild(script);
+            });
+        }
+
+        function testLine(ok, text) {
+            return `<div style="padding:6px 0;border-bottom:1px solid #2a2a3e;">${ok ? '✅' : '❌'} ${text}</div>`;
+        }
+
+        async function runAutoTest() {
+            const box = document.getElementById('autoTestResults');
+            const status = document.getElementById('googleTestStatus');
+            box.innerHTML = '자동 테스트 시작... 가짜 사진 7장을 만들어 확인합니다.';
+            status.textContent = '자동 테스트 진행 중...';
+            const lines = [];
+            try {
+                const sample = makeTestPhoto('1. 전압');
+                lines.push(testLine(!!sample && sample.startsWith('data:image/jpeg'), '가짜 사진 생성'));
+
+                const compressed = await compressImage(sample, 640, 0.6);
+                lines.push(testLine(!!compressed, '사진 압축'));
+
+                await idbSet('autotest', { sample: compressed.slice(0, 80), at: Date.now() });
+                const roundtrip = await idbGet('autotest');
+                lines.push(testLine(!!roundtrip, '폰(브라우저) 저장'));
+
+                const probe = await probeGoogleVersion();
+                const isV3 = !!(probe.ok && probe.data && probe.data.version === 'v3');
+                lines.push(testLine(isV3, isV3
+                    ? '구글 Apps Script v3 확인'
+                    : '구글 Apps Script가 구버전입니다. 사진이 드라이브에 안 들어갑니다.'));
+
+                const loc = {
+                    region: '테스트',
+                    city: '테스트',
+                    station: '자동테스트',
+                    zone: '거점1: 자동확인'
+                };
+                for (let i = 0; i < photoTypes.length; i++) {
+                    const type = photoTypes[i];
+                    status.textContent = `테스트 사진 전송 ${i + 1}/${photoTypes.length}`;
+                    const dataUrl = makeTestPhoto(type.label);
+                    await postGoogle({
+                        action: 'photo',
+                        ...loc,
+                        label: type.label,
+                        filename: `자동테스트_${type.id}.jpg`,
+                        data: dataUrl
+                    });
+                }
+                await postGoogle({
+                    action: 'complete',
+                    date: new Date().toISOString().split('T')[0],
+                    time: new Date().toLocaleTimeString(),
+                    inspector: state.inspector || '자동테스트',
+                    region: loc.region,
+                    city: loc.city,
+                    station: loc.station,
+                    zone: loc.zone,
+                    chargers: 0,
+                    maker: '테스트',
+                    gps: '',
+                    memo: '앱 설정에서 실행한 자동 테스트입니다. 이 행은 지워도 됩니다.',
+                    address: '',
+                    photoCount: photoTypes.length
+                });
+                lines.push(testLine(true, isV3
+                    ? '테스트 사진 7장 + 시트 기록 전송 완료. 드라이브 폴더 전기차충전소점검_대전팀/점검사진/테스트/자동테스트 를 확인하세요.'
+                    : '전송은 보냈지만 구버전 스크립트라 시트에만 남거나 사진이 없을 수 있습니다.'));
+
+                box.innerHTML = `<div class="info-box ${isV3 ? 'success' : 'warning'}"><div class="title">자동 테스트 결과</div></div>` + lines.join('');
+                status.textContent = isV3 ? '자동 테스트 완료' : '자동 테스트 완료 · Apps Script 재배포 필요';
+            } catch (err) {
+                lines.push(testLine(false, '테스트 중단: ' + err.message));
+                box.innerHTML = lines.join('');
+                status.textContent = '자동 테스트 실패';
+            }
         }
 
         async function testGoogleLink() {
