@@ -10,7 +10,7 @@
     <link rel="manifest" href="manifest.json">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #0f0f1a;
@@ -18,7 +18,7 @@
             min-height: 100vh;
             padding-bottom: 100px;
         }
-        
+
         .header {
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             padding: 16px;
@@ -27,37 +27,36 @@
             z-index: 100;
             border-bottom: 1px solid #333;
         }
-        
+
         .header h1 { font-size: 18px; display: flex; align-items: center; gap: 8px; }
         .header .subtitle { font-size: 11px; color: #888; margin-top: 2px; }
-        
+
         .container { padding: 12px; max-width: 500px; margin: 0 auto; }
-        
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 8px;
             margin-bottom: 16px;
         }
-        
+
         .stat-card {
             background: #16213e;
             border-radius: 10px;
             padding: 12px 8px;
             text-align: center;
         }
-        
+
         .stat-value { font-size: 20px; font-weight: 700; color: #4ade80; }
-        .stat-value.warning { color: #f97316; }
         .stat-label { font-size: 10px; color: #888; margin-top: 2px; }
-        
+
         .card {
             background: #16213e;
             border-radius: 14px;
             margin-bottom: 12px;
             overflow: hidden;
         }
-        
+
         .card-header {
             padding: 14px 16px;
             border-bottom: 1px solid #333;
@@ -67,12 +66,12 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .card-body { padding: 14px 16px; }
-        
+
         .form-group { margin-bottom: 14px; }
         .form-label { display: block; font-size: 12px; color: #aaa; margin-bottom: 6px; }
-        
+
         .form-select, .form-input, .form-textarea {
             width: 100%;
             padding: 12px 14px;
@@ -82,32 +81,31 @@
             color: #eee;
             font-size: 15px;
         }
-        
+
         .form-select {
             appearance: none;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 10px center;
         }
-        
+
         .form-select:focus, .form-input:focus, .form-textarea:focus {
             outline: none;
             border-color: #4ade80;
         }
-        
+
         .form-textarea { min-height: 80px; resize: vertical; }
-        
+
         .zone-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        
+
         .zone-card {
             background: #0f0f23;
             border: 2px solid transparent;
             border-radius: 10px;
             padding: 12px;
             cursor: pointer;
-            transition: all 0.2s;
         }
-        
+
         .zone-card.selected { border-color: #4ade80; background: #1a2e1a; }
         .zone-card.completed { border-color: #22c55e; opacity: 0.7; }
         .zone-card .zone-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
@@ -121,7 +119,7 @@
             border-radius: 8px;
             margin-bottom: 6px;
         }
-        
+
         .btn {
             width: 100%;
             padding: 14px;
@@ -130,54 +128,15 @@
             font-size: 15px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
             margin-top: 8px;
         }
-        
+
         .btn-primary { background: #4ade80; color: #000; }
         .btn-primary:disabled { background: #333; color: #666; cursor: not-allowed; }
         .btn-secondary { background: #333; color: #eee; }
         .btn-danger { background: #ef4444; color: #fff; }
         .btn-small { padding: 8px 12px; font-size: 13px; width: auto; margin: 0; }
-        
-        .checklist { list-style: none; }
-        
-        .checklist-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid #2a2a3e;
-        }
-        
-        .checklist-item:last-child { border-bottom: none; }
-        .checklist-item .item-info { display: flex; align-items: center; gap: 10px; }
-        .checklist-item .item-name { font-weight: 500; font-size: 14px; }
-        
-        .checklist-item .item-badge {
-            font-size: 9px;
-            padding: 2px 6px;
-            border-radius: 8px;
-            background: #f97316;
-            color: #000;
-        }
-        
-        .checklist-item .item-badge.optional { background: #333; color: #888; }
-        .checklist-item .status-done { color: #22c55e; font-weight: 600; font-size: 13px; }
-        
-        .btn-camera {
-            background: #3b82f6;
-            color: #fff;
-            padding: 8px 14px;
-            border: none;
-            border-radius: 8px;
-            font-size: 13px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        
+
         .info-box {
             background: #1e3a5f;
             border-left: 3px solid #3b82f6;
@@ -186,12 +145,12 @@
             margin-bottom: 14px;
             font-size: 13px;
         }
-        
+
         .info-box.warning { background: #3d2f0f; border-color: #f97316; }
         .info-box.success { background: #0f2f0f; border-color: #22c55e; }
         .info-box .title { font-weight: 600; margin-bottom: 4px; }
         .info-box .text { color: #ccc; }
-        
+
         .serial-list {
             background: #0f0f23;
             border-radius: 8px;
@@ -202,38 +161,135 @@
             max-height: 100px;
             overflow-y: auto;
         }
-        
+
         .serial-list .serial-item { padding: 3px 0; font-family: monospace; }
-        
+
         .gps-info {
             background: #0f0f23;
             padding: 8px 12px;
             border-radius: 8px;
             font-size: 11px;
             color: #888;
-            display: flex;
-            align-items: center;
-            gap: 8px;
             margin-bottom: 12px;
         }
-        
+
         .gps-info.active { color: #4ade80; }
-        
-        .photo-preview {
+
+        .photo-block {
+            padding: 14px 0;
+            border-bottom: 1px solid #2a2a3e;
+        }
+
+        .photo-block:last-child { border-bottom: none; }
+
+        .photo-block-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            gap: 8px;
+        }
+
+        .item-name { font-weight: 500; font-size: 14px; }
+        .item-badge {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: #f97316;
+            color: #000;
+            margin-left: 6px;
+        }
+        .item-badge.optional { background: #333; color: #888; }
+        .photo-count { font-size: 12px; color: #4ade80; white-space: nowrap; }
+
+        .thumb-row {
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
-            margin-top: 8px;
+            margin-bottom: 10px;
         }
-        
-        .photo-preview img {
-            width: 60px;
-            height: 60px;
+
+        .thumb {
+            position: relative;
+            width: 72px;
+            height: 72px;
+        }
+
+        .thumb img {
+            width: 72px;
+            height: 72px;
             object-fit: cover;
             border-radius: 8px;
             border: 2px solid #333;
+            display: block;
         }
-        
+
+        .thumb-del {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 22px;
+            height: 22px;
+            border: none;
+            border-radius: 50%;
+            background: #ef4444;
+            color: #fff;
+            font-size: 13px;
+            line-height: 22px;
+            text-align: center;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        .photo-actions { display: flex; gap: 8px; }
+
+        .btn-camera, .btn-album {
+            flex: 1;
+            color: #fff;
+            padding: 10px 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .btn-camera { background: #3b82f6; }
+        .btn-album { background: #334155; }
+
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .lightbox img {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 8px;
+        }
+
+        .lightbox-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            width: 100%;
+            max-width: 360px;
+        }
+
+        .upload-status {
+            font-size: 13px;
+            color: #aaa;
+            text-align: center;
+            margin: 8px 0;
+            min-height: 18px;
+        }
+
         .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -246,7 +302,7 @@
             padding: 10px 0;
             padding-bottom: max(10px, env(safe-area-inset-bottom));
         }
-        
+
         .nav-item {
             display: flex;
             flex-direction: column;
@@ -257,12 +313,12 @@
             cursor: pointer;
             padding: 4px 12px;
         }
-        
+
         .nav-item.active { color: #4ade80; }
         .nav-item .icon { font-size: 18px; }
-        
+
         .hidden { display: none !important; }
-        
+
         .completed-item {
             display: flex;
             align-items: center;
@@ -271,7 +327,7 @@
             border-bottom: 1px solid #2a2a3e;
             font-size: 13px;
         }
-        
+
         .completed-item .check {
             width: 22px;
             height: 22px;
@@ -284,23 +340,23 @@
             font-size: 12px;
             flex-shrink: 0;
         }
-        
+
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        
+
         .history-item {
             background: #0f0f23;
             border-radius: 10px;
             padding: 12px;
             margin-bottom: 10px;
         }
-        
+
         .history-item .date { font-size: 11px; color: #888; margin-bottom: 6px; }
         .history-item .station { font-weight: 600; font-size: 14px; }
         .history-item .detail { font-size: 12px; color: #aaa; margin-top: 4px; }
-        
+
         input[type="file"] { display: none; }
-        
+
         @media (max-width: 360px) {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
@@ -309,13 +365,11 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v2.0</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v3.0</div>
     </div>
-    
+
     <div class="container">
-        <!-- 탭 컨텐츠: 홈 -->
         <div id="tab-home" class="tab-content active">
-            <!-- 통계 -->
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-value" id="todayCount">0</div>
@@ -334,8 +388,7 @@
                     <div class="stat-label">진행률</div>
                 </div>
             </div>
-            
-            <!-- 위치 선택 화면 -->
+
             <div id="selectScreen">
                 <div class="card">
                     <div class="card-header">📍 점검 위치 선택</div>
@@ -355,19 +408,18 @@
                         <div class="form-group">
                             <label class="form-label">충전소 (검색 가능)</label>
                             <input type="text" class="form-input" id="stationSearch" placeholder="충전소명 검색..." style="margin-bottom:8px;">
-                            <select class="form-select" id="stationSelect" disabled size="5" style="height:auto;">
-                            </select>
+                            <select class="form-select" id="stationSelect" disabled size="5" style="height:auto;"></select>
                         </div>
                     </div>
                 </div>
-                
+
                 <div id="stationInfo" class="hidden">
                     <div class="info-box">
                         <div class="title" id="stationName"></div>
                         <div class="text" id="stationAddress"></div>
                         <div class="text" id="stationSummary"></div>
                     </div>
-                    
+
                     <div class="card">
                         <div class="card-header">거점 선택</div>
                         <div class="card-body">
@@ -378,45 +430,37 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <button class="btn btn-primary" id="startBtn" disabled>점검 시작</button>
                 </div>
             </div>
-            
-            <!-- 점검 화면 -->
+
             <div id="inspectScreen" class="hidden">
-                <div class="gps-info" id="gpsInfo">
-                    📍 GPS: 위치 확인 중...
-                </div>
-                
+                <div class="gps-info" id="gpsInfo">📍 GPS: 위치 확인 중...</div>
+
                 <div class="card">
-                    <div class="card-header">
-                        📸 <span id="inspectTitle"></span>
-                    </div>
+                    <div class="card-header">📸 <span id="inspectTitle"></span></div>
                     <div class="card-body">
                         <div class="info-box warning">
                             <div class="text">충전기 <strong id="chargerCount"></strong>대 | 제조사: <span id="makerInfo"></span></div>
                         </div>
-                        
-                        <div style="font-weight:600;font-size:14px;margin-bottom:10px;">사진 촬영</div>
-                        <ul class="checklist" id="checklist"></ul>
-                        
+                        <div style="font-weight:600;font-size:14px;margin-bottom:10px;">사진 촬영 — 종류별로 여러 장 가능</div>
+                        <div id="checklist"></div>
                         <div class="form-group" style="margin-top:16px;">
                             <label class="form-label">📝 특이사항 메모</label>
                             <textarea class="form-textarea" id="memoInput" placeholder="이상 발견 시 내용을 기록하세요..."></textarea>
                         </div>
                     </div>
                 </div>
-                
+
                 <div id="requiredWarning" class="info-box warning">
-                    ⚠️ 필수 사진을 모두 촬영해야 완료할 수 있습니다
+                    ⚠️ 필수 사진은 종류마다 최소 1장씩 촬영해야 완료할 수 있습니다
                 </div>
-                
+                <div class="upload-status" id="uploadStatus"></div>
                 <button class="btn btn-primary" id="completeZoneBtn" disabled>이 거점 점검 완료</button>
                 <button class="btn btn-secondary" id="backBtn">뒤로</button>
             </div>
-            
-            <!-- 오늘 완료 목록 -->
+
             <div id="completedSection" class="hidden">
                 <div class="card">
                     <div class="card-header">✅ 오늘 점검 완료</div>
@@ -424,21 +468,17 @@
                 </div>
             </div>
         </div>
-        
-        <!-- 탭 컨텐츠: 내역 -->
+
         <div id="tab-history" class="tab-content">
             <div class="card">
                 <div class="card-header">📋 점검 내역</div>
                 <div class="card-body">
-                    <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">
-                        📤 엑셀로 내보내기
-                    </button>
+                    <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📤 엑셀로 내보내기</button>
                     <div id="historyList"></div>
                 </div>
             </div>
         </div>
-        
-        <!-- 탭 컨텐츠: 설정 -->
+
         <div id="tab-settings" class="tab-content">
             <div class="card">
                 <div class="card-header">⚙️ 설정</div>
@@ -448,13 +488,31 @@
                         <input type="text" class="form-input" id="inspectorName" placeholder="이름 입력">
                     </div>
                     <button class="btn btn-secondary" onclick="saveSettings()">저장</button>
-                    <button class="btn btn-danger" onclick="clearAllData()" style="margin-top:12px;">
-                        🗑️ 모든 데이터 삭제
-                    </button>
+                    <button class="btn btn-danger" onclick="clearAllData()" style="margin-top:12px;">🗑️ 모든 데이터 삭제</button>
                 </div>
             </div>
-            
-            <div class="card" style="margin-top:12px;">
+
+            <div class="card">
+                <div class="card-header">☁️ 구글 연동</div>
+                <div class="card-body">
+                    <div class="info-box">
+                        <div class="title">시트 + 드라이브</div>
+                        <div class="text">
+                            점검 완료 시 구글 시트에 기록이 추가되고, 사진은
+                            <b>내 드라이브 / 전기차충전소점검_대전팀 / 점검사진</b>
+                            폴더에 충전소·거점별로 저장됩니다.
+                        </div>
+                    </div>
+                    <div class="text" style="font-size:12px;color:#aaa;margin-bottom:10px;">
+                        사진이 안 올라가면 Apps Script를 v3 코드로 바꾸고
+                        <b>새 버전으로 다시 배포</b>해야 합니다.
+                    </div>
+                    <button class="btn btn-secondary" onclick="testGoogleLink()">구글 연결 테스트</button>
+                    <div class="upload-status" id="googleTestStatus"></div>
+                </div>
+            </div>
+
+            <div class="card">
                 <div class="card-header">📊 통계</div>
                 <div class="card-body">
                     <div class="text" style="font-size:13px;color:#aaa;">
@@ -466,46 +524,48 @@
             </div>
         </div>
     </div>
-    
+
     <div class="bottom-nav">
-        <div class="nav-item active" onclick="showTab('home')">
-            <span class="icon">🏠</span>
-            <span>홈</span>
+        <div class="nav-item active" data-tab="home" onclick="showTab('home', this)">
+            <span class="icon">🏠</span><span>홈</span>
         </div>
-        <div class="nav-item" onclick="showTab('history')">
-            <span class="icon">📋</span>
-            <span>내역</span>
+        <div class="nav-item" data-tab="history" onclick="showTab('history', this)">
+            <span class="icon">📋</span><span>내역</span>
         </div>
-        <div class="nav-item" onclick="showTab('settings')">
-            <span class="icon">⚙️</span>
-            <span>설정</span>
+        <div class="nav-item" data-tab="settings" onclick="showTab('settings', this)">
+            <span class="icon">⚙️</span><span>설정</span>
         </div>
     </div>
-    
-    <!-- 카메라 입력 (숨김) -->
-    <input type="file" id="cameraInput" accept="image/*" capture="environment">
 
-    <!-- 충전소 데이터 -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment">
+    <input type="file" id="galleryInput" accept="image/*" multiple>
+
+    <div id="lightbox" class="lightbox hidden">
+        <img id="lightboxImg" alt="미리보기">
+        <div class="lightbox-actions">
+            <button class="btn btn-danger" id="lightboxDelete" style="margin-top:0;">이 사진 삭제</button>
+            <button class="btn btn-secondary" id="lightboxClose" style="margin-top:0;">닫기</button>
+        </div>
+    </div>
+
     <script src="station_data.js"></script>
-    
     <script>
-        // 사진 타입 정의
+        const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
+
         const photoTypes = [
-            { id: "exterior", label: "충전기 외관", required: true },
-            { id: "voltage", label: "전압 측정", required: true },
-            { id: "panel", label: "분전함", required: true },
-            { id: "qr", label: "QR코드/시리얼", required: true },
-            { id: "environment", label: "주변 환경", required: false },
-            { id: "issue", label: "이상 발견", required: false }
+            { id: 'exterior', label: '충전기 외관', required: true },
+            { id: 'voltage', label: '전압 측정', required: true },
+            { id: 'panel', label: '분전함', required: true },
+            { id: 'qr', label: 'QR코드/시리얼', required: true },
+            { id: 'environment', label: '주변 환경', required: false },
+            { id: 'issue', label: '이상 발견', required: false }
         ];
-        
-        // 상태
+
         let state = {
-            region: "",
-            city: "",
-            station: "",
+            region: '',
+            city: '',
+            station: '',
             selectedZone: null,
-            photos: {},
             photoData: {},
             completedZones: [],
             allHistory: [],
@@ -513,77 +573,98 @@
             weekInspected: 0,
             totalInspected: 0,
             currentGPS: null,
-            inspector: ""
+            inspector: ''
         };
-        
-        // 초기화
+
+        let currentPhotoId = null;
+        let lightboxTarget = null;
+
         function init() {
             loadState();
             initRegions();
             updateStats();
             renderCompletedList();
             renderHistory();
-            
-            // GPS 시작
             startGPS();
-            
-            // 설정 로드
             document.getElementById('inspectorName').value = state.inspector || '';
         }
-        
-        // 로컬 스토리지
+
         function loadState() {
             const saved = localStorage.getItem('inspectionStateV2');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                const today = new Date().toDateString();
-                
-                if (parsed.date !== today) {
-                    parsed.completedZones = [];
-                    parsed.todayInspected = 0;
-                }
-                
-                // 주간 계산
-                const weekStart = getWeekStart();
-                parsed.weekInspected = (parsed.allHistory || [])
-                    .filter(h => new Date(h.date) >= weekStart)
-                    .reduce((sum, h) => sum + h.chargers, 0);
-                
-                state = { ...state, ...parsed };
+            if (!saved) return;
+            const parsed = JSON.parse(saved);
+            const today = new Date().toDateString();
+            if (parsed.date !== today) {
+                parsed.completedZones = [];
+                parsed.todayInspected = 0;
             }
+            const weekStart = getWeekStart();
+            parsed.weekInspected = (parsed.allHistory || [])
+                .filter(h => new Date(h.date) >= weekStart)
+                .reduce((sum, h) => sum + (h.chargers || 0), 0);
+            delete parsed.photoData;
+            delete parsed.photos;
+            delete parsed.selectedZone;
+            state = { ...state, ...parsed, photoData: {} };
         }
-        
+
         function saveState() {
-            state.date = new Date().toDateString();
-            localStorage.setItem('inspectionStateV2', JSON.stringify(state));
+            const toSave = {
+                date: new Date().toDateString(),
+                completedZones: state.completedZones,
+                allHistory: (state.allHistory || []).map(h => ({
+                    date: h.date,
+                    time: h.time,
+                    inspector: h.inspector,
+                    region: h.region,
+                    city: h.city,
+                    station: h.station,
+                    zoneId: h.zoneId,
+                    zoneName: h.zoneName,
+                    zoneIndex: h.zoneIndex,
+                    chargers: h.chargers,
+                    maker: h.maker,
+                    gps: h.gps,
+                    memo: h.memo,
+                    address: h.address,
+                    photoCount: h.photoCount,
+                    upload: h.upload
+                })),
+                todayInspected: state.todayInspected,
+                weekInspected: state.weekInspected,
+                totalInspected: state.totalInspected,
+                inspector: state.inspector
+            };
+            localStorage.setItem('inspectionStateV2', JSON.stringify(toSave));
         }
-        
+
         function getWeekStart() {
             const now = new Date();
             const day = now.getDay();
             const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-            return new Date(now.setDate(diff));
+            return new Date(now.getFullYear(), now.getMonth(), diff);
         }
-        
-        // GPS
+
         function startGPS() {
-            if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(
-                    (pos) => {
-                        state.currentGPS = {
-                            lat: pos.coords.latitude.toFixed(6),
-                            lng: pos.coords.longitude.toFixed(6)
-                        };
-                        updateGPSDisplay();
-                    },
-                    (err) => {
-                        document.getElementById('gpsInfo').textContent = '📍 GPS: 사용 불가';
-                    },
-                    { enableHighAccuracy: true }
-                );
+            if (!navigator.geolocation) {
+                document.getElementById('gpsInfo').textContent = '📍 GPS: 사용 불가';
+                return;
             }
+            navigator.geolocation.watchPosition(
+                (pos) => {
+                    state.currentGPS = {
+                        lat: pos.coords.latitude.toFixed(6),
+                        lng: pos.coords.longitude.toFixed(6)
+                    };
+                    updateGPSDisplay();
+                },
+                () => {
+                    document.getElementById('gpsInfo').textContent = '📍 GPS: 사용 불가';
+                },
+                { enableHighAccuracy: true }
+            );
         }
-        
+
         function updateGPSDisplay() {
             const el = document.getElementById('gpsInfo');
             if (state.currentGPS) {
@@ -591,17 +672,15 @@
                 el.classList.add('active');
             }
         }
-        
-        // 통계 업데이트
+
         function updateStats() {
             document.getElementById('todayCount').textContent = state.todayInspected;
             document.getElementById('weekCount').textContent = state.weekInspected;
             document.getElementById('totalCount').textContent = state.totalInspected;
-            const pct = ((state.totalInspected / 4571) * 100).toFixed(1);
-            document.getElementById('progressPercent').textContent = pct + '%';
+            document.getElementById('progressPercent').textContent =
+                ((state.totalInspected / 4571) * 100).toFixed(1) + '%';
         }
-        
-        // 지역 초기화
+
         function initRegions() {
             const select = document.getElementById('regionSelect');
             select.innerHTML = '<option value="">선택하세요</option>';
@@ -609,97 +688,77 @@
                 select.innerHTML += `<option value="${region}">${region}</option>`;
             });
         }
-        
-        // 이벤트: 지역 선택
+
         document.getElementById('regionSelect').addEventListener('change', (e) => {
             state.region = e.target.value;
-            state.city = "";
-            state.station = "";
-            
+            state.city = '';
+            state.station = '';
             const citySelect = document.getElementById('citySelect');
             citySelect.disabled = !state.region;
             citySelect.innerHTML = '<option value="">선택하세요</option>';
-            
             if (state.region && STATION_DATA[state.region]) {
                 Object.keys(STATION_DATA[state.region]).sort().forEach(city => {
                     citySelect.innerHTML += `<option value="${city}">${city}</option>`;
                 });
             }
-            
             document.getElementById('stationSelect').innerHTML = '';
             document.getElementById('stationSelect').disabled = true;
             document.getElementById('stationInfo').classList.add('hidden');
             document.getElementById('stationSearch').value = '';
         });
-        
-        // 이벤트: 시군 선택
+
         document.getElementById('citySelect').addEventListener('change', (e) => {
             state.city = e.target.value;
-            state.station = "";
-            
+            state.station = '';
             renderStationList();
             document.getElementById('stationInfo').classList.add('hidden');
         });
-        
-        // 충전소 목록 렌더링
+
         function renderStationList(filter = '') {
             const stationSelect = document.getElementById('stationSelect');
             stationSelect.disabled = !state.city;
             stationSelect.innerHTML = '';
-            
-            if (state.region && state.city && STATION_DATA[state.region][state.city]) {
-                const stations = Object.keys(STATION_DATA[state.region][state.city]).sort();
-                const filtered = filter 
-                    ? stations.filter(s => s.toLowerCase().includes(filter.toLowerCase()))
-                    : stations;
-                
-                filtered.forEach(station => {
-                    const data = STATION_DATA[state.region][state.city][station];
-                    const chargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
-                    stationSelect.innerHTML += `<option value="${station}">${station} (${chargers}대)</option>`;
-                });
-            }
+            if (!(state.region && state.city && STATION_DATA[state.region][state.city])) return;
+            const stations = Object.keys(STATION_DATA[state.region][state.city]).sort();
+            const filtered = filter
+                ? stations.filter(s => s.toLowerCase().includes(filter.toLowerCase()))
+                : stations;
+            filtered.forEach(station => {
+                const data = STATION_DATA[state.region][state.city][station];
+                const chargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
+                stationSelect.innerHTML += `<option value="${station}">${station} (${chargers}대)</option>`;
+            });
         }
-        
-        // 이벤트: 충전소 검색
+
         document.getElementById('stationSearch').addEventListener('input', (e) => {
             renderStationList(e.target.value);
         });
-        
-        // 이벤트: 충전소 선택
+
         document.getElementById('stationSelect').addEventListener('change', (e) => {
             state.station = e.target.value;
             state.selectedZone = null;
-            
             if (state.station && STATION_DATA[state.region][state.city][state.station]) {
                 const data = STATION_DATA[state.region][state.city][state.station];
-                
                 document.getElementById('stationName').textContent = state.station;
                 document.getElementById('stationAddress').textContent = data.address;
-                
                 const totalChargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
-                document.getElementById('stationSummary').textContent = 
+                document.getElementById('stationSummary').textContent =
                     `거점 ${data.zones.length}개, 총 ${totalChargers}대`;
-                
                 renderZones(data.zones);
                 document.getElementById('stationInfo').classList.remove('hidden');
             } else {
                 document.getElementById('stationInfo').classList.add('hidden');
             }
-            
             document.getElementById('startBtn').disabled = true;
         });
-        
-        // 거점 렌더링
+
         function renderZones(zones) {
             const grid = document.getElementById('zoneGrid');
             grid.innerHTML = '';
-            
             zones.forEach((zone, idx) => {
-                const isCompleted = state.completedZones.some(c => 
+                const isCompleted = state.completedZones.some(c =>
                     c.station === state.station && c.zoneId === zone.id
                 );
-                
                 const card = document.createElement('div');
                 card.className = `zone-card ${isCompleted ? 'completed' : ''}`;
                 card.innerHTML = `
@@ -712,20 +771,15 @@
                 grid.appendChild(card);
             });
         }
-        
-        // 거점 선택
+
         function selectZone(zone, idx) {
             state.selectedZone = zone;
             state.selectedZoneIdx = idx;
-            
             document.querySelectorAll('.zone-card').forEach((card, i) => {
                 card.classList.toggle('selected', i === idx);
             });
-            
-            // 시리얼 표시
             const serialList = document.getElementById('serialList');
             const serialItems = document.getElementById('serialItems');
-            
             if (zone.serials && zone.serials.length > 0) {
                 serialItems.innerHTML = zone.serials
                     .map(s => `<div class="serial-item">• ${s}</div>`)
@@ -734,70 +788,73 @@
             } else {
                 serialList.classList.add('hidden');
             }
-            
             document.getElementById('startBtn').disabled = false;
         }
-        
-        // 점검 시작
+
         document.getElementById('startBtn').addEventListener('click', () => {
-            state.photos = {};
             state.photoData = {};
+            photoTypes.forEach(p => { state.photoData[p.id] = []; });
             document.getElementById('memoInput').value = '';
+            document.getElementById('uploadStatus').textContent = '';
             showInspectScreen();
         });
-        
+
         function showInspectScreen() {
             document.getElementById('selectScreen').classList.add('hidden');
             document.getElementById('inspectScreen').classList.remove('hidden');
             document.getElementById('completedSection').classList.add('hidden');
-            
             const zone = state.selectedZone;
-            document.getElementById('inspectTitle').textContent = 
+            document.getElementById('inspectTitle').textContent =
                 `${state.station} - 거점${state.selectedZoneIdx + 1}`;
             document.getElementById('chargerCount').textContent = zone.chargers;
             document.getElementById('makerInfo').textContent = zone.maker || '미상';
-            
             renderChecklist();
             updateGPSDisplay();
         }
-        
-        // 체크리스트 렌더링
+
+        function photosOf(id) {
+            if (!Array.isArray(state.photoData[id])) state.photoData[id] = [];
+            return state.photoData[id];
+        }
+
         function renderChecklist() {
             const list = document.getElementById('checklist');
             list.innerHTML = '';
-            
             photoTypes.forEach(photo => {
-                const isDone = state.photos[photo.id];
-                const li = document.createElement('li');
-                li.className = 'checklist-item';
-                li.innerHTML = `
-                    <div class="item-info">
-                        <span class="item-name">${photo.label}</span>
-                        <span class="item-badge ${photo.required ? '' : 'optional'}">
-                            ${photo.required ? '필수' : '선택'}
-                        </span>
+                const shots = photosOf(photo.id);
+                const block = document.createElement('div');
+                block.className = 'photo-block';
+                const thumbs = shots.map((src, i) => `
+                    <div class="thumb">
+                        <img src="${src}" alt="${photo.label} ${i + 1}" onclick="openLightbox('${photo.id}', ${i})">
+                        <button type="button" class="thumb-del" onclick="deletePhoto('${photo.id}', ${i})">×</button>
                     </div>
-                    <div>
-                        ${isDone 
-                            ? '<span class="status-done">✓ 완료</span>' 
-                            : `<button class="btn-camera" onclick="takePhoto('${photo.id}')">📷 촬영</button>`
-                        }
+                `).join('');
+                block.innerHTML = `
+                    <div class="photo-block-head">
+                        <div>
+                            <span class="item-name">${photo.label}</span>
+                            <span class="item-badge ${photo.required ? '' : 'optional'}">${photo.required ? '필수' : '선택'}</span>
+                        </div>
+                        <span class="photo-count">${shots.length}장</span>
+                    </div>
+                    <div class="thumb-row">${thumbs || '<div style="color:#666;font-size:12px;">아직 사진 없음</div>'}</div>
+                    <div class="photo-actions">
+                        <button type="button" class="btn-camera" onclick="takePhoto('${photo.id}', 'camera')">📷 촬영</button>
+                        <button type="button" class="btn-album" onclick="takePhoto('${photo.id}', 'gallery')">🖼 추가</button>
                     </div>
                 `;
-                list.appendChild(li);
+                list.appendChild(block);
             });
-            
             checkCanComplete();
         }
-        
-        // 사진 촬영
-        let currentPhotoId = null;
-        
-        function takePhoto(photoId) {
+
+        function takePhoto(photoId, source) {
             currentPhotoId = photoId;
-            document.getElementById('cameraInput').click();
+            const input = document.getElementById(source === 'gallery' ? 'galleryInput' : 'cameraInput');
+            input.click();
         }
-        
+
         function compressImage(dataUrl) {
             return new Promise((resolve) => {
                 const img = new Image();
@@ -815,73 +872,108 @@
             });
         }
 
-        document.getElementById('cameraInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
+        async function addFiles(fileList) {
             const photoId = currentPhotoId;
-            if (file && photoId) {
-                const reader = new FileReader();
-                reader.onload = async (ev) => {
-                    state.photoData[photoId] = await compressImage(ev.target.result);
-                    state.photos[photoId] = true;
-                    renderChecklist();
-                    if (navigator.vibrate) navigator.vibrate(50);
-                };
-                reader.readAsDataURL(file);
+            if (!photoId || !fileList || !fileList.length) return;
+            for (const file of fileList) {
+                if (!file.type.startsWith('image/')) continue;
+                const dataUrl = await readFile(file);
+                photosOf(photoId).push(await compressImage(dataUrl));
             }
+            renderChecklist();
+            if (navigator.vibrate) navigator.vibrate(50);
+        }
+
+        function readFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => resolve(ev.target.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        document.getElementById('cameraInput').addEventListener('change', async (e) => {
+            await addFiles(e.target.files);
             e.target.value = '';
         });
-        
+
+        document.getElementById('galleryInput').addEventListener('change', async (e) => {
+            await addFiles(e.target.files);
+            e.target.value = '';
+        });
+
+        function deletePhoto(photoId, index) {
+            photosOf(photoId).splice(index, 1);
+            closeLightbox();
+            renderChecklist();
+        }
+
+        function openLightbox(photoId, index) {
+            lightboxTarget = { photoId, index };
+            document.getElementById('lightboxImg').src = photosOf(photoId)[index];
+            document.getElementById('lightbox').classList.remove('hidden');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.add('hidden');
+            document.getElementById('lightboxImg').src = '';
+            lightboxTarget = null;
+        }
+
+        document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+        document.getElementById('lightboxDelete').addEventListener('click', () => {
+            if (lightboxTarget) deletePhoto(lightboxTarget.photoId, lightboxTarget.index);
+        });
+
         function checkCanComplete() {
-            const required = photoTypes.filter(p => p.required);
-            const allDone = required.every(p => state.photos[p.id]);
-            
+            const allDone = photoTypes.filter(p => p.required).every(p => photosOf(p.id).length > 0);
             document.getElementById('completeZoneBtn').disabled = !allDone;
             document.getElementById('requiredWarning').classList.toggle('hidden', allDone);
         }
-        
-        // 구글 시트 연동 URL
-        const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
-        
-        // 구글 시트에 데이터 전송
-        async function sendToGoogleSheet(record, photos) {
-            try {
-                await fetch(GOOGLE_SHEET_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: {
-                        'Content-Type': 'text/plain;charset=utf-8',
-                    },
-                    body: JSON.stringify({
-                        date: record.date,
-                        time: record.time,
-                        inspector: record.inspector,
-                        region: record.region,
-                        city: record.city,
-                        station: record.station,
-                        zone: `거점${record.zoneIndex}: ${record.zoneName}`,
-                        chargers: record.chargers,
-                        maker: record.maker || '',
-                        gps: record.gps ? `${record.gps.lat}, ${record.gps.lng}` : '',
-                        memo: record.memo || '',
-                        address: record.address || '',
-                        photos: photos
-                    })
-                });
-                return true;
-            } catch (error) {
-                console.error('구글 시트 전송 실패:', error);
-                return false;
-            }
+
+        function postGoogle(payload) {
+            return fetch(GOOGLE_SHEET_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
         }
-        
-        // 점검 완료
+
+        function zoneLabel(record) {
+            return `거점${record.zoneIndex}: ${record.zoneName}`;
+        }
+
+        function flattenPhotos() {
+            const list = [];
+            photoTypes.forEach(p => {
+                photosOf(p.id).forEach((data, i) => {
+                    list.push({
+                        id: p.id,
+                        label: p.label,
+                        filename: `${p.label}_${i + 1}.jpg`,
+                        data
+                    });
+                });
+            });
+            return list;
+        }
+
         document.getElementById('completeZoneBtn').addEventListener('click', async () => {
             const zone = state.selectedZone;
             const memo = document.getElementById('memoInput').value.trim();
             const btn = document.getElementById('completeZoneBtn');
-            btn.disabled = true;
-            btn.textContent = '사진 업로드 중...';
-            
+            const status = document.getElementById('uploadStatus');
+            if (!state.inspector) {
+                const name = prompt('점검자 이름을 입력하세요');
+                if (name) {
+                    state.inspector = name.trim();
+                    document.getElementById('inspectorName').value = state.inspector;
+                }
+            }
+
+            const photos = flattenPhotos();
             const record = {
                 station: state.station,
                 zoneId: zone.id,
@@ -893,66 +985,96 @@
                 time: new Date().toLocaleTimeString(),
                 date: new Date().toISOString().split('T')[0],
                 gps: state.currentGPS,
-                memo: memo,
+                memo,
                 inspector: state.inspector,
                 region: state.region,
                 city: state.city,
-                address: STATION_DATA[state.region][state.city][state.station].address
+                address: STATION_DATA[state.region][state.city][state.station].address,
+                photoCount: photos.length
             };
 
-            const photos = photoTypes
-                .filter((p) => state.photoData[p.id])
-                .map((p) => ({
-                    id: p.id,
-                    label: p.label,
-                    name: `${p.id}.jpg`,
-                    data: state.photoData[p.id]
-                }));
-            
-            await sendToGoogleSheet(record, photos);
-            
+            btn.disabled = true;
+            let failed = 0;
+
+            try {
+                status.textContent = '구글 시트에 기록 중...';
+                await postGoogle({
+                    action: 'complete',
+                    date: record.date,
+                    time: record.time,
+                    inspector: record.inspector,
+                    region: record.region,
+                    city: record.city,
+                    station: record.station,
+                    zone: zoneLabel(record),
+                    chargers: record.chargers,
+                    maker: record.maker || '',
+                    gps: record.gps ? `${record.gps.lat}, ${record.gps.lng}` : '',
+                    memo: record.memo || '',
+                    address: record.address || '',
+                    photoCount: photos.length
+                });
+
+                for (let i = 0; i < photos.length; i++) {
+                    status.textContent = `사진 업로드 중 ${i + 1}/${photos.length}`;
+                    try {
+                        await postGoogle({
+                            action: 'photo',
+                            region: record.region,
+                            city: record.city,
+                            station: record.station,
+                            zone: zoneLabel(record),
+                            label: photos[i].label,
+                            filename: photos[i].filename,
+                            data: photos[i].data
+                        });
+                    } catch (err) {
+                        failed += 1;
+                    }
+                }
+                record.upload = failed ? `시트 전송, 사진 실패 ${failed}장` : `시트+드라이브 ${photos.length}장`;
+            } catch (err) {
+                record.upload = '구글 전송 실패 (폰에만 저장됨)';
+                alert('구글 전송에 실패했습니다. 기록은 이 폰에 남아 있습니다.');
+            }
+
             state.completedZones.push(record);
             state.allHistory.push(record);
             state.todayInspected += zone.chargers;
             state.weekInspected += zone.chargers;
             state.totalInspected += zone.chargers;
-            
             state.selectedZone = null;
-            state.photos = {};
             state.photoData = {};
-            
             saveState();
             updateStats();
             renderCompletedList();
             renderHistory();
-            
+
             document.getElementById('inspectScreen').classList.add('hidden');
             document.getElementById('selectScreen').classList.remove('hidden');
-            
-            const data = STATION_DATA[state.region][state.city][state.station];
-            renderZones(data.zones);
+            renderZones(STATION_DATA[state.region][state.city][state.station].zones);
             btn.textContent = '이 거점 점검 완료';
-            
-            alert('점검 완료. 기록과 사진이 구글 드라이브에 저장됩니다.');
+            status.textContent = '';
+
+            const msg = failed
+                ? `점검은 저장됐습니다. 사진 ${failed}장은 구글 업로드에 실패했을 수 있습니다.`
+                : `점검 완료. 시트에 기록하고 사진 ${photos.length}장을 드라이브에 올렸습니다.`;
+            alert(msg);
         });
-        
-        // 뒤로가기
+
         document.getElementById('backBtn').addEventListener('click', () => {
             document.getElementById('inspectScreen').classList.add('hidden');
             document.getElementById('selectScreen').classList.remove('hidden');
             renderCompletedList();
         });
-        
-        // 완료 목록 렌더링
+
         function renderCompletedList() {
             const section = document.getElementById('completedSection');
             const list = document.getElementById('completedList');
-            
             if (state.completedZones.length === 0) {
                 section.classList.add('hidden');
                 return;
             }
-            
             section.classList.remove('hidden');
             list.innerHTML = state.completedZones.map(item => `
                 <div class="completed-item">
@@ -961,98 +1083,106 @@
                         <div style="font-weight:500;">${item.station} - 거점${item.zoneIndex}</div>
                         <div style="font-size:11px;color:#888;">
                             ${item.zoneName} (${item.chargers}대) · ${item.time}
+                            ${item.photoCount ? ` · 사진 ${item.photoCount}장` : ''}
                             ${item.memo ? '<br>📝 ' + item.memo : ''}
                         </div>
                     </div>
                 </div>
             `).join('');
         }
-        
-        // 히스토리 렌더링
+
         function renderHistory() {
             const list = document.getElementById('historyList');
             const history = (state.allHistory || []).slice().reverse().slice(0, 50);
-            
             if (history.length === 0) {
                 list.innerHTML = '<div style="color:#888;font-size:13px;">점검 기록이 없습니다.</div>';
                 return;
             }
-            
             list.innerHTML = history.map(item => `
                 <div class="history-item">
                     <div class="date">${item.date} ${item.time}</div>
                     <div class="station">${item.station}</div>
                     <div class="detail">
                         거점${item.zoneIndex}: ${item.zoneName} (${item.chargers}대)
+                        ${item.photoCount ? ` · 사진 ${item.photoCount}장` : ''}
+                        ${item.upload ? `<br>☁️ ${item.upload}` : ''}
                         ${item.memo ? '<br>📝 ' + item.memo : ''}
                     </div>
                 </div>
             `).join('');
         }
-        
-        // 탭 전환
-        function showTab(tab) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            
+
+        function showTab(tab, el) {
+            document.querySelectorAll('.tab-content').forEach(node => node.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(node => node.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.add('active');
-            event.currentTarget.classList.add('active');
+            (el || document.querySelector(`.nav-item[data-tab="${tab}"]`)).classList.add('active');
         }
-        
-        // 설정 저장
+
         function saveSettings() {
             state.inspector = document.getElementById('inspectorName').value.trim();
             saveState();
             alert('설정이 저장되었습니다.');
         }
-        
-        // 데이터 내보내기 (CSV)
+
+        async function testGoogleLink() {
+            const el = document.getElementById('googleTestStatus');
+            el.textContent = '테스트 전송 중...';
+            try {
+                await postGoogle({
+                    action: 'complete',
+                    date: new Date().toISOString().split('T')[0],
+                    time: new Date().toLocaleTimeString(),
+                    inspector: state.inspector || '연결테스트',
+                    region: '테스트',
+                    city: '테스트',
+                    station: '구글연결테스트',
+                    zone: '테스트',
+                    chargers: 0,
+                    maker: '',
+                    gps: '',
+                    memo: '설정 화면에서 보낸 연결 테스트입니다. 이 행은 지워도 됩니다.',
+                    address: '',
+                    photoCount: 0
+                });
+                el.textContent = '전송했습니다. 구글 시트에 "구글연결테스트" 행이 생기면 연동된 것입니다.';
+            } catch (err) {
+                el.textContent = '전송 실패. 인터넷 또는 Apps Script 배포를 확인하세요.';
+            }
+        }
+
         function exportData() {
             if (!state.allHistory || state.allHistory.length === 0) {
                 alert('내보낼 데이터가 없습니다.');
                 return;
             }
-            
-            const headers = ['날짜', '시간', '지역', '시군', '충전소', '거점', '충전기수', '제조사', '점검자', 'GPS', '메모'];
+            const headers = ['날짜', '시간', '지역', '시군', '충전소', '거점', '충전기수', '제조사', '점검자', 'GPS', '메모', '사진수'];
             const rows = state.allHistory.map(h => [
-                h.date,
-                h.time,
-                h.region,
-                h.city,
-                h.station,
+                h.date, h.time, h.region, h.city, h.station,
                 `거점${h.zoneIndex}: ${h.zoneName}`,
-                h.chargers,
-                h.maker || '',
-                h.inspector || '',
+                h.chargers, h.maker || '', h.inspector || '',
                 h.gps ? `${h.gps.lat},${h.gps.lng}` : '',
-                h.memo || ''
+                h.memo || '', h.photoCount || 0
             ]);
-            
             const csvContent = [headers, ...rows]
                 .map(row => row.map(cell => `"${cell}"`).join(','))
                 .join('\n');
-            
-            const BOM = '\uFEFF';
-            const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
-            
             const a = document.createElement('a');
             a.href = url;
             a.download = `점검기록_${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
-            
             URL.revokeObjectURL(url);
         }
-        
-        // 데이터 삭제
+
         function clearAllData() {
             if (confirm('정말 모든 데이터를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
                 localStorage.removeItem('inspectionStateV2');
                 location.reload();
             }
         }
-        
-        // 시작
+
         init();
     </script>
 </body>
