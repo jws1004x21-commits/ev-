@@ -1,5 +1,5 @@
 /**
- * 충전소 점검앱 v3 — Google Apps Script
+ * 충전소 점검앱 v4 — Google Apps Script
  *
  * 사용법:
  * 1. 구글 시트 → 확장 프로그램 → Apps Script
@@ -23,7 +23,11 @@ function setupDrive() {
 }
 
 function doGet(e) {
-  var payload = { ok: true, version: 'v3', message: '충전소 점검 서버 정상' };
+  var action = e && e.parameter && e.parameter.action;
+  var payload = { ok: true, version: 'v4', message: '충전소 점검 서버 정상' };
+  if (action === 'progress') {
+    payload.progress = loadProgress_();
+  }
   var cb = e && e.parameter && e.parameter.callback;
   if (cb) {
     return ContentService
@@ -33,13 +37,33 @@ function doGet(e) {
   return json_(payload);
 }
 
+function loadProgress_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var values = sheet.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < values.length; i++) {
+    var region = String(values[i][3] || '');
+    var station = String(values[i][5] || '');
+    if (!station || region === '테스트' || region === '집테스트') continue;
+    if (station.indexOf('테스트') >= 0) continue;
+    out.push({
+      region: region,
+      city: String(values[i][4] || ''),
+      station: station,
+      zone: String(values[i][6] || ''),
+      inspector: String(values[i][2] || '')
+    });
+  }
+  return out;
+}
+
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var action = data.action || 'complete';
 
     if (action === 'ping') {
-      return json_({ ok: true, version: 'v3' });
+      return json_({ ok: true, version: 'v4' });
     }
 
     if (action === 'photo') {

@@ -510,7 +510,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.1</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.2</div>
     </div>
 
     <div class="container">
@@ -622,7 +622,7 @@
                 <div class="card-header">🗺️ 지역 동선</div>
                 <div class="card-body">
                     <div class="info-box">
-                        <div class="text">지역을 고르면 시/군별 로드맵이 나옵니다. 주황 점이 아직 안 한 거점, 초록은 완료입니다.</div>
+                        <div class="text">지역을 고르면 시/군별 로드맵이 나옵니다. 주황은 남은 거점, 초록은 완료입니다. 다른 사람 완료는 구글 시트에서 불러옵니다.</div>
                     </div>
                     <div class="legend">🟠 남은 거점 &nbsp; 🟢 완료 거점 &nbsp; 시/군을 누르면 방문 순서</div>
                     <div class="form-group">
@@ -664,6 +664,8 @@
                         <div class="title" id="routeSummaryTitle"></div>
                         <div class="text" id="routeSummaryText"></div>
                     </div>
+                    <div class="text" id="routeSyncStatus" style="font-size:12px;color:#aaa;margin:8px 0;">팀 진행: 구글 시트에서 불러오면 다른 사람 완료도 보입니다.</div>
+                    <button class="btn btn-secondary" id="routeSyncBtn">🔄 팀 완료 불러오기</button>
                     <button class="btn btn-secondary" id="routeShareBtn" disabled>📤 이 조 목록 보내기</button>
                     <button class="btn btn-secondary" id="routeDownloadBtn" disabled>📥 엑셀로 내려받기</button>
                 </div>
@@ -796,7 +798,8 @@
             weekInspected: 0,
             totalInspected: 0,
             currentGPS: null,
-            inspector: ''
+            inspector: '',
+            teamProgress: []
         };
 
         let currentPhotoId = null;
@@ -1210,9 +1213,7 @@
             const grid = document.getElementById('zoneGrid');
             grid.innerHTML = '';
             zones.forEach((zone, idx) => {
-                const isCompleted = state.completedZones.some(c =>
-                    c.station === state.station && c.zoneId === zone.id
-                );
+                const isCompleted = isZoneDone(state.station, state.city, zone, idx);
                 const card = document.createElement('div');
                 card.className = `zone-card ${isCompleted ? 'completed' : ''}`;
                 card.innerHTML = `
@@ -1767,9 +1768,23 @@
             return strip(historyCity) === strip(city) || city.includes(historyCity) || historyCity.includes(city);
         }
 
-        function isZoneDone(station, city, zoneId) {
+        function parseSheetZone(label) {
+            const m = String(label || '').match(/^거점\s*(\d+)\s*:\s*(.*)$/);
+            if (m) return { zoneIndex: Number(m[1]), zoneName: m[2].trim() };
+            return { zoneIndex: 0, zoneName: String(label || '').trim() };
+        }
+
+        function isZoneDone(station, city, zone, idx) {
+            const zoneId = zone && zone.id;
             const hit = (h) => h.station === station && h.zoneId === zoneId && cityMatches(h.city, city);
-            return (state.allHistory || []).some(hit) || (state.completedZones || []).some(hit);
+            if ((state.allHistory || []).some(hit) || (state.completedZones || []).some(hit)) return true;
+            return (state.teamProgress || []).some((row) => {
+                if (row.station !== station) return false;
+                if (!cityMatches(row.city, city)) return false;
+                const parsed = parseSheetZone(row.zone);
+                return (parsed.zoneName && zone && parsed.zoneName === zone.name) ||
+                    (parsed.zoneIndex && idx >= 0 && parsed.zoneIndex === idx + 1);
+            });
         }
 
         function collectRouteStations(region, city) {
@@ -1782,7 +1797,7 @@
                     name: z.name,
                     idx,
                     chargers: z.chargers,
-                    done: isZoneDone(name, city, z.id)
+                    done: isZoneDone(name, city, z, idx)
                 }));
                 const done = zoneRows.filter((z) => z.done).length;
                 return {
@@ -1824,6 +1839,75 @@
         }
 
         let routePlan = { region: '', city: '', teams: [] };
+        let lastProgressFetch = 0;
+
+        function updateRouteSyncStatus(at, extra) {
+            const el = document.getElementById('routeSyncStatus');
+            if (!el) return;
+            const n = (state.teamProgress || []).length;
+            const when = at ? new Date(at).toLocaleTimeString() : '';
+            el.textContent = extra || (n
+                ? `팀 완료 ${n}건 반영됨${when ? ' · ' + when : ''}`
+                : '팀 진행: 불러오면 다른 사람 완료도 이 폰에 보입니다.');
+        }
+
+        function loadCachedProgress() {
+            try {
+                const raw = localStorage.getItem('teamProgressV1');
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                state.teamProgress = parsed.rows || [];
+                updateRouteSyncStatus(parsed.at);
+            } catch (err) {
+                state.teamProgress = [];
+            }
+        }
+
+        function googleJsonp(query, timeoutMs) {
+            return new Promise((resolve) => {
+                const cb = 'evCb_' + Date.now() + '_' + Math.floor(Math.random() * 999);
+                let script;
+                const timer = setTimeout(() => {
+                    cleanup();
+                    resolve({ ok: false, reason: '응답 없음' });
+                }, timeoutMs || 12000);
+                function cleanup() {
+                    clearTimeout(timer);
+                    try { delete window[cb]; } catch (e) {}
+                    if (script && script.parentNode) script.parentNode.removeChild(script);
+                }
+                window[cb] = (data) => {
+                    cleanup();
+                    resolve({ ok: true, data });
+                };
+                script = document.createElement('script');
+                script.src = GOOGLE_SHEET_URL + (query ? '?' + query + '&callback=' + cb : '?callback=' + cb);
+                script.onerror = () => {
+                    cleanup();
+                    resolve({ ok: false, reason: '스크립트 로드 실패' });
+                };
+                document.body.appendChild(script);
+            });
+        }
+
+        async function fetchTeamProgress(force) {
+            if (!force && lastProgressFetch && Date.now() - lastProgressFetch < 60000) return;
+            updateRouteSyncStatus(null, '팀 진행 불러오는 중...');
+            const probe = await googleJsonp('action=progress', 15000);
+            if (!probe.ok || !probe.data) {
+                updateRouteSyncStatus(null, '불러오기 실패. 인터넷을 확인하세요.');
+                return;
+            }
+            if (!Array.isArray(probe.data.progress)) {
+                updateRouteSyncStatus(null, '구글 스크립트를 v4로 다시 배포해야 팀 진행이 보입니다.');
+                return;
+            }
+            lastProgressFetch = Date.now();
+            state.teamProgress = probe.data.progress;
+            localStorage.setItem('teamProgressV1', JSON.stringify({ at: lastProgressFetch, rows: state.teamProgress }));
+            updateRouteSyncStatus(lastProgressFetch);
+            renderRoutePlan();
+        }
 
         function suggestedTeamCount(n) {
             if (n >= 40) return 3;
@@ -1862,6 +1946,8 @@
             document.getElementById('routeFilter').addEventListener('change', renderRoutePlan);
             document.getElementById('routeShareBtn').addEventListener('click', shareRoutePlan);
             document.getElementById('routeDownloadBtn').addEventListener('click', downloadRoutePlan);
+            document.getElementById('routeSyncBtn').addEventListener('click', () => fetchTeamProgress(true));
+            loadCachedProgress();
         }
 
         function currentRouteTeams() {
@@ -2130,7 +2216,11 @@
             document.querySelectorAll('.nav-item').forEach(node => node.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.add('active');
             (el || document.querySelector(`.nav-item[data-tab="${tab}"]`)).classList.add('active');
-            if (tab === 'route') renderRoutePlan();
+            if (tab === 'route') {
+                loadCachedProgress();
+                renderRoutePlan();
+                fetchTeamProgress(false);
+            }
         }
 
         function saveSettings() {
@@ -2161,30 +2251,7 @@
         }
 
         function probeGoogleVersion() {
-            return new Promise((resolve) => {
-                const cb = 'evProbe_' + Date.now();
-                let script;
-                const timer = setTimeout(() => {
-                    cleanup();
-                    resolve({ ok: false, reason: '응답 없음 (스크립트 구버전이거나 미배포)' });
-                }, 8000);
-                function cleanup() {
-                    clearTimeout(timer);
-                    try { delete window[cb]; } catch (e) {}
-                    if (script && script.parentNode) script.parentNode.removeChild(script);
-                }
-                window[cb] = (data) => {
-                    cleanup();
-                    resolve({ ok: true, data });
-                };
-                script = document.createElement('script');
-                script.src = GOOGLE_SHEET_URL + '?callback=' + cb;
-                script.onerror = () => {
-                    cleanup();
-                    resolve({ ok: false, reason: '스크립트 로드 실패' });
-                };
-                document.body.appendChild(script);
-            });
+            return googleJsonp('', 8000);
         }
 
         function testLine(ok, text) {
@@ -2209,9 +2276,10 @@
                 lines.push(testLine(!!roundtrip, '폰(브라우저) 저장'));
 
                 const probe = await probeGoogleVersion();
-                const isV3 = !!(probe.ok && probe.data && probe.data.version === 'v3');
+                const ver = probe.ok && probe.data && String(probe.data.version || '');
+                const isV3 = /^v[3-9]/.test(ver);
                 lines.push(testLine(isV3, isV3
-                    ? '구글 Apps Script v3 확인'
+                    ? '구글 Apps Script ' + ver + ' 확인'
                     : '구글 Apps Script가 구버전입니다. 사진이 드라이브에 안 들어갑니다.'));
 
                 const loc = {
