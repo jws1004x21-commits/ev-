@@ -224,6 +224,23 @@
             display: block;
         }
 
+        .thumb.uploading img { opacity: 0.55; }
+
+        .thumb-status {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            font-size: 9px;
+            text-align: center;
+            background: rgba(0,0,0,0.7);
+            color: #4ade80;
+            border-radius: 0 0 8px 8px;
+            padding: 2px 0;
+        }
+
+        .thumb-status.fail { color: #fb923c; }
+
         .thumb-del {
             position: absolute;
             top: -6px;
@@ -365,7 +382,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v3.2</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v3.3</div>
     </div>
 
     <div class="container">
@@ -444,7 +461,8 @@
                         <div class="info-box warning">
                             <div class="text">충전기 <strong id="chargerCount"></strong>대 | 제조사: <span id="makerInfo"></span></div>
                         </div>
-                        <div style="font-weight:600;font-size:14px;margin-bottom:10px;">사진 촬영 — 종류별로 여러 장 가능</div>
+                        <div style="font-weight:600;font-size:14px;margin-bottom:4px;">사진 촬영 — 장수 제한 없음</div>
+                        <div id="zonePhotoTotal" style="font-size:12px;color:#4ade80;margin-bottom:10px;">이 거점 사진 0장</div>
                         <div id="checklist"></div>
                         <div class="form-group" style="margin-top:16px;">
                             <label class="form-label">📝 특이사항 메모</label>
@@ -813,22 +831,55 @@
             updateGPSDisplay();
         }
 
+        let uploadQueue = Promise.resolve();
+
         function photosOf(id) {
             if (!Array.isArray(state.photoData[id])) state.photoData[id] = [];
             return state.photoData[id];
         }
 
+        function allPhotos() {
+            return photoTypes.flatMap(p => photosOf(p.id));
+        }
+
+        function totalPhotoCount() {
+            return allPhotos().length;
+        }
+
+        function currentLocationFields() {
+            const zone = state.selectedZone;
+            return {
+                region: state.region,
+                city: state.city,
+                station: state.station,
+                zone: `거점${(state.selectedZoneIdx || 0) + 1}: ${zone ? zone.name : ''}`
+            };
+        }
+
+        function thumbStatus(item) {
+            if (item.uploading) return '<div class="thumb-status">올리는 중</div>';
+            if (item.failed) return '<div class="thumb-status fail">실패·재시도</div>';
+            if (item.uploaded) return '<div class="thumb-status">업로드됨</div>';
+            return '';
+        }
+
         function renderChecklist() {
             const list = document.getElementById('checklist');
             list.innerHTML = '';
+            const totalEl = document.getElementById('zonePhotoTotal');
+            const pending = allPhotos().filter(p => p.uploading || p.failed).length;
+            totalEl.textContent = pending
+                ? `이 거점 사진 ${totalPhotoCount()}장 · ${pending}장 처리 중`
+                : `이 거점 사진 ${totalPhotoCount()}장 · 장수 제한 없음`;
             photoTypes.forEach(photo => {
                 const shots = photosOf(photo.id);
                 const block = document.createElement('div');
                 block.className = 'photo-block';
-                const thumbs = shots.map((src, i) => `
-                    <div class="thumb">
-                        <img src="${src}" alt="${photo.label} ${i + 1}" onclick="openLightbox('${photo.id}', ${i})">
+                const thumbs = shots.map((item, i) => `
+                    <div class="thumb ${item.uploading ? 'uploading' : ''}">
+                        <img src="${item.thumb || item.data}" alt="${photo.label} ${i + 1}" onclick="openLightbox('${photo.id}', ${i})">
                         <button type="button" class="thumb-del" onclick="deletePhoto('${photo.id}', ${i})">×</button>
+                        ${thumbStatus(item)}
                     </div>
                 `).join('');
                 block.innerHTML = `
@@ -839,7 +890,7 @@
                         </div>
                         <span class="photo-count">${shots.length}장</span>
                     </div>
-                    <div class="thumb-row">${thumbs || '<div style="color:#666;font-size:12px;">아직 사진 없음</div>'}</div>
+                    <div class="thumb-row">${thumbs || '<div style="color:#666;font-size:12px;">아직 사진 없음 · 여러 장 가능</div>'}</div>
                     <div class="photo-actions">
                         <button type="button" class="btn-camera" onclick="takePhoto('${photo.id}', 'camera')">📷 촬영</button>
                         <button type="button" class="btn-album" onclick="takePhoto('${photo.id}', 'gallery')">🖼 추가</button>
@@ -856,32 +907,71 @@
             input.click();
         }
 
-        function compressImage(dataUrl) {
+        function compressImage(dataUrl, maxW = 1280, quality = 0.7) {
             return new Promise((resolve) => {
                 const img = new Image();
                 img.onload = () => {
-                    const maxW = 1280;
                     const scale = Math.min(1, maxW / img.width);
                     const canvas = document.createElement('canvas');
                     canvas.width = Math.round(img.width * scale);
                     canvas.height = Math.round(img.height * scale);
                     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                    resolve(canvas.toDataURL('image/jpeg', quality));
                 };
                 img.onerror = () => resolve(dataUrl);
                 img.src = dataUrl;
             });
         }
 
+        function enqueueUpload(item) {
+            uploadQueue = uploadQueue.then(() => uploadPhotoNow(item)).catch(() => {});
+        }
+
+        async function uploadPhotoNow(item) {
+            if (!item.data || item.uploaded) return;
+            item.uploading = true;
+            item.failed = false;
+            renderChecklist();
+            try {
+                await postGoogle({
+                    action: 'photo',
+                    ...currentLocationFields(),
+                    label: item.label,
+                    filename: item.filename,
+                    data: item.data
+                });
+                item.uploaded = true;
+                item.uploading = false;
+                item.data = null;
+            } catch (err) {
+                item.uploading = false;
+                item.failed = true;
+            }
+            renderChecklist();
+        }
+
         async function addFiles(fileList) {
             const photoId = currentPhotoId;
-            if (!photoId || !fileList || !fileList.length) return;
+            const type = photoTypes.find(p => p.id === photoId);
+            if (!photoId || !type || !fileList || !fileList.length) return;
             for (const file of fileList) {
                 if (!file.type.startsWith('image/')) continue;
                 const dataUrl = await readFile(file);
-                photosOf(photoId).push(await compressImage(dataUrl));
+                const full = await compressImage(dataUrl, 1280, 0.7);
+                const thumb = await compressImage(full, 720, 0.6);
+                const item = {
+                    thumb,
+                    data: full,
+                    uploading: true,
+                    uploaded: false,
+                    failed: false,
+                    label: type.label,
+                    filename: `${type.label.replace(/[\\/:*?"<>|]/g, '')}_${Date.now()}_${photosOf(photoId).length + 1}.jpg`
+                };
+                photosOf(photoId).push(item);
+                renderChecklist();
+                enqueueUpload(item);
             }
-            renderChecklist();
             if (navigator.vibrate) navigator.vibrate(50);
         }
 
@@ -912,7 +1002,8 @@
 
         function openLightbox(photoId, index) {
             lightboxTarget = { photoId, index };
-            document.getElementById('lightboxImg').src = photosOf(photoId)[index];
+            const item = photosOf(photoId)[index];
+            document.getElementById('lightboxImg').src = (item && (item.thumb || item.data)) || '';
             document.getElementById('lightbox').classList.remove('hidden');
         }
 
@@ -946,21 +1037,6 @@
             return `거점${record.zoneIndex}: ${record.zoneName}`;
         }
 
-        function flattenPhotos() {
-            const list = [];
-            photoTypes.forEach(p => {
-                photosOf(p.id).forEach((data, i) => {
-                    list.push({
-                        id: p.id,
-                        label: p.label,
-                        filename: `${p.label}_${i + 1}.jpg`,
-                        data
-                    });
-                });
-            });
-            return list;
-        }
-
         document.getElementById('completeZoneBtn').addEventListener('click', async () => {
             const zone = state.selectedZone;
             const memo = document.getElementById('memoInput').value.trim();
@@ -974,7 +1050,7 @@
                 }
             }
 
-            const photos = flattenPhotos();
+            const photoCount = totalPhotoCount();
             const record = {
                 station: state.station,
                 zoneId: zone.id,
@@ -991,13 +1067,22 @@
                 region: state.region,
                 city: state.city,
                 address: STATION_DATA[state.region][state.city][state.station].address,
-                photoCount: photos.length
+                photoCount
             };
 
             btn.disabled = true;
             let failed = 0;
 
             try {
+                status.textContent = '남은 사진 올리는 중...';
+                await uploadQueue;
+                const pending = allPhotos().filter(p => !p.uploaded && p.data);
+                for (let i = 0; i < pending.length; i++) {
+                    status.textContent = `사진 재시도 ${i + 1}/${pending.length}`;
+                    await uploadPhotoNow(pending[i]);
+                }
+                failed = allPhotos().filter(p => p.failed || !p.uploaded).length;
+
                 status.textContent = '구글 시트에 기록 중...';
                 await postGoogle({
                     action: 'complete',
@@ -1013,27 +1098,9 @@
                     gps: record.gps ? `${record.gps.lat}, ${record.gps.lng}` : '',
                     memo: record.memo || '',
                     address: record.address || '',
-                    photoCount: photos.length
+                    photoCount
                 });
-
-                for (let i = 0; i < photos.length; i++) {
-                    status.textContent = `사진 업로드 중 ${i + 1}/${photos.length}`;
-                    try {
-                        await postGoogle({
-                            action: 'photo',
-                            region: record.region,
-                            city: record.city,
-                            station: record.station,
-                            zone: zoneLabel(record),
-                            label: photos[i].label,
-                            filename: photos[i].filename,
-                            data: photos[i].data
-                        });
-                    } catch (err) {
-                        failed += 1;
-                    }
-                }
-                record.upload = failed ? `시트 전송, 사진 실패 ${failed}장` : `시트+드라이브 ${photos.length}장`;
+                record.upload = failed ? `시트 전송, 사진 실패 ${failed}장 / 전체 ${photoCount}장` : `시트+드라이브 ${photoCount}장`;
             } catch (err) {
                 record.upload = '구글 전송 실패 (폰에만 저장됨)';
                 alert('구글 전송에 실패했습니다. 기록은 이 폰에 남아 있습니다.');
@@ -1059,7 +1126,7 @@
 
             const msg = failed
                 ? `점검은 저장됐습니다. 사진 ${failed}장은 구글 업로드에 실패했을 수 있습니다.`
-                : `점검 완료. 시트에 기록하고 사진 ${photos.length}장을 드라이브에 올렸습니다.`;
+                : `점검 완료. 시트에 기록하고 사진 ${photoCount}장을 드라이브에 올렸습니다.`;
             alert(msg);
         });
 
