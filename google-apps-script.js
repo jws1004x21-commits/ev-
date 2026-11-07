@@ -1,5 +1,5 @@
 /**
- * 충전소 점검앱 v4 — Google Apps Script
+ * 충전소 점검앱 v5 — Google Apps Script
  *
  * 사용법:
  * 1. 구글 시트 → 확장 프로그램 → Apps Script
@@ -24,9 +24,12 @@ function setupDrive() {
 
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action;
-  var payload = { ok: true, version: 'v4', message: '충전소 점검 서버 정상' };
+  var payload = { ok: true, version: 'v5', message: '충전소 점검 서버 정상' };
   if (action === 'progress') {
     payload.progress = loadProgress_();
+  }
+  if (action === 'record') {
+    payload.record = loadRecord_(e.parameter || {});
   }
   var cb = e && e.parameter && e.parameter.callback;
   if (cb) {
@@ -72,7 +75,7 @@ function doPost(e) {
     var action = data.action || 'complete';
 
     if (action === 'ping') {
-      return json_({ ok: true, version: 'v4' });
+      return json_({ ok: true, version: 'v5' });
     }
 
     if (action === 'photo') {
@@ -87,10 +90,8 @@ function doPost(e) {
     var folder = ensureZoneFolder_(data);
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     ensureHeader_(sheet);
-    if (isDuplicateComplete_(sheet, data)) {
-      return json_({ ok: true, duplicate: true, folderUrl: folder.getUrl() });
-    }
-    sheet.appendRow([
+    var photoCount = folderFileCount_(folder);
+    var rowValues = [
       data.date || '',
       data.time || '',
       data.inspector || '',
@@ -103,9 +104,23 @@ function doPost(e) {
       data.gps || '',
       data.memo || '',
       data.address || '',
-      data.photoCount || 0,
+      data.photoCount || photoCount,
       folder.getUrl()
-    ]);
+    ];
+    var existingRow = findRow_(sheet, data.station, data.zone);
+    if (action === 'update' || existingRow) {
+      if (existingRow) {
+        if (!data.date) rowValues[0] = sheet.getRange(existingRow, 1).getDisplayValue();
+        rowValues[12] = photoCount;
+        sheet.getRange(existingRow, 1, 1, 14).setValues([rowValues]);
+        return json_({ ok: true, updated: true, folderUrl: folder.getUrl(), photoCount: photoCount });
+      }
+    }
+    if (isDuplicateComplete_(sheet, data)) {
+      return json_({ ok: true, duplicate: true, folderUrl: folder.getUrl() });
+    }
+    rowValues[12] = photoCount;
+    sheet.appendRow(rowValues);
 
     if (data.photos && data.photos.length) {
       for (var i = 0; i < data.photos.length; i++) {
@@ -127,15 +142,68 @@ function doPost(e) {
   }
 }
 
-function isDuplicateComplete_(sheet, data) {
-  var station = String(data.station || '');
-  var zone = String(data.zone || '');
-  if (!station || !zone) return false;
+function findRow_(sheet, station, zone) {
+  station = String(station || '');
+  zone = String(zone || '');
+  if (!station || !zone) return 0;
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
-    if (String(values[i][5]) === station && String(values[i][6]) === zone) return true;
+    if (String(values[i][5]) === station && String(values[i][6]) === zone) return i + 1;
   }
-  return false;
+  return 0;
+}
+
+function isDuplicateComplete_(sheet, data) {
+  return findRow_(sheet, data.station, data.zone) > 0;
+}
+
+function folderFileCount_(folder) {
+  var n = 0;
+  var files = folder.getFiles();
+  while (files.hasNext()) {
+    files.next();
+    n++;
+  }
+  return n;
+}
+
+function loadRecord_(p) {
+  var station = String(p.station || '');
+  var zone = String(p.zone || '');
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var row = findRow_(sheet, station, zone);
+  var rec = { found: false, station: station, zone: zone, photos: [] };
+  if (row) {
+    var values = sheet.getRange(row, 1, 1, 14).getDisplayValues()[0];
+    rec.found = true;
+    rec.date = values[0];
+    rec.time = values[1];
+    rec.inspector = values[2];
+    rec.region = values[3];
+    rec.city = values[4];
+    rec.memo = values[10];
+    rec.address = values[11];
+    rec.photoCount = values[12];
+    rec.folderUrl = values[13];
+  }
+  rec.photos = listPhotos_({
+    region: rec.region || p.region,
+    city: rec.city || p.city,
+    station: station,
+    zone: zone
+  });
+  return rec;
+}
+
+function listPhotos_(data) {
+  var folder = ensureZoneFolder_(data);
+  var files = folder.getFiles();
+  var out = [];
+  while (files.hasNext()) {
+    var file = files.next();
+    out.push({ name: file.getName(), id: file.getId() });
+  }
+  return out;
 }
 
 function ensureHeader_(sheet) {

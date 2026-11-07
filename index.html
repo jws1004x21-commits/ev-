@@ -425,6 +425,33 @@
         .history-item .date { font-size: 11px; color: #888; margin-bottom: 6px; }
         .history-item .station { font-weight: 600; font-size: 14px; }
         .history-item .detail { font-size: 12px; color: #aaa; margin-top: 4px; }
+        .history-item .edit-btn {
+            margin-top: 8px;
+            width: auto;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .remote-ph {
+            width: 72px;
+            height: 72px;
+            font-size: 9px;
+            line-height: 1.3;
+            padding: 6px;
+            color: #93c5fd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            word-break: break-all;
+        }
+        .edit-banner {
+            background: #3d2f0f;
+            border-left: 3px solid #f97316;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
 
         input[type="file"] { display: none; }
 
@@ -595,6 +622,7 @@
                         </div>
                         <div style="font-weight:600;font-size:14px;margin-bottom:4px;">사진 촬영 — 장수 제한 없음</div>
                         <div style="font-size:12px;color:#aaa;margin-bottom:8px;">찍은 직후 화면이 열립니다. 확대해서 380V·220V·저항·절연 숫자가 읽히는지 보고, 흐리면 다시 찍기를 누르세요.</div>
+                        <div id="editBanner" class="edit-banner hidden">완료된 거점입니다. 바꿀 사진·메모만 고치면 시트 같은 줄이 덮어씌워집니다.</div>
                         <div id="zonePhotoTotal" style="font-size:12px;color:#4ade80;margin-bottom:10px;">이 거점 사진 0장</div>
                         <div id="checklist"></div>
                         <div class="form-group" style="margin-top:16px;">
@@ -803,7 +831,9 @@
             totalInspected: 0,
             currentGPS: null,
             inspector: '',
-            teamProgress: []
+            teamProgress: [],
+            editing: false,
+            originalDate: ''
         };
 
         let currentPhotoId = null;
@@ -1312,7 +1342,10 @@
             } else {
                 serialList.classList.add('hidden');
             }
-            document.getElementById('startBtn').disabled = false;
+            const done = isZoneDone(state.station, state.city, zone, idx);
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = false;
+            startBtn.textContent = done ? '완료 건 수정' : '점검 시작';
         }
 
         let inspectZoneKey = '';
@@ -1322,7 +1355,28 @@
         }
 
         document.getElementById('startBtn').addEventListener('click', () => {
+            const zone = state.selectedZone;
+            const done = isZoneDone(state.station, state.city, zone, state.selectedZoneIdx);
+            if (done) {
+                startEdit({
+                    region: state.region,
+                    city: state.city,
+                    station: state.station,
+                    zoneId: zone.id,
+                    zoneName: zone.name,
+                    zoneIndex: state.selectedZoneIdx + 1,
+                    chargers: zone.chargers,
+                    maker: zone.maker,
+                    serials: zone.serials,
+                    memo: (findLocalRecord(state.station, zone.id) || {}).memo || '',
+                    date: (findLocalRecord(state.station, zone.id) || {}).date || '',
+                    inspector: state.inspector
+                });
+                return;
+            }
             const key = currentZoneKey();
+            state.editing = false;
+            state.originalDate = '';
             if (key !== inspectZoneKey || totalPhotoCount() === 0) {
                 state.photoData = {};
                 photoTypes.forEach(p => { state.photoData[p.id] = []; });
@@ -1340,11 +1394,127 @@
             document.getElementById('completedSection').classList.add('hidden');
             const zone = state.selectedZone;
             document.getElementById('inspectTitle').textContent =
-                `${state.station} - 거점${state.selectedZoneIdx + 1}`;
+                `${state.editing ? '수정 · ' : ''}${state.station} - 거점${state.selectedZoneIdx + 1}`;
             document.getElementById('chargerCount').textContent = zone.chargers;
             document.getElementById('makerInfo').textContent = zone.maker || '미상';
+            document.getElementById('editBanner').classList.toggle('hidden', !state.editing);
+            document.getElementById('completeZoneBtn').textContent = state.editing ? '수정 저장' : '이 거점 점검 완료';
             renderChecklist();
             updateGPSDisplay();
+        }
+
+        function findLocalRecord(station, zoneId) {
+            return (state.allHistory || []).find((h) => h.station === station && h.zoneId === zoneId)
+                || (state.completedZones || []).find((h) => h.station === station && h.zoneId === zoneId)
+                || null;
+        }
+
+        function matchPhotoTypeByName(name) {
+            const n = String(name || '');
+            return photoTypes.find((t) => n.indexOf(t.label) === 0)
+                || photoTypes.find((t) => n.indexOf(t.id) >= 0)
+                || photoTypes[photoTypes.length - 1];
+        }
+
+        function restoreLocationSelects(record) {
+            const regionSel = document.getElementById('regionSelect');
+            const citySel = document.getElementById('citySelect');
+            const stationSel = document.getElementById('stationSelect');
+            regionSel.value = record.region || '';
+            citySel.disabled = !record.region;
+            citySel.innerHTML = '<option value="">선택하세요</option>';
+            if (record.region && STATION_DATA[record.region]) {
+                Object.keys(STATION_DATA[record.region]).sort().forEach((city) => {
+                    citySel.innerHTML += `<option value="${city}">${city}</option>`;
+                });
+            }
+            citySel.value = record.city || '';
+            stationSel.disabled = !record.city;
+            stationSel.innerHTML = '';
+            if (record.region && record.city && STATION_DATA[record.region][record.city]) {
+                Object.keys(STATION_DATA[record.region][record.city]).sort().forEach((station) => {
+                    const data = STATION_DATA[record.region][record.city][station];
+                    const chargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
+                    stationSel.innerHTML += `<option value="${station}">${station} (${chargers}대)</option>`;
+                });
+            }
+            stationSel.value = record.station || '';
+        }
+
+        async function startEdit(record) {
+            if (!record || !record.station) return;
+            showTab('home');
+            const stationData = STATION_DATA[record.region]
+                && STATION_DATA[record.region][record.city]
+                && STATION_DATA[record.region][record.city][record.station];
+            if (!stationData) {
+                alert('이 폰에서 해당 충전소를 찾지 못했습니다.');
+                return;
+            }
+            state.editing = true;
+            state.region = record.region;
+            state.city = record.city;
+            state.station = record.station;
+            restoreLocationSelects(record);
+            let idx = stationData.zones.findIndex((z) => z.id === record.zoneId);
+            if (idx < 0 && record.zoneIndex) idx = record.zoneIndex - 1;
+            if (idx < 0) idx = 0;
+            state.selectedZone = stationData.zones[idx];
+            state.selectedZoneIdx = idx;
+            document.getElementById('stationInfo').classList.remove('hidden');
+            renderZones(stationData.zones);
+            selectZone(state.selectedZone, idx);
+            state.photoData = {};
+            photoTypes.forEach((p) => { state.photoData[p.id] = []; });
+            document.getElementById('memoInput').value = record.memo || '';
+            state.originalDate = record.date || '';
+            inspectZoneKey = currentZoneKey();
+            document.getElementById('uploadStatus').textContent = '드라이브 사진 불러오는 중...';
+            showInspectScreen();
+            persistWorking();
+            await loadDriveRecord();
+        }
+
+        async function loadDriveRecord() {
+            const zone = zoneLabel({ zoneIndex: state.selectedZoneIdx + 1, zoneName: state.selectedZone.name });
+            const q = 'action=record'
+                + '&station=' + encodeURIComponent(state.station)
+                + '&zone=' + encodeURIComponent(zone)
+                + '&region=' + encodeURIComponent(state.region)
+                + '&city=' + encodeURIComponent(state.city);
+            const res = await googleJsonp(q, 15000);
+            const rec = res.ok && res.data && res.data.record;
+            if (!rec) {
+                document.getElementById('uploadStatus').textContent = '기존 기록을 못 불러왔습니다. 바꿀 사진만 다시 찍으면 됩니다.';
+                checkCanComplete();
+                return;
+            }
+            if (rec.memo) document.getElementById('memoInput').value = rec.memo;
+            if (rec.date) state.originalDate = rec.date;
+            (rec.photos || []).forEach((file) => {
+                const type = matchPhotoTypeByName(file.name);
+                photosOf(type.id).push({
+                    filename: file.name,
+                    label: type.label,
+                    remote: true,
+                    uploaded: true,
+                    driveId: file.id,
+                    thumb: file.id ? ('https://drive.google.com/thumbnail?id=' + encodeURIComponent(file.id) + '&sz=w400') : ''
+                });
+            });
+            document.getElementById('uploadStatus').textContent = (rec.photos && rec.photos.length)
+                ? `드라이브 사진 ${rec.photos.length}장. 바꿀 것만 지우거나 다시 찍으세요.`
+                : '드라이브에 사진이 없습니다. 필요한 장만 다시 찍으면 됩니다.';
+            renderChecklist();
+        }
+
+        function startEditHistory(revIndex) {
+            const history = (state.allHistory || []).slice().reverse().slice(0, 50);
+            startEdit(history[revIndex]);
+        }
+
+        function startEditCompleted(i) {
+            startEdit(state.completedZones[i]);
         }
 
         let uploadQueue = Promise.resolve();
@@ -1375,6 +1545,7 @@
         function thumbStatus(item) {
             if (item.uploading) return '<div class="thumb-status">올리는 중</div>';
             if (item.failed) return '<div class="thumb-status fail">실패·재시도</div>';
+            if (item.remote) return '<div class="thumb-status">드라이브</div>';
             if (item.uploaded) return '<div class="thumb-status">업로드됨</div>';
             return '';
         }
@@ -1391,13 +1562,18 @@
                 const shots = photosOf(photo.id);
                 const block = document.createElement('div');
                 block.className = 'photo-block';
-                const thumbs = shots.map((item, i) => `
+                const thumbs = shots.map((item, i) => {
+                    const src = item.thumb || item.data;
+                    const preview = src
+                        ? `<img src="${src}" alt="${photo.label} ${i + 1}" onclick="openLightbox('${photo.id}', ${i})">`
+                        : `<div class="remote-ph" onclick="openLightbox('${photo.id}', ${i})">${item.filename || '드라이브 사진'}</div>`;
+                    return `
                     <div class="thumb ${item.uploading ? 'uploading' : ''}">
-                        <img src="${item.thumb || item.data}" alt="${photo.label} ${i + 1}" onclick="openLightbox('${photo.id}', ${i})">
+                        ${preview}
                         <button type="button" class="thumb-del" onclick="deletePhoto('${photo.id}', ${i})">×</button>
                         ${thumbStatus(item)}
-                    </div>
-                `).join('');
+                    </div>`;
+                }).join('');
                 block.innerHTML = `
                     <div class="photo-block-head">
                         <div>
@@ -1580,7 +1756,8 @@
         function openLightbox(photoId, index) {
             lightboxTarget = { photoId, index };
             const item = photosOf(photoId)[index];
-            document.getElementById('lightboxImg').src = (item && (item.data || item.thumb)) || '';
+            document.getElementById('lightboxImg').src = (item && (item.data || item.thumb))
+                || (item && item.driveId ? ('https://drive.google.com/thumbnail?id=' + encodeURIComponent(item.driveId) + '&sz=w1600') : '');
             document.getElementById('lightbox').classList.remove('hidden');
             resetLightboxZoom();
         }
@@ -1659,7 +1836,7 @@
             const pending = photosStillUploading();
             const btn = document.getElementById('completeZoneBtn');
             btn.disabled = !allDone || pending || completingLock;
-            btn.textContent = pending ? '사진 올리는 중...' : '이 거점 점검 완료';
+            btn.textContent = pending ? '사진 올리는 중...' : (state.editing ? '수정 저장' : '이 거점 점검 완료');
             const warn = document.getElementById('requiredWarning');
             if (!allDone) {
                 warn.classList.remove('hidden');
@@ -1740,14 +1917,14 @@
                     return;
                 }
 
-                const already = isZoneDone(state.station, state.city, zone, state.selectedZoneIdx);
+                const already = !state.editing && isZoneDone(state.station, state.city, zone, state.selectedZoneIdx);
                 if (already) {
                     record.upload = '시트에 이미 있는 거점 (중복 생략)';
                 } else {
-                    status.textContent = '구글 시트에 기록 중...';
+                    status.textContent = state.editing ? '구글 시트 같은 줄을 수정 중...' : '구글 시트에 기록 중...';
                     await postGoogle({
-                        action: 'complete',
-                        date: record.date,
+                        action: state.editing ? 'update' : 'complete',
+                        date: state.editing ? (state.originalDate || record.date) : record.date,
                         time: record.time,
                         inspector: record.inspector,
                         region: record.region,
@@ -1761,7 +1938,9 @@
                         address: record.address || '',
                         photoCount
                     });
-                    record.upload = failed ? `시트 전송, 사진 실패 ${failed}장 / 전체 ${photoCount}장` : `시트+드라이브 ${photoCount}장`;
+                    record.upload = state.editing
+                        ? (failed ? `시트 수정, 사진 실패 ${failed}장` : `시트 수정 저장 · 사진 ${photoCount}장`)
+                        : (failed ? `시트 전송, 사진 실패 ${failed}장 / 전체 ${photoCount}장` : `시트+드라이브 ${photoCount}장`);
                 }
             } catch (err) {
                 record.upload = '구글 전송 실패 (폰에만 저장됨)';
@@ -1777,11 +1956,23 @@
                 console.warn(err);
             }
 
-            state.completedZones.push(record);
-            state.allHistory.push(record);
-            state.todayInspected += zone.chargers;
-            state.weekInspected += zone.chargers;
-            state.totalInspected += zone.chargers;
+            if (state.editing) {
+                const patch = (h) => h.station === record.station && h.zoneId === record.zoneId;
+                const hi = (state.allHistory || []).findIndex(patch);
+                if (hi >= 0) state.allHistory[hi] = Object.assign({}, state.allHistory[hi], record);
+                else state.allHistory.push(record);
+                const ci = (state.completedZones || []).findIndex(patch);
+                if (ci >= 0) state.completedZones[ci] = Object.assign({}, state.completedZones[ci], record);
+                else state.completedZones.push(record);
+            } else {
+                state.completedZones.push(record);
+                state.allHistory.push(record);
+                state.todayInspected += zone.chargers;
+                state.weekInspected += zone.chargers;
+                state.totalInspected += zone.chargers;
+            }
+            state.editing = false;
+            state.originalDate = '';
             state.selectedZone = null;
             state.photoData = {};
             saveState();
@@ -1798,9 +1989,11 @@
 
             const msg = (record.upload || '').indexOf('중복') >= 0
                 ? '이미 시트에 있는 거점입니다. 한 줄만 유지합니다.'
-                : failed
-                    ? `점검은 저장됐습니다. 사진 ${failed}장은 구글 업로드에 실패했을 수 있습니다.`
-                    : `점검 완료. 시트에 기록하고 사진 ${photoCount}장을 드라이브에 올렸습니다.`;
+                : (record.upload || '').indexOf('수정') >= 0
+                    ? (failed ? `수정은 저장됐습니다. 사진 ${failed}장은 업로드 실패일 수 있습니다.` : '수정 저장 완료. 시트 같은 줄을 덮어썼습니다.')
+                    : failed
+                        ? `점검은 저장됐습니다. 사진 ${failed}장은 구글 업로드에 실패했을 수 있습니다.`
+                        : `점검 완료. 시트에 기록하고 사진 ${photoCount}장을 드라이브에 올렸습니다.`;
             alert(msg);
         });
 
@@ -1821,7 +2014,7 @@
                 return;
             }
             section.classList.remove('hidden');
-            list.innerHTML = state.completedZones.map(item => `
+            list.innerHTML = state.completedZones.map((item, i) => `
                 <div class="completed-item">
                     <span class="check">✓</span>
                     <div>
@@ -1831,6 +2024,7 @@
                             ${item.photoCount ? ` · 사진 ${item.photoCount}장` : ''}
                             ${item.memo ? '<br>📝 ' + item.memo : ''}
                         </div>
+                        <button type="button" class="btn btn-secondary edit-btn" onclick="startEditCompleted(${i})">수정</button>
                     </div>
                 </div>
             `).join('');
@@ -1843,7 +2037,7 @@
                 list.innerHTML = '<div style="color:#888;font-size:13px;">점검 기록이 없습니다.</div>';
                 return;
             }
-            list.innerHTML = history.map(item => `
+            list.innerHTML = history.map((item, i) => `
                 <div class="history-item">
                     <div class="date">${item.date} ${item.time}</div>
                     <div class="station">${item.station}</div>
@@ -1853,6 +2047,7 @@
                         ${item.upload ? `<br>☁️ ${item.upload}` : ''}
                         ${item.memo ? '<br>📝 ' + item.memo : ''}
                     </div>
+                    <button type="button" class="btn btn-secondary edit-btn" onclick="startEditHistory(${i})">수정</button>
                 </div>
             `).join('');
         }
@@ -2004,7 +2199,7 @@
                 return;
             }
             if (!Array.isArray(probe.data.progress)) {
-                updateRouteSyncStatus(null, '구글 스크립트를 v4로 다시 배포해야 팀 진행이 보입니다.');
+                updateRouteSyncStatus(null, '구글 스크립트를 v5로 다시 배포해야 팀 진행·수정이 됩니다.');
                 updateStats();
                 return;
             }
