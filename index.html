@@ -365,7 +365,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v3.0</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v3.1</div>
     </div>
 
     <div class="container">
@@ -553,12 +553,13 @@
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
-            { id: 'exterior', label: '충전기 외관', required: true },
-            { id: 'voltage', label: '전압 측정', required: true },
-            { id: 'panel', label: '분전함', required: true },
-            { id: 'qr', label: 'QR코드/시리얼', required: true },
-            { id: 'environment', label: '주변 환경', required: false },
-            { id: 'issue', label: '이상 발견', required: false }
+            { id: 'voltage', label: '전압', required: true },
+            { id: 'resistance', label: '저항', required: true },
+            { id: 'insulation', label: '절연', required: true },
+            { id: 'charger', label: '충전기', required: true },
+            { id: 'panel', label: '배전반', required: true },
+            { id: 'overview', label: '충전소 전체샷', required: true },
+            { id: 'issue', label: '특이사항', required: false }
         ];
 
         let state = {
