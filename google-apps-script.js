@@ -16,6 +16,14 @@
 var ROOT_FOLDER_NAME = '전기차충전소점검_대전팀';
 var PHOTO_ROOT_NAME = '점검사진';
 
+function setupDrive() {
+  var root = DriveApp.getRootFolder();
+  var folder = getOrCreateFolder_(root, ROOT_FOLDER_NAME);
+  var photos = getOrCreateFolder_(folder, PHOTO_ROOT_NAME);
+  Logger.log('드라이브 권한 OK');
+  Logger.log(folder.getUrl());
+}
+
 function doGet(e) {
   var payload = { ok: true, version: 'v3', message: '충전소 점검 서버 정상' };
   var cb = e && e.parameter && e.parameter.callback;
