@@ -465,6 +465,42 @@
             border-radius: 8px;
             margin-right: 6px;
         }
+        .city-card {
+            background: #0f0f23;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            border: 1px solid #2a2a3e;
+        }
+        .city-card.left { border-color: #f97316; }
+        .city-card.done { border-color: #22c55e; opacity: 0.7; }
+        .city-card .city-name { font-weight: 700; font-size: 15px; }
+        .progress-bar {
+            height: 8px;
+            background: #1a1a2e;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 8px 0 6px;
+        }
+        .progress-bar > span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #f97316, #22c55e);
+            border-radius: 8px;
+        }
+        .zone-pills { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .zone-pill {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: none;
+            cursor: pointer;
+            max-width: 100%;
+        }
+        .zone-pill.ok { background: #14532d; color: #86efac; }
+        .zone-pill.left { background: #431407; color: #fdba74; border: 1px solid #f97316; font-weight: 600; }
+        .legend { font-size: 11px; color: #888; margin-bottom: 10px; }
 
         @media (max-width: 360px) {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -474,7 +510,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.0</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.1</div>
     </div>
 
     <div class="container">
@@ -586,8 +622,9 @@
                 <div class="card-header">🗺️ 지역 동선</div>
                 <div class="card-body">
                     <div class="info-box">
-                        <div class="text">시/군을 고르면 가까운 주소끼리 묶고, 많으면 조로 나눕니다. 카카오맵으로 길찾기하거나 목록을 내려받을 수 있습니다.</div>
+                        <div class="text">지역을 고르면 시/군별 로드맵이 나옵니다. 주황 점이 아직 안 한 거점, 초록은 완료입니다.</div>
                     </div>
+                    <div class="legend">🟠 남은 거점 &nbsp; 🟢 완료 거점 &nbsp; 시/군을 누르면 방문 순서</div>
                     <div class="form-group">
                         <label class="form-label">지역</label>
                         <select class="form-select" id="routeRegion"></select>
@@ -595,9 +632,18 @@
                     <div class="form-group">
                         <label class="form-label">시/군</label>
                         <select class="form-select" id="routeCity" disabled>
-                            <option value="">선택하세요</option>
+                            <option value="">지역 전체 로드맵</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">보기</label>
+                        <select class="form-select" id="routeFilter">
+                            <option value="left">남은 것만</option>
+                            <option value="all">전체</option>
+                            <option value="done">완료만</option>
+                        </select>
+                    </div>
+                    <div id="routeTeamWrap">
                     <div class="form-group">
                         <label class="form-label">몇 조로 나눌까요</label>
                         <select class="form-select" id="routeTeams">
@@ -612,6 +658,7 @@
                         <select class="form-select" id="routeTeamView">
                             <option value="all">전체</option>
                         </select>
+                    </div>
                     </div>
                     <div id="routeSummary" class="info-box success hidden">
                         <div class="title" id="routeSummaryTitle"></div>
@@ -1713,15 +1760,16 @@
             return m ? m[1] : s;
         }
 
-        function stationProgress(region, city, station) {
-            const data = STATION_DATA[region] && STATION_DATA[region][city] && STATION_DATA[region][city][station];
-            const total = data ? data.zones.length : 0;
-            const doneIds = new Set(
-                (state.allHistory || [])
-                    .filter((h) => h.station === station && (h.city === city || (h.city && city.includes(h.city)) || (city && city.includes(h.city || ''))))
-                    .map((h) => h.zoneId)
-            );
-            return { total, done: Math.min(doneIds.size, total) };
+        function cityMatches(historyCity, city) {
+            if (!historyCity || !city) return true;
+            if (historyCity === city) return true;
+            const strip = (s) => String(s).replace(/^(대전|광주)\s/, '');
+            return strip(historyCity) === strip(city) || city.includes(historyCity) || historyCity.includes(city);
+        }
+
+        function isZoneDone(station, city, zoneId) {
+            const hit = (h) => h.station === station && h.zoneId === zoneId && cityMatches(h.city, city);
+            return (state.allHistory || []).some(hit) || (state.completedZones || []).some(hit);
         }
 
         function collectRouteStations(region, city) {
@@ -1729,18 +1777,25 @@
             if (!stations) return [];
             return Object.keys(stations).map((name) => {
                 const data = stations[name];
-                const chargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
-                const progress = stationProgress(region, city, name);
+                const zoneRows = data.zones.map((z, idx) => ({
+                    id: z.id,
+                    name: z.name,
+                    idx,
+                    chargers: z.chargers,
+                    done: isZoneDone(name, city, z.id)
+                }));
+                const done = zoneRows.filter((z) => z.done).length;
                 return {
                     region,
                     city,
                     name,
                     address: data.address || '',
                     hood: neighborhoodKey(data.address),
-                    zones: data.zones.length,
-                    chargers,
-                    done: progress.done,
-                    total: progress.total
+                    zoneRows,
+                    zones: zoneRows.length,
+                    chargers: zoneRows.reduce((sum, z) => sum + z.chargers, 0),
+                    done,
+                    total: zoneRows.length
                 };
             }).sort((a, b) => a.hood.localeCompare(b.hood, 'ko') || a.address.localeCompare(b.address, 'ko') || a.name.localeCompare(b.name, 'ko'));
         }
@@ -1786,7 +1841,7 @@
                 const region = document.getElementById('routeRegion').value;
                 const citySel = document.getElementById('routeCity');
                 citySel.disabled = !region;
-                citySel.innerHTML = '<option value="">선택하세요</option>';
+                citySel.innerHTML = '<option value="">지역 전체 로드맵</option>';
                 if (region && STATION_DATA[region]) {
                     Object.keys(STATION_DATA[region]).sort((a, b) => a.localeCompare(b, 'ko')).forEach((city) => {
                         const n = Object.keys(STATION_DATA[region][city]).length;
@@ -1804,6 +1859,7 @@
             });
             document.getElementById('routeTeams').addEventListener('change', renderRoutePlan);
             document.getElementById('routeTeamView').addEventListener('change', renderRoutePlan);
+            document.getElementById('routeFilter').addEventListener('change', renderRoutePlan);
             document.getElementById('routeShareBtn').addEventListener('click', shareRoutePlan);
             document.getElementById('routeDownloadBtn').addEventListener('click', downloadRoutePlan);
         }
@@ -1815,12 +1871,104 @@
             return [{ team: idx + 1, items: routePlan.teams[idx] || [] }];
         }
 
+        function applyRouteFilter(items) {
+            const mode = document.getElementById('routeFilter').value;
+            if (mode === 'left') return items.filter((it) => it.done < it.total);
+            if (mode === 'done') return items.filter((it) => it.done >= it.total && it.total);
+            return items;
+        }
+
+        function regionCityStats(region) {
+            if (!region || !STATION_DATA[region]) return [];
+            return Object.keys(STATION_DATA[region]).map((city) => {
+                const items = collectRouteStations(region, city);
+                const zones = items.reduce((s, it) => s + it.zones, 0);
+                const doneZ = items.reduce((s, it) => s + it.done, 0);
+                return {
+                    city,
+                    stations: items.length,
+                    doneStations: items.filter((it) => it.done >= it.total && it.total).length,
+                    zones,
+                    doneZ,
+                    leftZ: zones - doneZ,
+                    chargers: items.reduce((s, it) => s + it.chargers, 0)
+                };
+            }).sort((a, b) => b.leftZ - a.leftZ || a.city.localeCompare(b.city, 'ko'));
+        }
+
+        function zonePills(it) {
+            return `<div class="zone-pills">${it.zoneRows.map((z) => {
+                const cls = z.done ? 'ok' : 'left';
+                const mark = z.done ? '완료' : '남음';
+                return `<button type="button" class="zone-pill ${cls}" onclick='jumpToZone(${JSON.stringify(it.region)}, ${JSON.stringify(it.city)}, ${JSON.stringify(it.name)}, ${z.idx})'>${z.done ? '✓' : '●'} ${z.name} · ${mark}</button>`;
+            }).join('')}</div>`;
+        }
+
+        function renderRegionRoadmap(region) {
+            const filter = document.getElementById('routeFilter').value;
+            let cities = regionCityStats(region);
+            if (filter === 'left') cities = cities.filter((c) => c.leftZ > 0);
+            if (filter === 'done') cities = cities.filter((c) => c.leftZ === 0);
+            const all = regionCityStats(region);
+            const leftZ = all.reduce((s, c) => s + c.leftZ, 0);
+            const zones = all.reduce((s, c) => s + c.zones, 0);
+            document.getElementById('routeSummary').classList.remove('hidden');
+            document.getElementById('routeSummaryTitle').textContent = `${region} 로드맵`;
+            document.getElementById('routeSummaryText').textContent =
+                `시/군 ${all.length} · 충전소 ${all.reduce((s, c) => s + c.stations, 0)}곳 · 거점 ${zones}개 중 남은 ${leftZ}개`;
+            document.getElementById('routeShareBtn').disabled = !all.length;
+            document.getElementById('routeDownloadBtn').disabled = !all.length;
+            if (!cities.length) {
+                document.getElementById('routeList').innerHTML = '<div class="info-box success"><div class="title">이 보기에는 항목이 없습니다</div><div class="text">보기를 전체로 바꾸거나, 다른 지역을 선택하세요.</div></div>';
+                return;
+            }
+            document.getElementById('routeList').innerHTML = cities.map((c) => {
+                const pct = c.zones ? Math.round((c.doneZ / c.zones) * 100) : 0;
+                const cls = c.leftZ === 0 ? 'done' : 'left';
+                return `<div class="city-card ${cls}" onclick='openRouteCity(${JSON.stringify(c.city)})'>
+                    <div class="city-name">${c.city}</div>
+                    <div class="progress-bar"><span style="width:${pct}%"></span></div>
+                    <div class="route-meta">완료 ${c.doneZ}/${c.zones} 거점 · 남은 거점 <b style="color:${c.leftZ ? '#fdba74' : '#86efac'}">${c.leftZ}개</b> · 충전소 ${c.doneStations}/${c.stations}곳</div>
+                </div>`;
+            }).join('');
+        }
+
+        function openRouteCity(city) {
+            const sel = document.getElementById('routeCity');
+            sel.value = city;
+            const region = document.getElementById('routeRegion').value;
+            const items = collectRouteStations(region, city);
+            document.getElementById('routeTeams').value = String(suggestedTeamCount(items.length));
+            renderRoutePlan();
+            window.scrollTo(0, 0);
+        }
+
         function renderRoutePlan() {
             const region = document.getElementById('routeRegion').value;
             const city = document.getElementById('routeCity').value;
+            const teamWrap = document.getElementById('routeTeamWrap');
             const n = Number(document.getElementById('routeTeams').value) || 1;
-            const items = collectRouteStations(region, city);
-            routePlan = { region, city, teams: splitContiguous(items, n) };
+            const sumBox = document.getElementById('routeSummary');
+            const list = document.getElementById('routeList');
+            if (!region) {
+                teamWrap.style.display = 'none';
+                sumBox.classList.add('hidden');
+                document.getElementById('routeShareBtn').disabled = true;
+                document.getElementById('routeDownloadBtn').disabled = true;
+                list.innerHTML = '<div class="info-box"><div class="text">호남권 또는 충청권을 선택하면 시/군별 완료·남은 거점이 로드맵으로 나옵니다.</div></div>';
+                routePlan = { region: '', city: '', teams: [] };
+                return;
+            }
+            if (!city) {
+                teamWrap.style.display = 'none';
+                renderRegionRoadmap(region);
+                routePlan = { region, city: '', teams: [] };
+                return;
+            }
+            teamWrap.style.display = '';
+            const allItems = collectRouteStations(region, city);
+            const items = applyRouteFilter(allItems);
+            routePlan = { region, city, teams: splitContiguous(items, n), allItems };
             const viewSel = document.getElementById('routeTeamView');
             const prev = viewSel.value;
             viewSel.innerHTML = '<option value="all">전체</option>';
@@ -1829,30 +1977,33 @@
                 viewSel.innerHTML += `<option value="${i + 1}">${i + 1}조 (${team.length}곳)</option>`;
             });
             if ([...viewSel.options].some((o) => o.value === prev)) viewSel.value = prev;
-            const has = items.length > 0;
+            const has = allItems.length > 0;
             document.getElementById('routeShareBtn').disabled = !has;
             document.getElementById('routeDownloadBtn').disabled = !has;
-            const sumBox = document.getElementById('routeSummary');
-            const list = document.getElementById('routeList');
             if (!has) {
                 sumBox.classList.add('hidden');
-                list.innerHTML = '<div class="info-box"><div class="text">시/군을 선택하면 방문 순서가 나옵니다. 천안 서북구·대전 유성구처럼 많으면 2~3조로 나누세요.</div></div>';
+                list.innerHTML = '';
                 return;
             }
             sumBox.classList.remove('hidden');
-            const remaining = items.filter((it) => it.done < it.total);
-            document.getElementById('routeSummaryTitle').textContent = `${city} · 충전소 ${items.length}곳`;
+            const leftStations = allItems.filter((it) => it.done < it.total).length;
+            const leftZones = allItems.reduce((s, it) => s + (it.total - it.done), 0);
+            document.getElementById('routeSummaryTitle').textContent = `${city} · 남은 거점 ${leftZones}개`;
             document.getElementById('routeSummaryText').textContent =
-                `거점 ${items.reduce((s, it) => s + it.zones, 0)}개 · 충전기 ${items.reduce((s, it) => s + it.chargers, 0)}대 · 남은 곳 ${remaining.length}곳 · ${n}조로 분할`;
+                `충전소 ${allItems.length}곳 중 남은 ${leftStations}곳 · 거점 ${allItems.reduce((s, it) => s + it.zones, 0)}개 · ${n}조`;
+            if (!items.length) {
+                list.innerHTML = '<div class="info-box success"><div class="title">이 보기에는 없습니다</div><div class="text">남은 것만 보기인데 다 끝났거나, 완료만 보기인데 아직 없습니다.</div></div>';
+                return;
+            }
             const blocks = currentRouteTeams();
             list.innerHTML = blocks.map(({ team, items: teamItems }) => {
                 const html = teamItems.map((it, i) => {
                     const cls = it.done >= it.total && it.total ? 'done' : (it.done ? 'partial' : '');
-                    const mark = it.done >= it.total && it.total ? '완료' : (it.done ? `${it.done}/${it.total} 거점` : `거점 ${it.zones}개`);
                     const kakao = `https://map.kakao.com/link/search/${encodeURIComponent(it.address || it.name)}`;
                     return `<div class="route-item ${cls}">
                         <div><span class="route-num">${i + 1}</span><span class="route-name">${it.name}</span></div>
-                        <div class="route-meta">${it.address}<br>${it.hood} · ${mark} · ${it.chargers}대</div>
+                        <div class="route-meta">${it.address}<br>${it.hood} · 거점 ${it.done}/${it.total} 완료 · ${it.chargers}대</div>
+                        ${zonePills(it)}
                         <div class="route-btns">
                             <button type="button" class="btn btn-primary" onclick='jumpToStation(${JSON.stringify(it.region)}, ${JSON.stringify(it.city)}, ${JSON.stringify(it.name)})'>이 충전소 점검</button>
                             <a class="btn btn-secondary" href="${kakao}" target="_blank" rel="noopener">카카오맵</a>
@@ -1864,15 +2015,27 @@
         }
 
         function routeText() {
+            const region = document.getElementById('routeRegion').value;
+            const city = document.getElementById('routeCity').value;
+            if (region && !city) {
+                const lines = [`${region} 로드맵`, ''];
+                regionCityStats(region).forEach((c) => {
+                    lines.push(`${c.city}: 남은 거점 ${c.leftZ}개 (${c.doneZ}/${c.zones})`);
+                });
+                return lines.join('\n');
+            }
             const blocks = currentRouteTeams();
             const title = `${routePlan.city} 점검 동선`;
             const lines = [title, ''];
             blocks.forEach(({ team, items }) => {
                 if (routePlan.teams.length > 1) lines.push(`【${team}조】`);
                 items.forEach((it, i) => {
+                    const left = it.zoneRows.filter((z) => !z.done).map((z) => z.name);
+                    const done = it.zoneRows.filter((z) => z.done).map((z) => z.name);
                     lines.push(`${i + 1}. ${it.name}`);
                     lines.push(`   ${it.address}`);
-                    lines.push(`   거점 ${it.zones}개 · ${it.chargers}대`);
+                    if (left.length) lines.push(`   남음: ${left.join(', ')}`);
+                    if (done.length) lines.push(`   완료: ${done.join(', ')}`);
                 });
                 lines.push('');
             });
@@ -1898,17 +2061,36 @@
         }
 
         function downloadRoutePlan() {
-            const rows = [['조', '순서', '충전소', '주소', '근처', '거점수', '충전기수', '점검거점']];
-            routePlan.teams.forEach((items, t) => {
-                items.forEach((it, i) => {
-                    rows.push([t + 1, i + 1, it.name, it.address, it.hood, it.zones, it.chargers, `${it.done}/${it.total}`]);
+            const region = document.getElementById('routeRegion').value;
+            const city = document.getElementById('routeCity').value;
+            let rows;
+            let filename;
+            if (region && !city) {
+                rows = [['지역', '시군', '충전소', '거점', '상태', '충전기수', '주소']];
+                Object.keys(STATION_DATA[region] || {}).sort((a, b) => a.localeCompare(b, 'ko')).forEach((c) => {
+                    collectRouteStations(region, c).forEach((it) => {
+                        it.zoneRows.forEach((z) => {
+                            rows.push([region, c, it.name, z.name, z.done ? '완료' : '남음', z.chargers, it.address]);
+                        });
+                    });
                 });
-            });
+                filename = `로드맵_${region}.csv`;
+            } else {
+                rows = [['조', '순서', '충전소', '거점', '상태', '충전기수', '주소']];
+                routePlan.teams.forEach((items, t) => {
+                    items.forEach((it, i) => {
+                        it.zoneRows.forEach((z) => {
+                            rows.push([t + 1, i + 1, it.name, z.name, z.done ? '완료' : '남음', z.chargers, it.address]);
+                        });
+                    });
+                });
+                filename = `동선_${routePlan.city || '지역'}.csv`;
+            }
             const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
             const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `동선_${routePlan.city || '지역'}.csv`;
+            a.download = filename;
             a.click();
             URL.revokeObjectURL(a.href);
         }
@@ -1935,6 +2117,12 @@
             stationSelect.value = station;
             stationSelect.dispatchEvent(new Event('change'));
             window.scrollTo(0, 0);
+        }
+
+        function jumpToZone(region, city, station, zoneIdx) {
+            jumpToStation(region, city, station);
+            const data = STATION_DATA[region] && STATION_DATA[region][city] && STATION_DATA[region][city][station];
+            if (data && data.zones[zoneIdx]) selectZone(data.zones[zoneIdx], zoneIdx);
         }
 
         function showTab(tab, el) {
