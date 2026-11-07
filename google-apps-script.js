@@ -20,8 +20,6 @@ function setupDrive() {
   var root = DriveApp.getRootFolder();
   var folder = getOrCreateFolder_(root, ROOT_FOLDER_NAME);
   var photos = getOrCreateFolder_(folder, PHOTO_ROOT_NAME);
-  Logger.log('드라이브 권한 OK');
-  Logger.log(folder.getUrl());
 }
 
 function doGet(e) {
