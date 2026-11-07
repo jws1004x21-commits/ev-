@@ -424,7 +424,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v3.5</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v3.6</div>
     </div>
 
     <div class="container">
@@ -517,6 +517,7 @@
                     ⚠️ 필수 사진은 종류마다 최소 1장씩 촬영해야 완료할 수 있습니다
                 </div>
                 <div class="upload-status" id="uploadStatus"></div>
+                <button class="btn btn-secondary" id="saveToPhoneBtn">📥 이 거점 사진을 폰에 저장</button>
                 <button class="btn btn-primary" id="completeZoneBtn" disabled>이 거점 점검 완료</button>
                 <button class="btn btn-secondary" id="backBtn">뒤로</button>
             </div>
@@ -563,11 +564,17 @@
                             폴더에 충전소·거점별로 저장됩니다.
                         </div>
                     </div>
+                    <div class="text" style="font-size:12px;color:#aaa;margin-bottom:10px;" id="localBackupStatus">
+                        폰 저장 확인 중...
+                    </div>
                     <div class="text" style="font-size:12px;color:#aaa;margin-bottom:10px;">
-                        사진이 안 올라가면 Apps Script를 v3 코드로 바꾸고
-                        <b>새 버전으로 다시 배포</b>해야 합니다.
+                        1. 구글 시트 → 확장 프로그램 → Apps Script<br>
+                        2. 코드 붙여넣기:
+                        <a href="https://github.com/jws1004x21-commits/ev-/blob/main/google-apps-script.js" style="color:#4ade80;">google-apps-script.js</a><br>
+                        3. 저장 후 배포 → 새 버전 → 배포 → 권한 허용
                     </div>
                     <button class="btn btn-secondary" onclick="testGoogleLink()">구글 연결 테스트</button>
+                    <button class="btn btn-secondary" onclick="retryPendingUploads()">대기 중인 구글 업로드 재시도</button>
                     <div class="upload-status" id="googleTestStatus"></div>
                 </div>
             </div>
@@ -647,8 +654,231 @@
 
         let currentPhotoId = null;
         let lightboxTarget = null;
+        let idb = null;
+        let persistTimer = null;
 
-        function init() {
+        function idbReady() {
+            if (idb) return Promise.resolve(idb);
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('ev-inspection-db', 1);
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv', { keyPath: 'id' });
+                };
+                req.onsuccess = () => { idb = req.result; resolve(idb); };
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function idbSet(id, value) {
+            return idbReady().then((db) => new Promise((resolve, reject) => {
+                const tx = db.transaction('kv', 'readwrite');
+                tx.objectStore('kv').put({ id, value });
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            }));
+        }
+
+        function idbGet(id) {
+            return idbReady().then((db) => new Promise((resolve, reject) => {
+                const req = db.transaction('kv', 'readonly').objectStore('kv').get(id);
+                req.onsuccess = () => resolve(req.result ? req.result.value : null);
+                req.onerror = () => reject(req.error);
+            }));
+        }
+
+        function idbDel(id) {
+            return idbReady().then((db) => new Promise((resolve, reject) => {
+                const tx = db.transaction('kv', 'readwrite');
+                tx.objectStore('kv').delete(id);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            }));
+        }
+
+        function snapshotPhotos() {
+            const out = {};
+            photoTypes.forEach((p) => {
+                out[p.id] = photosOf(p.id).map((item) => ({
+                    thumb: item.thumb,
+                    data: item.data || item.thumb,
+                    uploading: false,
+                    uploaded: !!item.uploaded,
+                    failed: !!item.failed,
+                    cancelled: false,
+                    label: item.label,
+                    filename: item.filename
+                }));
+            });
+            return out;
+        }
+
+        function persistWorking() {
+            clearTimeout(persistTimer);
+            persistTimer = setTimeout(async () => {
+                try {
+                    await idbSet('working', {
+                        region: state.region,
+                        city: state.city,
+                        station: state.station,
+                        selectedZone: state.selectedZone,
+                        selectedZoneIdx: state.selectedZoneIdx,
+                        memo: (document.getElementById('memoInput') || {}).value || '',
+                        inspector: state.inspector,
+                        photoData: snapshotPhotos(),
+                        inspecting: !document.getElementById('inspectScreen').classList.contains('hidden'),
+                        savedAt: Date.now()
+                    });
+                    updateLocalBackupStatus();
+                } catch (err) {
+                    console.warn('폰 저장 실패', err);
+                }
+            }, 250);
+        }
+
+        async function restoreWorking() {
+            const w = await idbGet('working');
+            if (!w || !w.station || !w.selectedZone) return;
+            state.region = w.region || '';
+            state.city = w.city || '';
+            state.station = w.station || '';
+            state.selectedZone = w.selectedZone;
+            state.selectedZoneIdx = w.selectedZoneIdx || 0;
+            state.photoData = w.photoData || {};
+            if (w.inspector && !state.inspector) state.inspector = w.inspector;
+            fillLocationSelects();
+            document.getElementById('memoInput').value = w.memo || '';
+            if (w.inspecting || totalPhotoCount() > 0) {
+                showInspectScreen();
+            }
+        }
+
+        function fillLocationSelects() {
+            const regionSelect = document.getElementById('regionSelect');
+            const citySelect = document.getElementById('citySelect');
+            const stationSelect = document.getElementById('stationSelect');
+            if (state.region) {
+                regionSelect.value = state.region;
+                citySelect.disabled = false;
+                citySelect.innerHTML = '<option value="">선택하세요</option>';
+                Object.keys(STATION_DATA[state.region] || {}).sort().forEach((city) => {
+                    citySelect.innerHTML += `<option value="${city}">${city}</option>`;
+                });
+            }
+            if (state.city) {
+                citySelect.value = state.city;
+                renderStationList();
+            }
+            if (state.station) {
+                stationSelect.value = state.station;
+                const data = STATION_DATA[state.region] && STATION_DATA[state.region][state.city]
+                    ? STATION_DATA[state.region][state.city][state.station]
+                    : null;
+                if (data) {
+                    document.getElementById('stationName').textContent = state.station;
+                    document.getElementById('stationAddress').textContent = data.address;
+                    const totalChargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
+                    document.getElementById('stationSummary').textContent =
+                        `거점 ${data.zones.length}개, 총 ${totalChargers}대`;
+                    renderZones(data.zones);
+                    document.getElementById('stationInfo').classList.remove('hidden');
+                    if (state.selectedZone) selectZone(state.selectedZone, state.selectedZoneIdx || 0);
+                }
+            }
+        }
+
+        async function updateLocalBackupStatus() {
+            const el = document.getElementById('localBackupStatus');
+            if (!el) return;
+            try {
+                const w = await idbGet('working');
+                const n = w && w.photoData
+                    ? Object.values(w.photoData).reduce((sum, arr) => sum + (arr ? arr.length : 0), 0)
+                    : 0;
+                const pending = allPhotos().filter((p) => !p.uploaded).length;
+                el.textContent = n
+                    ? `폰에 임시 저장됨: 진행 중 사진 ${n}장` + (pending ? ` · 구글 대기 ${pending}장` : '')
+                    : '진행 중인 점검은 찍는 즉시 이 폰에 저장됩니다. 갤러리에 넣으려면 "폰에 저장"을 누르세요.';
+            } catch (err) {
+                el.textContent = '이 브라우저는 폰 저장을 지원하지 않을 수 있습니다.';
+            }
+        }
+
+        function dataUrlToFile(dataUrl, filename) {
+            const parts = String(dataUrl).split(',');
+            const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
+            const bin = atob(parts[1] || '');
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            return new File([arr], filename || 'photo.jpg', { type: mime });
+        }
+
+        async function savePhotosToPhone() {
+            const items = allPhotos().filter((p) => p.data || p.thumb);
+            if (!items.length) {
+                alert('저장할 사진이 없습니다.');
+                return;
+            }
+            const files = items.map((item, i) =>
+                dataUrlToFile(item.data || item.thumb, item.filename || `점검사진_${i + 1}.jpg`)
+            );
+            try {
+                if (navigator.canShare && navigator.canShare({ files })) {
+                    await navigator.share({
+                        files,
+                        title: `${state.station || '충전소'} 점검사진`,
+                        text: `${state.station} 거점${(state.selectedZoneIdx || 0) + 1}`
+                    });
+                    return;
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') return;
+            }
+            files.forEach((file) => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(file);
+                a.download = file.name;
+                a.click();
+            });
+            alert(`사진 ${files.length}장을 다운로드했습니다. 파일 앱/갤러리에서 확인하세요.`);
+        }
+
+        async function retryPendingUploads() {
+            const el = document.getElementById('googleTestStatus');
+            let pending = allPhotos().filter((p) => p.data && !p.uploaded);
+            if (!pending.length) {
+                const last = await idbGet('last-complete');
+                if (last && last.photos && last.record) {
+                    state.photoData = last.photos;
+                    state.region = last.record.region;
+                    state.city = last.record.city;
+                    state.station = last.record.station;
+                    state.selectedZone = {
+                        id: last.record.zoneId,
+                        name: last.record.zoneName,
+                        chargers: last.record.chargers
+                    };
+                    state.selectedZoneIdx = (last.record.zoneIndex || 1) - 1;
+                    pending = allPhotos().filter((p) => p.data && !p.uploaded);
+                }
+            }
+            if (!pending.length) {
+                el.textContent = '다시 올릴 사진이 없습니다. 점검을 이어서 하거나, 방금 완료한 거점 사진이 이미 전송된 상태입니다.';
+                return;
+            }
+            el.textContent = `사진 ${pending.length}장 재업로드 중...`;
+            let failed = 0;
+            for (const item of pending) {
+                await uploadPhotoNow(item);
+                if (!item.uploaded) failed += 1;
+            }
+            persistWorking();
+            el.textContent = failed
+                ? `실패 ${failed}장. 인터넷과 Apps Script 배포를 확인하세요.`
+                : `사진 ${pending.length}장 전송을 다시 보냈습니다. 드라이브 폴더를 확인하세요.`;
+        }
+
+        async function init() {
             loadState();
             initRegions();
             updateStats();
@@ -656,6 +886,12 @@
             renderHistory();
             startGPS();
             document.getElementById('inspectorName').value = state.inspector || '';
+            try {
+                await restoreWorking();
+            } catch (err) {
+                console.warn(err);
+            }
+            updateLocalBackupStatus();
         }
 
         function loadState() {
@@ -861,11 +1097,14 @@
         }
 
         document.getElementById('startBtn').addEventListener('click', () => {
-            state.photoData = {};
-            photoTypes.forEach(p => { state.photoData[p.id] = []; });
-            document.getElementById('memoInput').value = '';
+            if (totalPhotoCount() === 0) {
+                state.photoData = {};
+                photoTypes.forEach(p => { state.photoData[p.id] = []; });
+                document.getElementById('memoInput').value = '';
+            }
             document.getElementById('uploadStatus').textContent = '';
             showInspectScreen();
+            persistWorking();
         });
 
         function showInspectScreen() {
@@ -1005,6 +1244,7 @@
                 item.failed = true;
             }
             renderChecklist();
+            persistWorking();
         }
 
         async function addFiles(fileList) {
@@ -1030,6 +1270,7 @@
                 enqueueUpload(item);
             }
             if (navigator.vibrate) navigator.vibrate(50);
+            persistWorking();
         }
 
         function readFile(file) {
@@ -1058,6 +1299,7 @@
             photosOf(photoId).splice(index, 1);
             closeLightbox();
             renderChecklist();
+            persistWorking();
             if (item.filename) {
                 postGoogle({
                     action: 'deletePhoto',
@@ -1254,6 +1496,13 @@
                 alert('구글 전송에 실패했습니다. 기록은 이 폰에 남아 있습니다.');
             }
 
+            try {
+                await idbSet('last-complete', { record, photos: snapshotPhotos(), savedAt: Date.now() });
+                await idbDel('working');
+            } catch (err) {
+                console.warn(err);
+            }
+
             state.completedZones.push(record);
             state.allHistory.push(record);
             state.todayInspected += zone.chargers;
@@ -1262,6 +1511,7 @@
             state.selectedZone = null;
             state.photoData = {};
             saveState();
+            updateLocalBackupStatus();
             updateStats();
             renderCompletedList();
             renderHistory();
@@ -1279,10 +1529,13 @@
         });
 
         document.getElementById('backBtn').addEventListener('click', () => {
+            persistWorking();
             document.getElementById('inspectScreen').classList.add('hidden');
             document.getElementById('selectScreen').classList.remove('hidden');
             renderCompletedList();
         });
+        document.getElementById('saveToPhoneBtn').addEventListener('click', savePhotosToPhone);
+        document.getElementById('memoInput').addEventListener('input', persistWorking);
 
         function renderCompletedList() {
             const section = document.getElementById('completedSection');
@@ -1395,6 +1648,7 @@
         function clearAllData() {
             if (confirm('정말 모든 데이터를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
                 localStorage.removeItem('inspectionStateV2');
+                indexedDB.deleteDatabase('ev-inspection-db');
                 location.reload();
             }
         }
