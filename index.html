@@ -425,6 +425,47 @@
 
         input[type="file"] { display: none; }
 
+        .route-item {
+            background: #0f0f23;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-left: 3px solid #3b82f6;
+        }
+        .route-item.done { border-left-color: #22c55e; opacity: 0.72; }
+        .route-item.partial { border-left-color: #f97316; }
+        .route-num {
+            display: inline-block;
+            min-width: 22px;
+            font-weight: 700;
+            color: #4ade80;
+            margin-right: 6px;
+        }
+        .route-name { font-weight: 600; font-size: 14px; }
+        .route-meta { font-size: 12px; color: #aaa; margin-top: 4px; line-height: 1.45; }
+        .route-btns { display: flex; gap: 8px; margin-top: 8px; }
+        .route-btns .btn {
+            width: auto;
+            flex: 1;
+            margin-top: 0;
+            padding: 8px;
+            font-size: 12px;
+            text-align: center;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .team-chip {
+            display: inline-block;
+            background: #1e3a5f;
+            color: #93c5fd;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 8px;
+            margin-right: 6px;
+        }
+
         @media (max-width: 360px) {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
@@ -433,7 +474,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v3.9</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.0</div>
     </div>
 
     <div class="container">
@@ -540,6 +581,49 @@
             </div>
         </div>
 
+        <div id="tab-route" class="tab-content">
+            <div class="card">
+                <div class="card-header">🗺️ 지역 동선</div>
+                <div class="card-body">
+                    <div class="info-box">
+                        <div class="text">시/군을 고르면 가까운 주소끼리 묶고, 많으면 조로 나눕니다. 카카오맵으로 길찾기하거나 목록을 내려받을 수 있습니다.</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">지역</label>
+                        <select class="form-select" id="routeRegion"></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">시/군</label>
+                        <select class="form-select" id="routeCity" disabled>
+                            <option value="">선택하세요</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">몇 조로 나눌까요</label>
+                        <select class="form-select" id="routeTeams">
+                            <option value="1">1조 (혼자 / 하루)</option>
+                            <option value="2">2조</option>
+                            <option value="3">3조</option>
+                            <option value="4">4조</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">볼 조</label>
+                        <select class="form-select" id="routeTeamView">
+                            <option value="all">전체</option>
+                        </select>
+                    </div>
+                    <div id="routeSummary" class="info-box success hidden">
+                        <div class="title" id="routeSummaryTitle"></div>
+                        <div class="text" id="routeSummaryText"></div>
+                    </div>
+                    <button class="btn btn-secondary" id="routeShareBtn" disabled>📤 이 조 목록 보내기</button>
+                    <button class="btn btn-secondary" id="routeDownloadBtn" disabled>📥 엑셀로 내려받기</button>
+                </div>
+            </div>
+            <div id="routeList"></div>
+        </div>
+
         <div id="tab-history" class="tab-content">
             <div class="card">
                 <div class="card-header">📋 점검 내역</div>
@@ -607,6 +691,9 @@
     <div class="bottom-nav">
         <div class="nav-item active" data-tab="home" onclick="showTab('home', this)">
             <span class="icon">🏠</span><span>홈</span>
+        </div>
+        <div class="nav-item" data-tab="route" onclick="showTab('route', this)">
+            <span class="icon">🗺️</span><span>동선</span>
         </div>
         <div class="nav-item" data-tab="history" onclick="showTab('history', this)">
             <span class="icon">📋</span><span>내역</span>
@@ -895,6 +982,7 @@
         async function init() {
             loadState();
             initRegions();
+            initRouteTab();
             updateStats();
             renderCompletedList();
             renderHistory();
@@ -1618,11 +1706,243 @@
             `).join('');
         }
 
+        function neighborhoodKey(address) {
+            const s = String(address || '');
+            const m = s.match(/([가-힣A-Za-z0-9]+(?:동|읍|면|가))\b/) ||
+                s.match(/([가-힣A-Za-z0-9]+(?:대로|로|길))\b/);
+            return m ? m[1] : s;
+        }
+
+        function stationProgress(region, city, station) {
+            const data = STATION_DATA[region] && STATION_DATA[region][city] && STATION_DATA[region][city][station];
+            const total = data ? data.zones.length : 0;
+            const doneIds = new Set(
+                (state.allHistory || [])
+                    .filter((h) => h.station === station && (h.city === city || (h.city && city.includes(h.city)) || (city && city.includes(h.city || ''))))
+                    .map((h) => h.zoneId)
+            );
+            return { total, done: Math.min(doneIds.size, total) };
+        }
+
+        function collectRouteStations(region, city) {
+            const stations = STATION_DATA[region] && STATION_DATA[region][city];
+            if (!stations) return [];
+            return Object.keys(stations).map((name) => {
+                const data = stations[name];
+                const chargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
+                const progress = stationProgress(region, city, name);
+                return {
+                    region,
+                    city,
+                    name,
+                    address: data.address || '',
+                    hood: neighborhoodKey(data.address),
+                    zones: data.zones.length,
+                    chargers,
+                    done: progress.done,
+                    total: progress.total
+                };
+            }).sort((a, b) => a.hood.localeCompare(b.hood, 'ko') || a.address.localeCompare(b.address, 'ko') || a.name.localeCompare(b.name, 'ko'));
+        }
+
+        function splitContiguous(items, n) {
+            const teams = Array.from({ length: n }, () => []);
+            if (!items.length) return teams;
+            const total = items.reduce((sum, it) => sum + Math.max(it.chargers, 1), 0);
+            const goal = total / n;
+            let team = 0;
+            let acc = 0;
+            items.forEach((it, i) => {
+                const leftItems = items.length - i;
+                const leftTeams = n - team;
+                if (team < n - 1 && leftItems === leftTeams) {
+                    team += 1;
+                    acc = 0;
+                } else if (team < n - 1 && acc >= goal && teams[team].length) {
+                    team += 1;
+                    acc = 0;
+                }
+                teams[team].push(it);
+                acc += Math.max(it.chargers, 1);
+            });
+            return teams;
+        }
+
+        let routePlan = { region: '', city: '', teams: [] };
+
+        function suggestedTeamCount(n) {
+            if (n >= 40) return 3;
+            if (n >= 18) return 2;
+            return 1;
+        }
+
+        function initRouteTab() {
+            const regionSel = document.getElementById('routeRegion');
+            regionSel.innerHTML = '<option value="">선택하세요</option>';
+            Object.keys(STATION_DATA).forEach((region) => {
+                regionSel.innerHTML += `<option value="${region}">${region}</option>`;
+            });
+            document.getElementById('routeRegion').addEventListener('change', () => {
+                const region = document.getElementById('routeRegion').value;
+                const citySel = document.getElementById('routeCity');
+                citySel.disabled = !region;
+                citySel.innerHTML = '<option value="">선택하세요</option>';
+                if (region && STATION_DATA[region]) {
+                    Object.keys(STATION_DATA[region]).sort((a, b) => a.localeCompare(b, 'ko')).forEach((city) => {
+                        const n = Object.keys(STATION_DATA[region][city]).length;
+                        citySel.innerHTML += `<option value="${city}">${city} (${n}곳)</option>`;
+                    });
+                }
+                renderRoutePlan();
+            });
+            document.getElementById('routeCity').addEventListener('change', () => {
+                const region = document.getElementById('routeRegion').value;
+                const city = document.getElementById('routeCity').value;
+                const items = collectRouteStations(region, city);
+                document.getElementById('routeTeams').value = String(suggestedTeamCount(items.length));
+                renderRoutePlan();
+            });
+            document.getElementById('routeTeams').addEventListener('change', renderRoutePlan);
+            document.getElementById('routeTeamView').addEventListener('change', renderRoutePlan);
+            document.getElementById('routeShareBtn').addEventListener('click', shareRoutePlan);
+            document.getElementById('routeDownloadBtn').addEventListener('click', downloadRoutePlan);
+        }
+
+        function currentRouteTeams() {
+            const view = document.getElementById('routeTeamView').value;
+            if (view === 'all') return routePlan.teams.map((items, i) => ({ team: i + 1, items }));
+            const idx = Number(view) - 1;
+            return [{ team: idx + 1, items: routePlan.teams[idx] || [] }];
+        }
+
+        function renderRoutePlan() {
+            const region = document.getElementById('routeRegion').value;
+            const city = document.getElementById('routeCity').value;
+            const n = Number(document.getElementById('routeTeams').value) || 1;
+            const items = collectRouteStations(region, city);
+            routePlan = { region, city, teams: splitContiguous(items, n) };
+            const viewSel = document.getElementById('routeTeamView');
+            const prev = viewSel.value;
+            viewSel.innerHTML = '<option value="all">전체</option>';
+            routePlan.teams.forEach((team, i) => {
+                if (!team.length) return;
+                viewSel.innerHTML += `<option value="${i + 1}">${i + 1}조 (${team.length}곳)</option>`;
+            });
+            if ([...viewSel.options].some((o) => o.value === prev)) viewSel.value = prev;
+            const has = items.length > 0;
+            document.getElementById('routeShareBtn').disabled = !has;
+            document.getElementById('routeDownloadBtn').disabled = !has;
+            const sumBox = document.getElementById('routeSummary');
+            const list = document.getElementById('routeList');
+            if (!has) {
+                sumBox.classList.add('hidden');
+                list.innerHTML = '<div class="info-box"><div class="text">시/군을 선택하면 방문 순서가 나옵니다. 천안 서북구·대전 유성구처럼 많으면 2~3조로 나누세요.</div></div>';
+                return;
+            }
+            sumBox.classList.remove('hidden');
+            const remaining = items.filter((it) => it.done < it.total);
+            document.getElementById('routeSummaryTitle').textContent = `${city} · 충전소 ${items.length}곳`;
+            document.getElementById('routeSummaryText').textContent =
+                `거점 ${items.reduce((s, it) => s + it.zones, 0)}개 · 충전기 ${items.reduce((s, it) => s + it.chargers, 0)}대 · 남은 곳 ${remaining.length}곳 · ${n}조로 분할`;
+            const blocks = currentRouteTeams();
+            list.innerHTML = blocks.map(({ team, items: teamItems }) => {
+                const html = teamItems.map((it, i) => {
+                    const cls = it.done >= it.total && it.total ? 'done' : (it.done ? 'partial' : '');
+                    const mark = it.done >= it.total && it.total ? '완료' : (it.done ? `${it.done}/${it.total} 거점` : `거점 ${it.zones}개`);
+                    const kakao = `https://map.kakao.com/link/search/${encodeURIComponent(it.address || it.name)}`;
+                    return `<div class="route-item ${cls}">
+                        <div><span class="route-num">${i + 1}</span><span class="route-name">${it.name}</span></div>
+                        <div class="route-meta">${it.address}<br>${it.hood} · ${mark} · ${it.chargers}대</div>
+                        <div class="route-btns">
+                            <button type="button" class="btn btn-primary" onclick='jumpToStation(${JSON.stringify(it.region)}, ${JSON.stringify(it.city)}, ${JSON.stringify(it.name)})'>이 충전소 점검</button>
+                            <a class="btn btn-secondary" href="${kakao}" target="_blank" rel="noopener">카카오맵</a>
+                        </div>
+                    </div>`;
+                }).join('');
+                return `<div class="card"><div class="card-header">${n > 1 ? team + '조' : '방문 순서'} · ${teamItems.length}곳</div><div class="card-body">${html || '없음'}</div></div>`;
+            }).join('');
+        }
+
+        function routeText() {
+            const blocks = currentRouteTeams();
+            const title = `${routePlan.city} 점검 동선`;
+            const lines = [title, ''];
+            blocks.forEach(({ team, items }) => {
+                if (routePlan.teams.length > 1) lines.push(`【${team}조】`);
+                items.forEach((it, i) => {
+                    lines.push(`${i + 1}. ${it.name}`);
+                    lines.push(`   ${it.address}`);
+                    lines.push(`   거점 ${it.zones}개 · ${it.chargers}대`);
+                });
+                lines.push('');
+            });
+            return lines.join('\n');
+        }
+
+        async function shareRoutePlan() {
+            const text = routeText();
+            try {
+                if (navigator.share) {
+                    await navigator.share({ title: `${routePlan.city} 점검 동선`, text });
+                    return;
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') return;
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                alert('목록을 복사했습니다. 카톡에 붙여넣기 하세요.');
+            } catch (err) {
+                alert(text);
+            }
+        }
+
+        function downloadRoutePlan() {
+            const rows = [['조', '순서', '충전소', '주소', '근처', '거점수', '충전기수', '점검거점']];
+            routePlan.teams.forEach((items, t) => {
+                items.forEach((it, i) => {
+                    rows.push([t + 1, i + 1, it.name, it.address, it.hood, it.zones, it.chargers, `${it.done}/${it.total}`]);
+                });
+            });
+            const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `동선_${routePlan.city || '지역'}.csv`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function jumpToStation(region, city, station) {
+            document.getElementById('inspectScreen').classList.add('hidden');
+            document.getElementById('selectScreen').classList.remove('hidden');
+            showTab('home', document.querySelector('.nav-item[data-tab="home"]'));
+            state.region = region;
+            state.city = city;
+            state.station = station;
+            state.selectedZone = null;
+            const regionSelect = document.getElementById('regionSelect');
+            regionSelect.value = region;
+            const citySelect = document.getElementById('citySelect');
+            citySelect.disabled = false;
+            citySelect.innerHTML = '<option value="">선택하세요</option>';
+            Object.keys(STATION_DATA[region] || {}).sort((a, b) => a.localeCompare(b, 'ko')).forEach((c) => {
+                citySelect.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+            citySelect.value = city;
+            renderStationList();
+            const stationSelect = document.getElementById('stationSelect');
+            stationSelect.value = station;
+            stationSelect.dispatchEvent(new Event('change'));
+            window.scrollTo(0, 0);
+        }
+
         function showTab(tab, el) {
             document.querySelectorAll('.tab-content').forEach(node => node.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(node => node.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.add('active');
             (el || document.querySelector(`.nav-item[data-tab="${tab}"]`)).classList.add('active');
+            if (tab === 'route') renderRoutePlan();
         }
 
         function saveSettings() {
