@@ -513,7 +513,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.3</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.4</div>
     </div>
 
     <div class="container">
@@ -536,6 +536,7 @@
                     <div class="stat-label">진행률</div>
                 </div>
             </div>
+            <div style="font-size:11px;color:#888;margin:-6px 0 12px;">숫자는 팀 전체(구글 시트) 기준입니다</div>
 
             <div id="selectScreen">
                 <div class="card">
@@ -1047,6 +1048,7 @@
                 console.warn(err);
             }
             updateLocalBackupStatus();
+            fetchTeamProgress(false).catch(() => {});
         }
 
         function loadState() {
@@ -1133,12 +1135,76 @@
             }
         }
 
+        function parseSheetDate(value) {
+            const s = String(value || '');
+            const iso = s.match(/(\d{4}-\d{2}-\d{2})/);
+            if (iso) return iso[1];
+            const d = new Date(value);
+            if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+            return '';
+        }
+
+        function chargersForRow(row) {
+            if (row.chargers) return Number(row.chargers) || 0;
+            const parsed = parseSheetZone(row.zone || '');
+            for (const region of Object.keys(STATION_DATA)) {
+                for (const city of Object.keys(STATION_DATA[region])) {
+                    if (row.city && !cityMatches(row.city, city)) continue;
+                    const st = STATION_DATA[region][city][row.station];
+                    if (!st) continue;
+                    const zone = st.zones.find((z, i) => z.name === parsed.zoneName || i + 1 === parsed.zoneIndex);
+                    return zone ? zone.chargers : 0;
+                }
+            }
+            return 0;
+        }
+
+        function uniqueTeamCompletions() {
+            const map = new Map();
+            (state.teamProgress || []).forEach((row) => {
+                const key = `${row.station}|${row.zone || ''}`;
+                if (!map.has(key)) map.set(key, row);
+            });
+            (state.allHistory || []).forEach((h) => {
+                const zone = `거점${h.zoneIndex}: ${h.zoneName}`;
+                const key = `${h.station}|${zone}`;
+                if (!map.has(key)) {
+                    map.set(key, {
+                        station: h.station,
+                        city: h.city,
+                        zone,
+                        date: h.date,
+                        chargers: h.chargers || 0
+                    });
+                }
+            });
+            return [...map.values()];
+        }
+
         function updateStats() {
-            document.getElementById('todayCount').textContent = state.todayInspected;
-            document.getElementById('weekCount').textContent = state.weekInspected;
-            document.getElementById('totalCount').textContent = state.totalInspected;
+            const rows = uniqueTeamCompletions();
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const weekStart = getWeekStart();
+            let today = 0;
+            let week = 0;
+            let total = 0;
+            rows.forEach((row) => {
+                const n = chargersForRow(row);
+                total += n;
+                const ds = parseSheetDate(row.date);
+                if (ds === todayStr) today += n;
+                if (ds && new Date(ds + 'T00:00:00') >= weekStart) week += n;
+            });
+            if (!rows.length) {
+                today = state.todayInspected;
+                week = state.weekInspected;
+                total = state.totalInspected;
+            }
+            document.getElementById('todayCount').textContent = today;
+            document.getElementById('weekCount').textContent = week;
+            document.getElementById('totalCount').textContent = total;
             document.getElementById('progressPercent').textContent =
-                ((state.totalInspected / 4571) * 100).toFixed(1) + '%';
+                ((total / 4571) * 100).toFixed(1) + '%';
         }
 
         function initRegions() {
@@ -1584,10 +1650,26 @@
             setLightboxZoom(zoomState.scale + (e.deltaY < 0 ? 0.25 : -0.25));
         }, { passive: false });
 
+        function photosStillUploading() {
+            return allPhotos().some((p) => p.uploading || (p.data && !p.uploaded && !p.failed));
+        }
+
         function checkCanComplete() {
             const allDone = photoTypes.filter(p => p.required).every(p => photosOf(p.id).length > 0);
-            document.getElementById('completeZoneBtn').disabled = !allDone;
-            document.getElementById('requiredWarning').classList.toggle('hidden', allDone);
+            const pending = photosStillUploading();
+            const btn = document.getElementById('completeZoneBtn');
+            btn.disabled = !allDone || pending || completingLock;
+            btn.textContent = pending ? '사진 올리는 중...' : '이 거점 점검 완료';
+            const warn = document.getElementById('requiredWarning');
+            if (!allDone) {
+                warn.classList.remove('hidden');
+                warn.textContent = '⚠️ 필수 사진은 종류마다 최소 1장씩 촬영해야 완료할 수 있습니다';
+            } else if (pending) {
+                warn.classList.remove('hidden');
+                warn.textContent = '⚠️ 사진이 드라이브에 다 올라간 뒤에 완료할 수 있습니다';
+            } else {
+                warn.classList.add('hidden');
+            }
         }
 
         function postGoogle(payload) {
@@ -1604,10 +1686,13 @@
         }
 
         document.getElementById('completeZoneBtn').addEventListener('click', async () => {
+            if (completingLock || photosStillUploading()) return;
             const zone = state.selectedZone;
             const memo = document.getElementById('memoInput').value.trim();
             const btn = document.getElementById('completeZoneBtn');
             const status = document.getElementById('uploadStatus');
+            completingLock = true;
+            btn.disabled = true;
             if (!state.inspector) {
                 const name = prompt('점검자 이름을 입력하세요');
                 if (name) {
@@ -1648,28 +1733,41 @@
                     await uploadPhotoNow(pending[i]);
                 }
                 failed = allPhotos().filter(p => p.failed || !p.uploaded).length;
+                if (photosStillUploading()) {
+                    status.textContent = '사진이 아직 올라가는 중입니다.';
+                    completingLock = false;
+                    checkCanComplete();
+                    return;
+                }
 
-                status.textContent = '구글 시트에 기록 중...';
-                await postGoogle({
-                    action: 'complete',
-                    date: record.date,
-                    time: record.time,
-                    inspector: record.inspector,
-                    region: record.region,
-                    city: record.city,
-                    station: record.station,
-                    zone: zoneLabel(record),
-                    chargers: record.chargers,
-                    maker: record.maker || '',
-                    gps: record.gps ? `${record.gps.lat}, ${record.gps.lng}` : '',
-                    memo: record.memo || '',
-                    address: record.address || '',
-                    photoCount
-                });
-                record.upload = failed ? `시트 전송, 사진 실패 ${failed}장 / 전체 ${photoCount}장` : `시트+드라이브 ${photoCount}장`;
+                const already = isZoneDone(state.station, state.city, zone, state.selectedZoneIdx);
+                if (already) {
+                    record.upload = '시트에 이미 있는 거점 (중복 생략)';
+                } else {
+                    status.textContent = '구글 시트에 기록 중...';
+                    await postGoogle({
+                        action: 'complete',
+                        date: record.date,
+                        time: record.time,
+                        inspector: record.inspector,
+                        region: record.region,
+                        city: record.city,
+                        station: record.station,
+                        zone: zoneLabel(record),
+                        chargers: record.chargers,
+                        maker: record.maker || '',
+                        gps: record.gps ? `${record.gps.lat}, ${record.gps.lng}` : '',
+                        memo: record.memo || '',
+                        address: record.address || '',
+                        photoCount
+                    });
+                    record.upload = failed ? `시트 전송, 사진 실패 ${failed}장 / 전체 ${photoCount}장` : `시트+드라이브 ${photoCount}장`;
+                }
             } catch (err) {
                 record.upload = '구글 전송 실패 (폰에만 저장됨)';
                 alert('구글 전송에 실패했습니다. 기록은 이 폰에 남아 있습니다.');
+            } finally {
+                completingLock = false;
             }
 
             try {
@@ -1698,9 +1796,11 @@
             btn.textContent = '이 거점 점검 완료';
             status.textContent = '';
 
-            const msg = failed
-                ? `점검은 저장됐습니다. 사진 ${failed}장은 구글 업로드에 실패했을 수 있습니다.`
-                : `점검 완료. 시트에 기록하고 사진 ${photoCount}장을 드라이브에 올렸습니다.`;
+            const msg = (record.upload || '').indexOf('중복') >= 0
+                ? '이미 시트에 있는 거점입니다. 한 줄만 유지합니다.'
+                : failed
+                    ? `점검은 저장됐습니다. 사진 ${failed}장은 구글 업로드에 실패했을 수 있습니다.`
+                    : `점검 완료. 시트에 기록하고 사진 ${photoCount}장을 드라이브에 올렸습니다.`;
             alert(msg);
         });
 
@@ -1843,6 +1943,7 @@
 
         let routePlan = { region: '', city: '', teams: [] };
         let lastProgressFetch = 0;
+        let completingLock = false;
 
         function updateRouteSyncStatus(at, extra) {
             const el = document.getElementById('routeSyncStatus');
@@ -1899,16 +2000,19 @@
             const probe = await googleJsonp('action=progress', 15000);
             if (!probe.ok || !probe.data) {
                 updateRouteSyncStatus(null, '불러오기 실패. 인터넷을 확인하세요.');
+                updateStats();
                 return;
             }
             if (!Array.isArray(probe.data.progress)) {
                 updateRouteSyncStatus(null, '구글 스크립트를 v4로 다시 배포해야 팀 진행이 보입니다.');
+                updateStats();
                 return;
             }
             lastProgressFetch = Date.now();
             state.teamProgress = probe.data.progress;
             localStorage.setItem('teamProgressV1', JSON.stringify({ at: lastProgressFetch, rows: state.teamProgress }));
             updateRouteSyncStatus(lastProgressFetch);
+            updateStats();
             renderRoutePlan();
         }
 
@@ -2099,8 +2203,39 @@
                         </div>
                     </div>`;
                 }).join('');
-                return `<div class="card"><div class="card-header">${n > 1 ? team + '조' : '방문 순서'} · ${teamItems.length}곳</div><div class="card-body">${html || '없음'}</div></div>`;
+                const driveBtns = driveRouteButtons(teamItems);
+                return `<div class="card"><div class="card-header">${n > 1 ? team + '조' : '방문 순서'} · ${teamItems.length}곳</div><div class="card-body">${driveBtns}${html || '없음'}</div></div>`;
             }).join('');
+        }
+
+        function googleDirUrl(addresses) {
+            const list = addresses.filter(Boolean).slice(0, 10);
+            if (!list.length) return '';
+            const dest = encodeURIComponent(list[list.length - 1]);
+            const wps = list.slice(0, -1).map(encodeURIComponent).join('|');
+            let url = 'https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=' + dest + '&travelmode=driving';
+            if (wps) url += '&waypoints=' + wps;
+            return url;
+        }
+
+        function driveRouteButtons(teamItems) {
+            const remaining = teamItems.filter((it) => it.done < it.total);
+            const targets = remaining.length ? remaining : teamItems;
+            const addrs = targets.map((it) => it.address || it.name);
+            if (!addrs.length) return '';
+            const chunks = [];
+            for (let i = 0; i < addrs.length; i += 10) chunks.push(addrs.slice(i, i + 10));
+            const nextKakao = `https://map.kakao.com/link/search/${encodeURIComponent(addrs[0])}`;
+            const links = chunks.map((chunk, i) => {
+                const url = googleDirUrl(chunk);
+                const label = chunks.length === 1 ? '이 조 운전 경로' : `운전 경로 ${i + 1} (${i * 10 + 1}~${i * 10 + chunk.length})`;
+                return `<a class="btn btn-secondary" href="${url}" target="_blank" rel="noopener">${label}</a>`;
+            }).join('');
+            return `<div class="route-btns" style="margin-bottom:12px;flex-wrap:wrap;">
+                ${links}
+                <a class="btn btn-secondary" href="${nextKakao}" target="_blank" rel="noopener">다음 곳 카카오맵</a>
+            </div>
+            <div class="route-meta" style="margin-bottom:10px;">운전 경로는 구글맵이 실제 도로로 안내합니다. 한 번에 최대 10곳입니다.</div>`;
         }
 
         function routeText() {

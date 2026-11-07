@@ -46,12 +46,21 @@ function loadProgress_() {
     var station = String(values[i][5] || '');
     if (!station || region === '테스트' || region === '집테스트') continue;
     if (station.indexOf('테스트') >= 0) continue;
+    var rawDate = values[i][0];
+    var dateStr = '';
+    if (rawDate instanceof Date) {
+      dateStr = Utilities.formatDate(rawDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    } else {
+      dateStr = String(rawDate || '').substring(0, 10);
+    }
     out.push({
       region: region,
       city: String(values[i][4] || ''),
       station: station,
       zone: String(values[i][6] || ''),
-      inspector: String(values[i][2] || '')
+      inspector: String(values[i][2] || ''),
+      date: dateStr,
+      chargers: Number(values[i][7]) || 0
     });
   }
   return out;
@@ -78,6 +87,9 @@ function doPost(e) {
     var folder = ensureZoneFolder_(data);
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     ensureHeader_(sheet);
+    if (isDuplicateComplete_(sheet, data)) {
+      return json_({ ok: true, duplicate: true, folderUrl: folder.getUrl() });
+    }
     sheet.appendRow([
       data.date || '',
       data.time || '',
@@ -113,6 +125,17 @@ function doPost(e) {
   } catch (err) {
     return json_({ ok: false, error: String(err) });
   }
+}
+
+function isDuplicateComplete_(sheet, data) {
+  var station = String(data.station || '');
+  var zone = String(data.zone || '');
+  if (!station || !zone) return false;
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][5]) === station && String(values[i][6]) === zone) return true;
+  }
+  return false;
 }
 
 function ensureHeader_(sheet) {
