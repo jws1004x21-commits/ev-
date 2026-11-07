@@ -334,12 +334,21 @@
 
         .lightbox-actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             width: 100%;
-            max-width: 360px;
+            max-width: 400px;
             margin: 0 auto;
             flex-shrink: 0;
         }
+
+        .lightbox-actions .btn {
+            width: auto;
+            flex: 1;
+            font-size: 13px;
+            padding: 12px 8px;
+        }
+
+        .btn-retake { background: #f97316; color: #000; }
 
         .upload-status {
             font-size: 13px;
@@ -424,7 +433,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v3.8</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v3.9</div>
     </div>
 
     <div class="container">
@@ -504,6 +513,7 @@
                             <div class="text">충전기 <strong id="chargerCount"></strong>대 | 제조사: <span id="makerInfo"></span></div>
                         </div>
                         <div style="font-weight:600;font-size:14px;margin-bottom:4px;">사진 촬영 — 장수 제한 없음</div>
+                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">찍은 직후 화면이 열립니다. 확대해서 380V·220V·저항·절연 숫자가 읽히는지 보고, 흐리면 다시 찍기를 누르세요.</div>
                         <div id="zonePhotoTotal" style="font-size:12px;color:#4ade80;margin-bottom:10px;">이 거점 사진 0장</div>
                         <div id="checklist"></div>
                         <div class="form-group" style="margin-top:16px;">
@@ -610,7 +620,7 @@
     <input type="file" id="galleryInput" accept="image/*" multiple>
 
     <div id="lightbox" class="lightbox hidden">
-        <div class="lightbox-hint">두 손가락으로 확대/축소 · 더블탭 · ＋－ 버튼</div>
+        <div class="lightbox-hint" id="lightboxHint">확대해서 전압·저항·절연 숫자가 읽히는지 확인하세요 · 두 손가락 또는 ＋－</div>
         <div class="lightbox-stage" id="lightboxStage">
             <img id="lightboxImg" alt="미리보기">
         </div>
@@ -620,8 +630,9 @@
             <button type="button" id="zoomIn" aria-label="확대">＋</button>
         </div>
         <div class="lightbox-actions">
-            <button class="btn btn-danger" id="lightboxDelete" style="margin-top:0;">이 사진 삭제</button>
-            <button class="btn btn-secondary" id="lightboxClose" style="margin-top:0;">닫기</button>
+            <button class="btn btn-retake" id="lightboxRetake" style="margin-top:0;">다시 찍기</button>
+            <button class="btn btn-danger" id="lightboxDelete" style="margin-top:0;">삭제</button>
+            <button class="btn btn-primary" id="lightboxClose" style="margin-top:0;">확인</button>
         </div>
     </div>
 
@@ -1261,11 +1272,13 @@
         async function addFiles(fileList) {
             const photoId = currentPhotoId;
             const type = photoTypes.find(p => p.id === photoId);
-            if (!photoId || !type || !fileList || !fileList.length) return;
+            if (!photoId || !type || !fileList || !fileList.length) return 0;
+            const meter = ['voltage', 'resistance', 'insulation'].includes(photoId);
+            let added = 0;
             for (const file of fileList) {
                 if (!file.type.startsWith('image/')) continue;
                 const dataUrl = await readFile(file);
-                const full = await compressImage(dataUrl, 1280, 0.7);
+                const full = await compressImage(dataUrl, meter ? 1920 : 1600, meter ? 0.85 : 0.75);
                 const thumb = await compressImage(full, 720, 0.6);
                 const item = {
                     thumb,
@@ -1277,11 +1290,13 @@
                     filename: `${type.label.replace(/[\\/:*?"<>|]/g, '')}_${Date.now()}_${photosOf(photoId).length + 1}.jpg`
                 };
                 photosOf(photoId).push(item);
+                added += 1;
                 renderChecklist();
                 enqueueUpload(item);
             }
             if (navigator.vibrate) navigator.vibrate(50);
             persistWorking();
+            return added;
         }
 
         function readFile(file) {
@@ -1294,13 +1309,18 @@
         }
 
         document.getElementById('cameraInput').addEventListener('change', async (e) => {
-            await addFiles(e.target.files);
+            const id = currentPhotoId;
+            const added = await addFiles(e.target.files);
             e.target.value = '';
+            if (added > 0) openLightbox(id, photosOf(id).length - 1);
         });
 
         document.getElementById('galleryInput').addEventListener('change', async (e) => {
-            await addFiles(e.target.files);
+            const id = currentPhotoId;
+            const count = e.target.files ? e.target.files.length : 0;
+            const added = await addFiles(e.target.files);
             e.target.value = '';
+            if (added === 1 && count === 1) openLightbox(id, photosOf(id).length - 1);
         });
 
         function deletePhoto(photoId, index) {
@@ -1371,6 +1391,12 @@
         document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
         document.getElementById('lightboxDelete').addEventListener('click', () => {
             if (lightboxTarget) deletePhoto(lightboxTarget.photoId, lightboxTarget.index);
+        });
+        document.getElementById('lightboxRetake').addEventListener('click', () => {
+            if (!lightboxTarget) return;
+            const photoId = lightboxTarget.photoId;
+            deletePhoto(photoId, lightboxTarget.index);
+            takePhoto(photoId, 'camera');
         });
         document.getElementById('zoomIn').addEventListener('click', () => setLightboxZoom(zoomState.scale + 0.5));
         document.getElementById('zoomOut').addEventListener('click', () => setLightboxZoom(zoomState.scale - 0.5));
