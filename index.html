@@ -276,27 +276,69 @@
         .lightbox {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.92);
+            background: rgba(0,0,0,0.94);
             z-index: 500;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 16px;
+            padding: 8px 8px 16px;
         }
 
-        .lightbox img {
+        .lightbox-hint {
+            text-align: center;
+            font-size: 12px;
+            color: #aaa;
+            padding: 6px 0 8px;
+            flex-shrink: 0;
+        }
+
+        .lightbox-stage {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        .lightbox-stage img {
             max-width: 100%;
-            max-height: 80vh;
+            max-height: 100%;
+            transform-origin: center center;
+            user-select: none;
+            -webkit-user-select: none;
+            pointer-events: none;
+        }
+
+        .lightbox-zoom-btns {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 10px 0;
+            flex-shrink: 0;
+        }
+
+        .lightbox-zoom-btns button {
+            width: 48px;
+            height: 40px;
+            border: none;
             border-radius: 8px;
+            background: #333;
+            color: #eee;
+            font-size: 20px;
+            font-weight: 700;
+            cursor: pointer;
         }
 
         .lightbox-actions {
             display: flex;
             gap: 10px;
-            margin-top: 14px;
             width: 100%;
             max-width: 360px;
+            margin: 0 auto;
+            flex-shrink: 0;
         }
 
         .upload-status {
@@ -382,7 +424,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v3.4</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v3.5</div>
     </div>
 
     <div class="container">
@@ -559,7 +601,15 @@
     <input type="file" id="galleryInput" accept="image/*" multiple>
 
     <div id="lightbox" class="lightbox hidden">
-        <img id="lightboxImg" alt="미리보기">
+        <div class="lightbox-hint">두 손가락으로 확대/축소 · 더블탭 · ＋－ 버튼</div>
+        <div class="lightbox-stage" id="lightboxStage">
+            <img id="lightboxImg" alt="미리보기">
+        </div>
+        <div class="lightbox-zoom-btns">
+            <button type="button" id="zoomOut" aria-label="축소">－</button>
+            <button type="button" id="zoomReset" aria-label="원본">1x</button>
+            <button type="button" id="zoomIn" aria-label="확대">＋</button>
+        </div>
         <div class="lightbox-actions">
             <button class="btn btn-danger" id="lightboxDelete" style="margin-top:0;">이 사진 삭제</button>
             <button class="btn btn-secondary" id="lightboxClose" style="margin-top:0;">닫기</button>
@@ -950,7 +1000,6 @@
                 }
                 item.uploaded = true;
                 item.uploading = false;
-                item.data = null;
             } catch (err) {
                 item.uploading = false;
                 item.failed = true;
@@ -1018,23 +1067,104 @@
             }
         }
 
+        const zoomState = { scale: 1, x: 0, y: 0, pointers: new Map(), startDist: 0, startScale: 1, pan: false, lastTap: 0 };
+
+        function applyLightboxZoom() {
+            const img = document.getElementById('lightboxImg');
+            img.style.transform = `translate(${zoomState.x}px, ${zoomState.y}px) scale(${zoomState.scale})`;
+            document.getElementById('zoomReset').textContent = zoomState.scale.toFixed(1) + 'x';
+        }
+
+        function resetLightboxZoom() {
+            zoomState.scale = 1;
+            zoomState.x = 0;
+            zoomState.y = 0;
+            applyLightboxZoom();
+        }
+
+        function setLightboxZoom(next) {
+            zoomState.scale = Math.min(5, Math.max(1, next));
+            if (zoomState.scale === 1) {
+                zoomState.x = 0;
+                zoomState.y = 0;
+            }
+            applyLightboxZoom();
+        }
+
+        function pointerDistance() {
+            const pts = [...zoomState.pointers.values()];
+            if (pts.length < 2) return 0;
+            const dx = pts[0].x - pts[1].x;
+            const dy = pts[0].y - pts[1].y;
+            return Math.hypot(dx, dy);
+        }
+
         function openLightbox(photoId, index) {
             lightboxTarget = { photoId, index };
             const item = photosOf(photoId)[index];
-            document.getElementById('lightboxImg').src = (item && (item.thumb || item.data)) || '';
+            document.getElementById('lightboxImg').src = (item && (item.data || item.thumb)) || '';
             document.getElementById('lightbox').classList.remove('hidden');
+            resetLightboxZoom();
         }
 
         function closeLightbox() {
             document.getElementById('lightbox').classList.add('hidden');
             document.getElementById('lightboxImg').src = '';
             lightboxTarget = null;
+            zoomState.pointers.clear();
+            resetLightboxZoom();
         }
 
         document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
         document.getElementById('lightboxDelete').addEventListener('click', () => {
             if (lightboxTarget) deletePhoto(lightboxTarget.photoId, lightboxTarget.index);
         });
+        document.getElementById('zoomIn').addEventListener('click', () => setLightboxZoom(zoomState.scale + 0.5));
+        document.getElementById('zoomOut').addEventListener('click', () => setLightboxZoom(zoomState.scale - 0.5));
+        document.getElementById('zoomReset').addEventListener('click', resetLightboxZoom);
+
+        const stage = document.getElementById('lightboxStage');
+        stage.addEventListener('pointerdown', (e) => {
+            stage.setPointerCapture(e.pointerId);
+            zoomState.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (zoomState.pointers.size === 2) {
+                zoomState.startDist = pointerDistance();
+                zoomState.startScale = zoomState.scale;
+                zoomState.pan = false;
+            } else if (zoomState.scale > 1) {
+                zoomState.pan = true;
+                zoomState.startX = e.clientX - zoomState.x;
+                zoomState.startY = e.clientY - zoomState.y;
+            }
+            const now = Date.now();
+            if (now - zoomState.lastTap < 280) {
+                if (zoomState.scale > 1) resetLightboxZoom();
+                else setLightboxZoom(2.5);
+            }
+            zoomState.lastTap = now;
+        });
+        stage.addEventListener('pointermove', (e) => {
+            if (!zoomState.pointers.has(e.pointerId)) return;
+            zoomState.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (zoomState.pointers.size === 2 && zoomState.startDist) {
+                setLightboxZoom(zoomState.startScale * (pointerDistance() / zoomState.startDist));
+            } else if (zoomState.pan && zoomState.pointers.size === 1) {
+                zoomState.x = e.clientX - zoomState.startX;
+                zoomState.y = e.clientY - zoomState.startY;
+                applyLightboxZoom();
+            }
+        });
+        function endPointer(e) {
+            zoomState.pointers.delete(e.pointerId);
+            if (zoomState.pointers.size < 2) zoomState.startDist = 0;
+            if (zoomState.pointers.size === 0) zoomState.pan = false;
+        }
+        stage.addEventListener('pointerup', endPointer);
+        stage.addEventListener('pointercancel', endPointer);
+        stage.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            setLightboxZoom(zoomState.scale + (e.deltaY < 0 ? 0.25 : -0.25));
+        }, { passive: false });
 
         function checkCanComplete() {
             const allDone = photoTypes.filter(p => p.required).every(p => photosOf(p.id).length > 0);
