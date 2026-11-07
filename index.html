@@ -7,7 +7,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/ev-/manifest.json">
+    <link rel="icon" href="/ev-/icon-192.png">
+    <link rel="apple-touch-icon" href="/ev-/icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -510,7 +513,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.2</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.3</div>
     </div>
 
     <div class="container">
@@ -2388,6 +2391,9 @@
             }
         }
 
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/ev-/sw.js').catch(() => {});
+        }
         init();
     </script>
 </body>
