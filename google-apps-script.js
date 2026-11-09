@@ -1,5 +1,5 @@
 /**
- * 충전소 점검앱 v5 — Google Apps Script
+ * 충전소 점검앱 v6 — Google Apps Script
  *
  * 사용법:
  * 1. 구글 시트 → 확장 프로그램 → Apps Script
@@ -24,7 +24,7 @@ function setupDrive() {
 
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action;
-  var payload = { ok: true, version: 'v5', message: '충전소 점검 서버 정상' };
+  var payload = { ok: true, version: 'v6', message: '충전소 점검 서버 정상' };
   if (action === 'progress') {
     payload.progress = loadProgress_();
   }
@@ -75,7 +75,7 @@ function doPost(e) {
     var action = data.action || 'complete';
 
     if (action === 'ping') {
-      return json_({ ok: true, version: 'v5' });
+      return json_({ ok: true, version: 'v6' });
     }
 
     if (action === 'photo') {
@@ -203,6 +203,9 @@ function listPhotos_(data) {
     var file = files.next();
     out.push({ name: file.getName(), id: file.getId() });
   }
+  out.sort(function (a, b) {
+    return String(a.name).localeCompare(String(b.name), 'ko', { numeric: true, sensitivity: 'base' });
+  });
   return out;
 }
 

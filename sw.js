@@ -1,3 +1,4 @@
+// v6: sequential Drive names, no per-shot confirm, phone save
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

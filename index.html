@@ -621,7 +621,7 @@
                             <div class="text">충전기 <strong id="chargerCount"></strong>대 | 제조사: <span id="makerInfo"></span></div>
                         </div>
                         <div style="font-weight:600;font-size:14px;margin-bottom:4px;">사진 촬영 — 장수 제한 없음</div>
-                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">찍은 직후 화면이 열립니다. 확대해서 380V·220V·저항·절연 숫자가 읽히는지 보고, 흐리면 다시 찍기를 누르세요.</div>
+                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">연속 촬영 가능합니다. 숫자가 안 보이면 썸네일을 눌러 확대·다시 찍기 하세요. 갤러리에 넣으려면 아래 "폰에 저장"을 누르세요.</div>
                         <div id="editBanner" class="edit-banner hidden">완료된 거점입니다. 바꿀 사진·메모만 고치면 시트 같은 줄이 덮어씌워집니다.</div>
                         <div id="zonePhotoTotal" style="font-size:12px;color:#4ade80;margin-bottom:10px;">이 거점 사진 0장</div>
                         <div id="checklist"></div>
@@ -933,6 +933,7 @@
             fillLocationSelects();
             document.getElementById('memoInput').value = w.memo || '';
             inspectZoneKey = currentZoneKey();
+            syncPhotoSeqFromExisting();
             if (w.inspecting || totalPhotoCount() > 0) {
                 showInspectScreen();
             }
@@ -998,14 +999,36 @@
             return new File([arr], filename || 'photo.jpg', { type: mime });
         }
 
+        function downloadFileToPhone(file) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(file);
+            a.download = file.name;
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                URL.revokeObjectURL(a.href);
+                a.remove();
+            }, 2000);
+        }
+
+        function sleep(ms) {
+            return new Promise((resolve) => setTimeout(resolve, ms));
+        }
+
+        function isIosPhone() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent)
+                || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        }
+
         async function savePhotosToPhone() {
-            const items = allPhotos().filter((p) => p.data || p.thumb);
+            const items = allPhotos().filter((p) => p.data);
             if (!items.length) {
-                alert('저장할 사진이 없습니다.');
+                alert('갤러리에 넣을 사진은 이 폰에서 방금 찍은 것만 됩니다. 드라이브에서 불러온 사진은 구글 드라이브에서 받으세요.');
                 return;
             }
             const files = items.map((item, i) =>
-                dataUrlToFile(item.data || item.thumb, item.filename || `점검사진_${i + 1}.jpg`)
+                dataUrlToFile(item.data || item.thumb, item.filename || `점검사진_${String(i + 1).padStart(2, '0')}.jpg`)
             );
             try {
                 if (navigator.canShare && navigator.canShare({ files })) {
@@ -1019,13 +1042,27 @@
             } catch (err) {
                 if (err && err.name === 'AbortError') return;
             }
-            files.forEach((file) => {
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(file);
-                a.download = file.name;
-                a.click();
-            });
-            alert(`사진 ${files.length}장을 다운로드했습니다. 파일 앱/갤러리에서 확인하세요.`);
+            const chunk = 8;
+            if (files.length > 1 && navigator.share && navigator.canShare && navigator.canShare({ files: [files[0]] })) {
+                for (let i = 0; i < files.length; i += chunk) {
+                    const part = files.slice(i, i + chunk);
+                    try {
+                        await navigator.share({
+                            files: part,
+                            title: `${state.station || '충전소'} 점검사진`,
+                            text: `${i + 1}~${i + part.length}`
+                        });
+                    } catch (err) {
+                        if (err && err.name === 'AbortError') return;
+                    }
+                }
+                return;
+            }
+            for (let i = 0; i < files.length; i++) {
+                downloadFileToPhone(files[i]);
+                await sleep(400);
+            }
+            alert(`사진 ${files.length}장을 저장했습니다. 파일 앱 또는 다운로드에서 확인하세요. 아이폰은 공유 화면에서 "이미지 저장"을 누르세요.`);
         }
 
         async function retryPendingUploads() {
@@ -1349,6 +1386,23 @@
         }
 
         let inspectZoneKey = '';
+        let photoSeq = 0;
+
+        function nextPhotoFilename(type) {
+            photoSeq += 1;
+            const seq = String(photoSeq).padStart(2, '0');
+            const cat = String(type.label || type.id).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+            return `${seq}_${cat}.jpg`;
+        }
+
+        function syncPhotoSeqFromExisting() {
+            let max = 0;
+            allPhotos().forEach((p) => {
+                const m = String(p.filename || '').match(/^(\d+)/);
+                if (m) max = Math.max(max, Number(m[1]));
+            });
+            photoSeq = max;
+        }
 
         function currentZoneKey() {
             return [state.station, state.selectedZone && state.selectedZone.id, state.selectedZoneIdx].join('|');
@@ -1380,6 +1434,7 @@
             if (key !== inspectZoneKey || totalPhotoCount() === 0) {
                 state.photoData = {};
                 photoTypes.forEach(p => { state.photoData[p.id] = []; });
+                photoSeq = 0;
                 document.getElementById('memoInput').value = '';
                 inspectZoneKey = key;
             }
@@ -1411,7 +1466,7 @@
 
         function matchPhotoTypeByName(name) {
             const n = String(name || '');
-            return photoTypes.find((t) => n.indexOf(t.label) === 0)
+            return photoTypes.find((t) => n.indexOf(t.label) >= 0)
                 || photoTypes.find((t) => n.indexOf(t.id) >= 0)
                 || photoTypes[photoTypes.length - 1];
         }
@@ -1466,6 +1521,7 @@
             selectZone(state.selectedZone, idx);
             state.photoData = {};
             photoTypes.forEach((p) => { state.photoData[p.id] = []; });
+            photoSeq = 0;
             document.getElementById('memoInput').value = record.memo || '';
             state.originalDate = record.date || '';
             inspectZoneKey = currentZoneKey();
@@ -1505,6 +1561,7 @@
             document.getElementById('uploadStatus').textContent = (rec.photos && rec.photos.length)
                 ? `드라이브 사진 ${rec.photos.length}장. 바꿀 것만 지우거나 다시 찍으세요.`
                 : '드라이브에 사진이 없습니다. 필요한 장만 다시 찍으면 됩니다.';
+            syncPhotoSeqFromExisting();
             renderChecklist();
         }
 
@@ -1668,7 +1725,7 @@
                     uploaded: false,
                     failed: false,
                     label: type.label,
-                    filename: `${type.label.replace(/[\\/:*?"<>|]/g, '')}_${Date.now()}_${photosOf(photoId).length + 1}.jpg`
+                    filename: nextPhotoFilename(type)
                 };
                 photosOf(photoId).push(item);
                 added += 1;
@@ -1677,6 +1734,11 @@
             }
             if (navigator.vibrate) navigator.vibrate(50);
             persistWorking();
+            if (added > 0 && !isIosPhone()) {
+                photosOf(photoId).slice(-added).forEach((item) => {
+                    if (item.data) downloadFileToPhone(dataUrlToFile(item.data, item.filename));
+                });
+            }
             return added;
         }
 
@@ -1690,18 +1752,13 @@
         }
 
         document.getElementById('cameraInput').addEventListener('change', async (e) => {
-            const id = currentPhotoId;
-            const added = await addFiles(e.target.files);
+            await addFiles(e.target.files);
             e.target.value = '';
-            if (added > 0) openLightbox(id, photosOf(id).length - 1);
         });
 
         document.getElementById('galleryInput').addEventListener('change', async (e) => {
-            const id = currentPhotoId;
-            const count = e.target.files ? e.target.files.length : 0;
-            const added = await addFiles(e.target.files);
+            await addFiles(e.target.files);
             e.target.value = '';
-            if (added === 1 && count === 1) openLightbox(id, photosOf(id).length - 1);
         });
 
         function deletePhoto(photoId, index) {
@@ -1975,6 +2032,7 @@
             state.originalDate = '';
             state.selectedZone = null;
             state.photoData = {};
+            photoSeq = 0;
             saveState();
             updateLocalBackupStatus();
             updateStats();
@@ -2199,7 +2257,7 @@
                 return;
             }
             if (!Array.isArray(probe.data.progress)) {
-                updateRouteSyncStatus(null, '구글 스크립트를 v5로 다시 배포해야 팀 진행·수정이 됩니다.');
+                updateRouteSyncStatus(null, '구글 스크립트를 v6로 다시 배포해야 팀 진행·수정이 됩니다.');
                 updateStats();
                 return;
             }
