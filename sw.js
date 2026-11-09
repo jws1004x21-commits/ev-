@@ -1,4 +1,4 @@
-// v6: app-order Drive names, zip export to phone, no per-shot confirm
+// v6.1: in-app continuous camera, no per-shot confirm
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

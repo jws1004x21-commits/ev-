@@ -344,6 +344,96 @@
             flex-shrink: 0;
         }
 
+        .live-camera {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 600;
+            display: flex;
+            flex-direction: column;
+        }
+        .live-camera video {
+            flex: 1;
+            width: 100%;
+            object-fit: cover;
+            background: #000;
+        }
+        .live-camera-top {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 14px 16px;
+            padding-top: calc(14px + env(safe-area-inset-top, 0px));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+            color: #fff;
+            z-index: 2;
+        }
+        .live-camera-top .cam-title { font-weight: 700; font-size: 16px; }
+        .live-camera-top .cam-count { font-size: 13px; color: #86efac; }
+        .live-camera-flash {
+            position: absolute;
+            inset: 0;
+            background: #fff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 3;
+        }
+        .live-camera-flash.on { opacity: 0.7; }
+        .live-camera-bottom {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 16px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
+            z-index: 2;
+        }
+        .live-camera-bottom .cam-side {
+            width: 64px;
+            height: 64px;
+            border: none;
+            border-radius: 12px;
+            background: #333;
+            color: #eee;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .live-camera-bottom .cam-shutter {
+            width: 76px;
+            height: 76px;
+            border: 6px solid #fff;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 0 4px rgba(255,255,255,0.25);
+        }
+        .live-camera-bottom .cam-shutter:disabled { opacity: 0.5; }
+        .live-camera-thumb {
+            width: 64px;
+            height: 64px;
+            object-fit: cover;
+            border-radius: 10px;
+            background: #222;
+            border: 1px solid #444;
+        }
+        .live-camera-hint {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 118px;
+            text-align: center;
+            color: #ddd;
+            font-size: 13px;
+            z-index: 2;
+            text-shadow: 0 1px 4px #000;
+        }
+
         .lightbox-actions .btn {
             width: auto;
             flex: 1;
@@ -540,7 +630,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.4</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.5</div>
     </div>
 
     <div class="container">
@@ -621,7 +711,7 @@
                             <div class="text">충전기 <strong id="chargerCount"></strong>대 | 제조사: <span id="makerInfo"></span></div>
                         </div>
                         <div style="font-weight:600;font-size:14px;margin-bottom:4px;">사진 촬영 — 장수 제한 없음</div>
-                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">연속 촬영됩니다. 드라이브에는 전압→저항→절연 순으로 저장됩니다. 갤러리에 넣으려면 아래 "사진을 폰으로 내보내기"를 누르세요.</div>
+                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">촬영을 누르면 카메라가 열린 채로 연속 촬영됩니다. 확인을 누를 필요 없습니다. 다 찍으면 닫기를 누르세요.</div>
                         <div id="editBanner" class="edit-banner hidden">완료된 거점입니다. 바꿀 사진·메모만 고치면 시트 같은 줄이 덮어씌워집니다.</div>
                         <div id="zonePhotoTotal" style="font-size:12px;color:#4ade80;margin-bottom:10px;">이 거점 사진 0장</div>
                         <div id="checklist"></div>
@@ -786,6 +876,21 @@
 
     <input type="file" id="cameraInput" accept="image/*" capture="environment">
     <input type="file" id="galleryInput" accept="image/*" multiple>
+
+    <div id="liveCamera" class="live-camera hidden">
+        <video id="liveCameraVideo" autoplay playsinline muted></video>
+        <div class="live-camera-flash" id="liveCameraFlash"></div>
+        <div class="live-camera-top">
+            <div class="cam-title" id="liveCameraTitle">촬영</div>
+            <div class="cam-count" id="liveCameraCount">0장</div>
+        </div>
+        <div class="live-camera-hint">빨간 버튼을 누를 때마다 바로 담깁니다 · 확인 없음</div>
+        <div class="live-camera-bottom">
+            <button type="button" class="cam-side" id="liveCameraClose">닫기</button>
+            <button type="button" class="cam-shutter" id="liveCameraShutter" aria-label="촬영"></button>
+            <img class="live-camera-thumb" id="liveCameraThumb" alt="">
+        </div>
+    </div>
 
     <div id="lightbox" class="lightbox hidden">
         <div class="lightbox-hint" id="lightboxHint">확대해서 전압·저항·절연 숫자가 읽히는지 확인하세요 · 두 손가락 또는 ＋－</div>
@@ -1718,10 +1823,100 @@
             checkCanComplete();
         }
 
+        let cameraStream = null;
+        let shutterBusy = false;
+
+        function updateLiveCameraHud() {
+            const type = photoTypes.find((p) => p.id === currentPhotoId);
+            document.getElementById('liveCameraTitle').textContent = type ? type.label : '촬영';
+            document.getElementById('liveCameraCount').textContent = (type ? photosOf(type.id).length : 0) + '장';
+        }
+
+        function stopLiveCamera() {
+            shutterBusy = false;
+            const video = document.getElementById('liveCameraVideo');
+            if (cameraStream) {
+                cameraStream.getTracks().forEach((t) => t.stop());
+                cameraStream = null;
+            }
+            video.srcObject = null;
+            document.getElementById('liveCamera').classList.add('hidden');
+            document.getElementById('liveCameraShutter').disabled = false;
+        }
+
+        async function startLiveCamera(photoId) {
+            currentPhotoId = photoId;
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                document.getElementById('cameraInput').click();
+                return;
+            }
+            const tries = [
+                { video: { facingMode: { exact: 'environment' }, width: { ideal: 1920 } }, audio: false },
+                { video: { facingMode: { ideal: 'environment' } }, audio: false },
+                { video: true, audio: false }
+            ];
+            let stream = null;
+            for (let i = 0; i < tries.length; i++) {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia(tries[i]);
+                    break;
+                } catch (err) {
+                    stream = null;
+                }
+            }
+            if (!stream) {
+                document.getElementById('cameraInput').click();
+                return;
+            }
+            if (cameraStream) stopLiveCamera();
+            cameraStream = stream;
+            const video = document.getElementById('liveCameraVideo');
+            video.setAttribute('playsinline', 'true');
+            video.muted = true;
+            video.srcObject = stream;
+            try { await video.play(); } catch (err) {}
+            updateLiveCameraHud();
+            document.getElementById('liveCameraThumb').removeAttribute('src');
+            document.getElementById('liveCamera').classList.remove('hidden');
+        }
+
+        async function captureLiveShot() {
+            if (shutterBusy || !cameraStream) return;
+            const video = document.getElementById('liveCameraVideo');
+            if (!video.videoWidth) return;
+            shutterBusy = true;
+            document.getElementById('liveCameraShutter').disabled = true;
+            const flash = document.getElementById('liveCameraFlash');
+            flash.classList.add('on');
+            setTimeout(() => flash.classList.remove('on'), 80);
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+                if (blob) {
+                    const file = new File([blob], 'shot.jpg', { type: 'image/jpeg' });
+                    const added = await addFiles([file]);
+                    if (added > 0) {
+                        document.getElementById('liveCameraThumb').src = URL.createObjectURL(blob);
+                        updateLiveCameraHud();
+                        if (navigator.vibrate) navigator.vibrate(40);
+                    }
+                }
+            } finally {
+                shutterBusy = false;
+                document.getElementById('liveCameraShutter').disabled = false;
+            }
+        }
+
         function takePhoto(photoId, source) {
             currentPhotoId = photoId;
-            const input = document.getElementById(source === 'gallery' ? 'galleryInput' : 'cameraInput');
-            input.click();
+            if (source === 'gallery') {
+                document.getElementById('galleryInput').click();
+                return;
+            }
+            startLiveCamera(photoId);
         }
 
         function compressImage(dataUrl, maxW = 1280, quality = 0.7) {
@@ -1813,6 +2008,12 @@
                 reader.readAsDataURL(file);
             });
         }
+
+        document.getElementById('liveCameraShutter').addEventListener('click', captureLiveShot);
+        document.getElementById('liveCameraClose').addEventListener('click', stopLiveCamera);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) stopLiveCamera();
+        });
 
         document.getElementById('cameraInput').addEventListener('change', async (e) => {
             const list = Array.from(e.target.files || []);
@@ -1994,6 +2195,7 @@
         }
 
         document.getElementById('completeZoneBtn').addEventListener('click', async () => {
+            stopLiveCamera();
             if (completingLock || photosStillUploading()) return;
             const zone = state.selectedZone;
             const memo = document.getElementById('memoInput').value.trim();
@@ -2129,6 +2331,7 @@
         });
 
         document.getElementById('backBtn').addEventListener('click', () => {
+            stopLiveCamera();
             persistWorking();
             document.getElementById('inspectScreen').classList.add('hidden');
             document.getElementById('selectScreen').classList.remove('hidden');
