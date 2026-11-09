@@ -1,4 +1,4 @@
-// v6: sequential Drive names, no per-shot confirm, phone save
+// v6: app-order Drive names, zip export to phone, no per-shot confirm
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

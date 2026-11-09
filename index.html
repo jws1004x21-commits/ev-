@@ -621,7 +621,7 @@
                             <div class="text">충전기 <strong id="chargerCount"></strong>대 | 제조사: <span id="makerInfo"></span></div>
                         </div>
                         <div style="font-weight:600;font-size:14px;margin-bottom:4px;">사진 촬영 — 장수 제한 없음</div>
-                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">연속 촬영 가능합니다. 숫자가 안 보이면 썸네일을 눌러 확대·다시 찍기 하세요. 갤러리에 넣으려면 아래 "폰에 저장"을 누르세요.</div>
+                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">연속 촬영됩니다. 드라이브에는 전압→저항→절연 순으로 저장됩니다. 갤러리에 넣으려면 아래 "사진을 폰으로 내보내기"를 누르세요.</div>
                         <div id="editBanner" class="edit-banner hidden">완료된 거점입니다. 바꿀 사진·메모만 고치면 시트 같은 줄이 덮어씌워집니다.</div>
                         <div id="zonePhotoTotal" style="font-size:12px;color:#4ade80;margin-bottom:10px;">이 거점 사진 0장</div>
                         <div id="checklist"></div>
@@ -636,7 +636,7 @@
                     ⚠️ 필수 사진은 종류마다 최소 1장씩 촬영해야 완료할 수 있습니다
                 </div>
                 <div class="upload-status" id="uploadStatus"></div>
-                <button class="btn btn-secondary" id="saveToPhoneBtn">📥 이 거점 사진을 폰에 저장</button>
+                <button class="btn btn-secondary" id="saveToPhoneBtn">📥 사진을 폰으로 내보내기</button>
                 <button class="btn btn-primary" id="completeZoneBtn" disabled>이 거점 점검 완료</button>
                 <button class="btn btn-secondary" id="backBtn">뒤로</button>
             </div>
@@ -933,7 +933,6 @@
             fillLocationSelects();
             document.getElementById('memoInput').value = w.memo || '';
             inspectZoneKey = currentZoneKey();
-            syncPhotoSeqFromExisting();
             if (w.inspecting || totalPhotoCount() > 0) {
                 showInspectScreen();
             }
@@ -984,7 +983,7 @@
                 const pending = allPhotos().filter((p) => !p.uploaded).length;
                 el.textContent = n
                     ? `폰에 임시 저장됨: 진행 중 사진 ${n}장` + (pending ? ` · 구글 대기 ${pending}장` : '')
-                    : '진행 중인 점검은 찍는 즉시 이 폰에 저장됩니다. 갤러리에 넣으려면 "폰에 저장"을 누르세요.';
+                    : '진행 중인 점검은 앱 안에 임시 저장됩니다. 갤러리에 넣으려면 "사진을 폰으로 내보내기"를 누르세요.';
             } catch (err) {
                 el.textContent = '이 브라우저는 폰 저장을 지원하지 않을 수 있습니다.';
             }
@@ -1012,57 +1011,125 @@
             }, 2000);
         }
 
-        function sleep(ms) {
-            return new Promise((resolve) => setTimeout(resolve, ms));
-        }
-
         function isIosPhone() {
             return /iPad|iPhone|iPod/.test(navigator.userAgent)
                 || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         }
 
+        const CRC32_TABLE = (() => {
+            const t = new Uint32Array(256);
+            for (let i = 0; i < 256; i++) {
+                let c = i;
+                for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                t[i] = c >>> 0;
+            }
+            return t;
+        })();
+
+        function crc32Of(bytes) {
+            let crc = 0xFFFFFFFF;
+            for (let i = 0; i < bytes.length; i++) {
+                crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+            }
+            return (crc ^ 0xFFFFFFFF) >>> 0;
+        }
+
+        function u16le(n) {
+            return new Uint8Array([n & 255, (n >>> 8) & 255]);
+        }
+
+        function u32le(n) {
+            return new Uint8Array([n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]);
+        }
+
+        function concatBytes(parts) {
+            const total = parts.reduce((sum, p) => sum + p.length, 0);
+            const out = new Uint8Array(total);
+            let off = 0;
+            parts.forEach((p) => { out.set(p, off); off += p.length; });
+            return out;
+        }
+
+        function dataUrlToBytes(dataUrl) {
+            const b64 = String(dataUrl).split(',')[1] || '';
+            const bin = atob(b64);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            return arr;
+        }
+
+        function buildZip(entries) {
+            const encoder = new TextEncoder();
+            const locals = [];
+            const centrals = [];
+            let offset = 0;
+            entries.forEach((entry) => {
+                const nameBytes = encoder.encode(entry.name);
+                const data = entry.bytes;
+                const crc = crc32Of(data);
+                const local = concatBytes([
+                    u32le(0x04034b50), u16le(20), u16le(0x0800), u16le(0),
+                    u16le(0), u16le(0), u32le(crc), u32le(data.length), u32le(data.length),
+                    u16le(nameBytes.length), u16le(0), nameBytes, data
+                ]);
+                const central = concatBytes([
+                    u32le(0x02014b50), u16le(20), u16le(20), u16le(0x0800), u16le(0),
+                    u16le(0), u16le(0), u32le(crc), u32le(data.length), u32le(data.length),
+                    u16le(nameBytes.length), u16le(0), u16le(0), u16le(0), u16le(0),
+                    u32le(0), u32le(offset), nameBytes
+                ]);
+                locals.push(local);
+                centrals.push(central);
+                offset += local.length;
+            });
+            const centerSize = centrals.reduce((sum, p) => sum + p.length, 0);
+            const end = concatBytes([
+                u32le(0x06054b50), u16le(0), u16le(0),
+                u16le(entries.length), u16le(entries.length),
+                u32le(centerSize), u32le(offset), u16le(0)
+            ]);
+            return concatBytes([...locals, ...centrals, end]);
+        }
+
+        function exportPhotoName(item, index) {
+            if (item.filename && /^\d{2}_/.test(item.filename)) return item.filename;
+            const label = String(item.label || '사진').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '');
+            return `${String(index + 1).padStart(2, '0')}_${label}.jpg`;
+        }
+
         async function savePhotosToPhone() {
             const items = allPhotos().filter((p) => p.data);
             if (!items.length) {
-                alert('갤러리에 넣을 사진은 이 폰에서 방금 찍은 것만 됩니다. 드라이브에서 불러온 사진은 구글 드라이브에서 받으세요.');
+                alert('이 폰에서 찍은 사진만 내보낼 수 있습니다. 드라이브에서 불러온 사진은 구글 드라이브 폴더에서 받으세요.');
                 return;
             }
-            const files = items.map((item, i) =>
-                dataUrlToFile(item.data || item.thumb, item.filename || `점검사진_${String(i + 1).padStart(2, '0')}.jpg`)
-            );
-            try {
-                if (navigator.canShare && navigator.canShare({ files })) {
-                    await navigator.share({
-                        files,
-                        title: `${state.station || '충전소'} 점검사진`,
-                        text: `${state.station} 거점${(state.selectedZoneIdx || 0) + 1}`
-                    });
-                    return;
-                }
-            } catch (err) {
-                if (err && err.name === 'AbortError') return;
-            }
-            const chunk = 8;
-            if (files.length > 1 && navigator.share && navigator.canShare && navigator.canShare({ files: [files[0]] })) {
-                for (let i = 0; i < files.length; i += chunk) {
-                    const part = files.slice(i, i + chunk);
-                    try {
-                        await navigator.share({
-                            files: part,
-                            title: `${state.station || '충전소'} 점검사진`,
-                            text: `${i + 1}~${i + part.length}`
-                        });
-                    } catch (err) {
-                        if (err && err.name === 'AbortError') return;
+            const files = items.map((item, i) => dataUrlToFile(item.data, exportPhotoName(item, i)));
+            const zipName = `${state.station || '충전소'}_거점${(state.selectedZoneIdx || 0) + 1}_점검사진.zip`;
+            const zipBytes = buildZip(items.map((item, i) => ({
+                name: exportPhotoName(item, i),
+                bytes: dataUrlToBytes(item.data)
+            })));
+            downloadFileToPhone(new File([zipBytes], zipName, { type: 'application/zip' }));
+            if (isIosPhone()) {
+                try {
+                    if (navigator.canShare && navigator.canShare({ files: [files[0]] })) {
+                        const chunk = 8;
+                        for (let i = 0; i < files.length; i += chunk) {
+                            const part = files.slice(i, i + chunk);
+                            if (!(navigator.canShare && navigator.canShare({ files: part }))) break;
+                            await navigator.share({
+                                files: part,
+                                title: `${state.station || '충전소'} 점검사진`,
+                                text: '공유 화면에서 "이미지 저장"을 누르세요.'
+                            });
+                        }
+                        return;
                     }
+                } catch (err) {
+                    if (err && err.name === 'AbortError') return;
                 }
-                return;
             }
-            for (let i = 0; i < files.length; i++) {
-                downloadFileToPhone(files[i]);
-                await sleep(400);
-            }
-            alert(`사진 ${files.length}장을 저장했습니다. 파일 앱 또는 다운로드에서 확인하세요. 아이폰은 공유 화면에서 "이미지 저장"을 누르세요.`);
+            alert(`사진 ${files.length}장을 앱 순서대로 ${zipName} 에 담았습니다. 파일 앱 또는 다운로드에서 확인하세요.`);
         }
 
         async function retryPendingUploads() {
@@ -1386,22 +1453,26 @@
         }
 
         let inspectZoneKey = '';
-        let photoSeq = 0;
 
-        function nextPhotoFilename(type) {
-            photoSeq += 1;
-            const seq = String(photoSeq).padStart(2, '0');
-            const cat = String(type.label || type.id).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
-            return `${seq}_${cat}.jpg`;
+        function photoFilename(type, shotNo) {
+            const typeNo = String(photoTypes.findIndex((t) => t.id === type.id) + 1).padStart(2, '0');
+            const n = String(shotNo).padStart(2, '0');
+            const cat = String(type.label || type.id).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '').trim();
+            return `${typeNo}_${cat}_${n}.jpg`;
         }
 
-        function syncPhotoSeqFromExisting() {
+        function nextShotIndex(type) {
             let max = 0;
-            allPhotos().forEach((p) => {
-                const m = String(p.filename || '').match(/^(\d+)/);
+            photosOf(type.id).forEach((p, i) => {
+                max = Math.max(max, i + 1);
+                const m = String(p.filename || '').match(/_(\d+)\.jpe?g$/i);
                 if (m) max = Math.max(max, Number(m[1]));
             });
-            photoSeq = max;
+            return max + 1;
+        }
+
+        function nextPhotoFilename(type) {
+            return photoFilename(type, nextShotIndex(type));
         }
 
         function currentZoneKey() {
@@ -1434,7 +1505,6 @@
             if (key !== inspectZoneKey || totalPhotoCount() === 0) {
                 state.photoData = {};
                 photoTypes.forEach(p => { state.photoData[p.id] = []; });
-                photoSeq = 0;
                 document.getElementById('memoInput').value = '';
                 inspectZoneKey = key;
             }
@@ -1465,8 +1535,8 @@
         }
 
         function matchPhotoTypeByName(name) {
-            const n = String(name || '');
-            return photoTypes.find((t) => n.indexOf(t.label) >= 0)
+            const n = String(name || '').replace(/\s+/g, '');
+            return photoTypes.find((t) => n.indexOf(String(t.label).replace(/\s+/g, '')) >= 0)
                 || photoTypes.find((t) => n.indexOf(t.id) >= 0)
                 || photoTypes[photoTypes.length - 1];
         }
@@ -1521,7 +1591,6 @@
             selectZone(state.selectedZone, idx);
             state.photoData = {};
             photoTypes.forEach((p) => { state.photoData[p.id] = []; });
-            photoSeq = 0;
             document.getElementById('memoInput').value = record.memo || '';
             state.originalDate = record.date || '';
             inspectZoneKey = currentZoneKey();
@@ -1561,7 +1630,6 @@
             document.getElementById('uploadStatus').textContent = (rec.photos && rec.photos.length)
                 ? `드라이브 사진 ${rec.photos.length}장. 바꿀 것만 지우거나 다시 찍으세요.`
                 : '드라이브에 사진이 없습니다. 필요한 장만 다시 찍으면 됩니다.';
-            syncPhotoSeqFromExisting();
             renderChecklist();
         }
 
@@ -1734,11 +1802,6 @@
             }
             if (navigator.vibrate) navigator.vibrate(50);
             persistWorking();
-            if (added > 0 && !isIosPhone()) {
-                photosOf(photoId).slice(-added).forEach((item) => {
-                    if (item.data) downloadFileToPhone(dataUrlToFile(item.data, item.filename));
-                });
-            }
             return added;
         }
 
@@ -1752,13 +1815,24 @@
         }
 
         document.getElementById('cameraInput').addEventListener('change', async (e) => {
-            await addFiles(e.target.files);
+            const list = Array.from(e.target.files || []);
             e.target.value = '';
+            const type = photoTypes.find((p) => p.id === currentPhotoId);
+            if (type && list.length && !isIosPhone()) {
+                let n = nextShotIndex(type);
+                list.forEach((file) => {
+                    if (!file.type.startsWith('image/')) return;
+                    downloadFileToPhone(new File([file], photoFilename(type, n), { type: file.type || 'image/jpeg' }));
+                    n += 1;
+                });
+            }
+            await addFiles(list);
         });
 
         document.getElementById('galleryInput').addEventListener('change', async (e) => {
-            await addFiles(e.target.files);
+            const list = Array.from(e.target.files || []);
             e.target.value = '';
+            await addFiles(list);
         });
 
         function deletePhoto(photoId, index) {
@@ -2032,7 +2106,6 @@
             state.originalDate = '';
             state.selectedZone = null;
             state.photoData = {};
-            photoSeq = 0;
             saveState();
             updateLocalBackupStatus();
             updateStats();

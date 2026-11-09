@@ -243,6 +243,10 @@ function savePhoto_(data) {
   var bytes = Utilities.base64Decode(raw);
   var filename = sanitize_(data.filename || ((data.label || '사진') + '.jpg'));
   if (!/\.jpe?g$/i.test(filename)) filename += '.jpg';
+  var existing = folder.getFilesByName(filename);
+  while (existing.hasNext()) {
+    existing.next().setTrashed(true);
+  }
   var file = folder.createFile(Utilities.newBlob(bytes, MimeType.JPEG, filename));
   return { url: file.getUrl(), folderUrl: folder.getUrl() };
 }
