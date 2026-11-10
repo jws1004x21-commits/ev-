@@ -827,7 +827,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.9</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.10</div>
     </div>
 
     <div class="container">
@@ -954,7 +954,7 @@
                 <div class="card">
                     <div class="card-header">✅ 오늘 점검 완료</div>
                     <div class="card-body">
-                        <button class="btn btn-primary btn-small" onclick="exportTodayPack()" style="margin-bottom:12px;">📤 오늘 완료분 전달하기</button>
+                        <button class="btn btn-primary btn-small" onclick="exportTodayReport()" style="margin-bottom:12px;">📤 오늘 점검 카톡으로 보내기</button>
                         <div id="completedList"></div>
                     </div>
                 </div>
@@ -1021,9 +1021,10 @@
             <div class="card">
                 <div class="card-header">📋 점검 내역</div>
                 <div class="card-body">
-                    <button class="btn btn-primary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📤 오늘 완료분 전달하기 (엑셀+사진)</button>
+                    <button class="btn btn-primary btn-small" onclick="exportTodayReport()" style="margin-bottom:8px;">📤 오늘 점검 카톡으로 보내기</button>
+                    <button class="btn btn-secondary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📁 원본 사진 폴더(zip)</button>
                     <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📋 전체 기록만 엑셀</button>
-                    <div style="font-size:12px;color:#aaa;margin-bottom:12px;">오늘 완료분은 zip으로 나갑니다. 받는 사람은 압축을 풀고 <b>점검목록.html</b>을 열면 사진까지 보입니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin-bottom:12px;">카톡 보내기는 파일 하나입니다. 받는 사람이 그 파일을 열면 기록과 사진이 바로 보입니다. 압축을 풀 필요 없습니다.</div>
                     <div id="historyList"></div>
                 </div>
             </div>
@@ -3727,7 +3728,7 @@ ${blocks}
 </body></html>`;
         }
 
-        async function exportTodayPack() {
+        async function loadTodayPack() {
             const date = todayStamp();
             let pack = await idbGet('daily-' + date);
             if (!pack || !pack.items || !pack.items.length) {
@@ -3735,11 +3736,104 @@ ${blocks}
                 const last = index[index.length - 1];
                 if (last) pack = await idbGet('daily-' + last);
             }
-            if (!pack || !pack.items || !pack.items.length) {
+            if (!pack || !pack.items || !pack.items.length) return null;
+            return pack;
+        }
+
+        function dailyStandaloneHtml(date, items) {
+            const rows = items.map((it) => {
+                const r = it.record;
+                return `<tr>
+                    <td>${r.city || ''}</td>
+                    <td>${r.station || ''}</td>
+                    <td>거점${r.zoneIndex} ${r.zoneName || ''}</td>
+                    <td>${r.chargers || 0}대</td>
+                    <td>${r.time || ''}</td>
+                    <td>${(r.memo || '').replace(/</g, '&lt;')}</td>
+                </tr>`;
+            }).join('');
+            const blocks = items.map((it) => {
+                const r = it.record;
+                const imgs = [];
+                photoTypes.forEach((type) => {
+                    (it.photos[type.id] || []).forEach((p) => {
+                        const src = p.thumb || p.data;
+                        if (!src || !String(src).startsWith('data:')) return;
+                        imgs.push(`<figure><img src="${src}" alt="${type.label}"><figcaption>${type.label}</figcaption></figure>`);
+                    });
+                });
+                return `<section>
+                    <h2>${r.station} · 거점${r.zoneIndex} ${r.zoneName || ''}</h2>
+                    <p>${r.city || ''} · ${r.date} ${r.time || ''} · ${r.chargers || 0}대 · ${r.inspector || ''} · 사진 ${r.photoCount || 0}장</p>
+                    <p>${(r.memo || '').replace(/</g, '&lt;')}</p>
+                    <div class="pics">${imgs.join('') || '<p>사진 없음</p>'}</div>
+                </section>`;
+            }).join('\n');
+            return `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>대전팀 점검 ${date}</title>
+<style>
+body{font-family:sans-serif;background:#111;color:#eee;margin:0;padding:16px;}
+h1{font-size:20px;} h2{font-size:16px;margin:18px 0 6px;}
+p{color:#bbb;font-size:13px;white-space:pre-wrap;}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:12px 0;}
+th,td{border:1px solid #333;padding:6px 8px;text-align:left;}
+th{background:#1f1f35;}
+section{border-top:1px solid #333;padding-top:8px;}
+.pics{display:flex;flex-wrap:wrap;gap:8px;}
+figure{margin:0;width:31%;max-width:140px;}
+img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#222;}
+figcaption{font-size:11px;color:#9ca3af;text-align:center;}
+</style></head>
+<body>
+<h1>대전팀 점검 ${date}</h1>
+<p>거점 ${items.length}곳 · 이 파일만 열면 됩니다. 압축 필요 없습니다. 사진을 누르면 이 화면에서 보입니다.</p>
+<table>
+<thead><tr><th>시군</th><th>충전소</th><th>거점</th><th>대수</th><th>시간</th><th>메모</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+${blocks}
+</body></html>`;
+        }
+
+        async function shareOrSaveFile(file, text) {
+            try {
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: file.name, text: text || '' });
+                    return true;
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') return true;
+            }
+            downloadFileToPhone(file);
+            return false;
+        }
+
+        async function exportTodayReport() {
+            const pack = await loadTodayPack();
+            if (!pack) {
+                alert('이 폰에서 완료한 거점이 아직 없습니다. 거점을 완료한 뒤에 보내면 사진이 들어갑니다.');
+                return;
+            }
+            const stamp = pack.date || todayStamp();
+            const html = dailyStandaloneHtml(stamp, pack.items);
+            const file = new File([html], `대전팀_점검_${stamp}.html`, { type: 'text/html' });
+            const list = pack.items.map((it) => `${it.record.city || ''} ${it.record.station} 거점${it.record.zoneIndex}`).join('\n');
+            const text = `오늘 점검 ${pack.items.length}곳\n${list}\n\n받은 파일을 열면 사진이 보입니다. 압축 필요 없습니다.`;
+            const shared = await shareOrSaveFile(file, text);
+            if (!shared) {
+                alert('파일을 저장했습니다. 카톡에서 파일을 첨부해 보내세요. 받는 사람은 그 파일만 열면 됩니다.');
+            }
+        }
+
+        async function exportTodayPack() {
+            const pack = await loadTodayPack();
+            if (!pack) {
                 alert('이 폰에서 완료한 거점이 아직 없습니다. 거점을 완료하면 그날 사진이 묶입니다.');
                 return;
             }
-            const stamp = pack.date || date;
+            const stamp = pack.date || todayStamp();
             const entries = [];
             entries.push({ name: '점검기록.csv', bytes: utf8Bytes(dailyCsv(pack.items)) });
             entries.push({ name: '점검목록.html', bytes: utf8Bytes(dailyHtml(stamp, pack.items)) });

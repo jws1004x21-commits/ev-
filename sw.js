@@ -1,4 +1,4 @@
-// v4.9: tap shots in camera to review 1:1 photos
+// v4.10: one-file HTML share for today's inspection
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
