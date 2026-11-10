@@ -794,7 +794,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.7</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.8</div>
     </div>
 
     <div class="container">
@@ -920,7 +920,10 @@
             <div id="completedSection" class="hidden">
                 <div class="card">
                     <div class="card-header">✅ 오늘 점검 완료</div>
-                    <div class="card-body" id="completedList"></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary btn-small" onclick="exportTodayPack()" style="margin-bottom:12px;">📤 오늘 완료분 전달하기</button>
+                        <div id="completedList"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -985,7 +988,9 @@
             <div class="card">
                 <div class="card-header">📋 점검 내역</div>
                 <div class="card-body">
-                    <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📤 엑셀로 내보내기</button>
+                    <button class="btn btn-primary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📤 오늘 완료분 전달하기 (엑셀+사진)</button>
+                    <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📋 전체 기록만 엑셀</button>
+                    <div style="font-size:12px;color:#aaa;margin-bottom:12px;">오늘 완료분은 zip으로 나갑니다. 받는 사람은 압축을 풀고 <b>점검목록.html</b>을 열면 사진까지 보입니다.</div>
                     <div id="historyList"></div>
                 </div>
             </div>
@@ -2812,7 +2817,9 @@
             }
 
             try {
-                await idbSet('last-complete', { record, photos: snapshotPhotos(), savedAt: Date.now() });
+                const photosSnap = snapshotPhotos();
+                await idbSet('last-complete', { record, photos: photosSnap, savedAt: Date.now() });
+                await saveDailyPack(record, photosSnap);
                 await idbDel('working');
             } catch (err) {
                 console.warn(err);
@@ -3557,6 +3564,152 @@
             } catch (err) {
                 el.textContent = '전송 실패. 인터넷 또는 Apps Script 배포를 확인하세요.';
             }
+        }
+
+        function todayStamp() {
+            const d = new Date();
+            const p = (n) => String(n).padStart(2, '0');
+            return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+        }
+
+        function folderSafe(name) {
+            return String(name || '미지정').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 60) || '미지정';
+        }
+
+        function utf8Bytes(text) {
+            return new TextEncoder().encode(text);
+        }
+
+        async function saveDailyPack(record, photos) {
+            const date = record.date || todayStamp();
+            const key = 'daily-' + date;
+            const pack = (await idbGet(key)) || { date, items: [] };
+            const idx = pack.items.findIndex((it) =>
+                it.record.station === record.station && String(it.record.zoneId) === String(record.zoneId)
+            );
+            const entry = { record, photos };
+            if (idx >= 0) pack.items[idx] = entry;
+            else pack.items.push(entry);
+            await idbSet(key, pack);
+            let index = (await idbGet('daily-index')) || [];
+            if (index.indexOf(date) < 0) index.push(date);
+            const keep = [];
+            for (let i = 0; i < index.length; i++) {
+                const d = index[i];
+                const age = (Date.now() - Date.parse(d + 'T00:00:00')) / 86400000;
+                if (age <= 7) keep.push(d);
+                else await idbDel('daily-' + d);
+            }
+            await idbSet('daily-index', keep);
+        }
+
+        function dailyCsv(items) {
+            const headers = ['날짜', '시간', '지역', '시군', '충전소', '거점', '충전기수', '제조사', '점검자', 'GPS', '메모', '사진수', '사진폴더'];
+            const rows = items.map((it) => {
+                const r = it.record;
+                const zone = `거점${r.zoneIndex}: ${r.zoneName}`;
+                const folder = ['사진', folderSafe(r.city), folderSafe(r.station), folderSafe('거점' + r.zoneIndex + '_' + r.zoneName)].join('/');
+                return [
+                    r.date, r.time, r.region, r.city, r.station, zone,
+                    r.chargers, r.maker || '', r.inspector || '',
+                    r.gps ? `${r.gps.lat},${r.gps.lng}` : '',
+                    r.memo || '', r.photoCount || 0, folder
+                ];
+            });
+            return '\uFEFF' + [headers, ...rows]
+                .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                .join('\n');
+        }
+
+        function dailyHtml(date, items) {
+            const blocks = items.map((it) => {
+                const r = it.record;
+                const zoneFolder = folderSafe('거점' + r.zoneIndex + '_' + r.zoneName);
+                const base = ['사진', folderSafe(r.city), folderSafe(r.station), zoneFolder].join('/');
+                const imgs = [];
+                photoTypes.forEach((type) => {
+                    (it.photos[type.id] || []).forEach((p) => {
+                        if (!p.data && !p.filename) return;
+                        const name = p.filename || (type.id + '.jpg');
+                        imgs.push(`<figure><img src="${base}/${name}" alt="${type.label}"><figcaption>${type.label}</figcaption></figure>`);
+                    });
+                });
+                return `<section>
+                    <h2>${r.station} · 거점${r.zoneIndex} ${r.zoneName || ''}</h2>
+                    <p>${r.city || ''} · ${r.date} ${r.time || ''} · ${r.chargers || 0}대 · 점검자 ${r.inspector || ''} · 사진 ${r.photoCount || 0}장</p>
+                    <p>${(r.memo || '').replace(/</g, '&lt;')}</p>
+                    <div class="pics">${imgs.join('')}</div>
+                </section>`;
+            }).join('\n');
+            return `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>대전팀 점검 ${date}</title>
+<style>
+body{font-family:sans-serif;background:#111;color:#eee;margin:0;padding:16px;}
+h1{font-size:20px;} h2{font-size:16px;margin:18px 0 6px;}
+p{color:#bbb;font-size:13px;white-space:pre-wrap;}
+section{border-top:1px solid #333;padding-top:8px;}
+.pics{display:flex;flex-wrap:wrap;gap:8px;}
+figure{margin:0;width:120px;}
+img{width:120px;height:120px;object-fit:cover;border-radius:8px;background:#222;}
+figcaption{font-size:11px;color:#9ca3af;text-align:center;}
+</style></head>
+<body>
+<h1>대전팀 점검 ${date}</h1>
+<p>거점 ${items.length}곳 · 압축을 푼 뒤 이 파일을 브라우저로 여세요. 사진은 시군/충전소/거점 폴더에도 있습니다.</p>
+${blocks}
+</body></html>`;
+        }
+
+        async function exportTodayPack() {
+            const date = todayStamp();
+            let pack = await idbGet('daily-' + date);
+            if (!pack || !pack.items || !pack.items.length) {
+                const index = (await idbGet('daily-index')) || [];
+                const last = index[index.length - 1];
+                if (last) pack = await idbGet('daily-' + last);
+            }
+            if (!pack || !pack.items || !pack.items.length) {
+                alert('이 폰에서 완료한 거점이 아직 없습니다. 거점을 완료하면 그날 사진이 묶입니다.');
+                return;
+            }
+            const stamp = pack.date || date;
+            const entries = [];
+            entries.push({ name: '점검기록.csv', bytes: utf8Bytes(dailyCsv(pack.items)) });
+            entries.push({ name: '점검목록.html', bytes: utf8Bytes(dailyHtml(stamp, pack.items)) });
+            entries.push({
+                name: '전달방법.txt',
+                bytes: utf8Bytes('1. 이 zip을 카톡/메일/USB로 보내세요.\n2. 받는 사람은 압축을 풉니다.\n3. 점검목록.html 을 열면 기록과 사진이 보입니다.\n4. 원본 사진은 사진/시군/충전소/거점 폴더에 있습니다.\n')
+            });
+            pack.items.forEach((it) => {
+                const r = it.record;
+                const zoneFolder = folderSafe('거점' + r.zoneIndex + '_' + r.zoneName);
+                const dir = ['사진', folderSafe(r.city), folderSafe(r.station), zoneFolder].join('/');
+                photoTypes.forEach((type) => {
+                    (it.photos[type.id] || []).forEach((p, i) => {
+                        if (!p.data) return;
+                        const name = p.filename || `${String(i + 1).padStart(2, '0')}_${type.label}.jpg`;
+                        entries.push({ name: dir + '/' + name, bytes: dataUrlToBytes(p.data) });
+                    });
+                });
+            });
+            const zipName = `대전팀_점검_${stamp}.zip`;
+            const zipFile = new File([buildZip(entries)], zipName, { type: 'application/zip' });
+            try {
+                if (navigator.canShare && navigator.canShare({ files: [zipFile] })) {
+                    await navigator.share({
+                        files: [zipFile],
+                        title: `대전팀 점검 ${stamp}`,
+                        text: `${pack.items.length}개 거점. 압축을 풀고 점검목록.html 을 여세요.`
+                    });
+                    return;
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') return;
+            }
+            downloadFileToPhone(zipFile);
+            alert(`오늘 완료분 ${pack.items.length}개 거점을 ${zipName} 으로 저장했습니다. 파일 앱에서 카톡으로 보내면 됩니다. 받는 사람은 압축을 풀고 점검목록.html 을 여세요.`);
         }
 
         function exportData() {

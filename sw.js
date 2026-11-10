@@ -1,4 +1,4 @@
-// v4.7: meter review, blur warn, missing-item checklist
+// v4.8: daily zip pack with excel and photos for sharing
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
