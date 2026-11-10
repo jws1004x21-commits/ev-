@@ -1,4 +1,4 @@
-// v6.1: in-app continuous camera, no per-shot confirm
+// v4.6: 1:1 viewfinder except overview, torch, type switcher
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
