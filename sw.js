@@ -1,4 +1,4 @@
-// v4.12: drive count, inspector required, meter sheet cols, already-done, update banner
+// v4.13: confirm Drive folder count, lock zone while inspecting
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

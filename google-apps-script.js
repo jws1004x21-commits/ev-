@@ -1,5 +1,5 @@
 /**
- * 충전소 점검앱 v7 — Google Apps Script
+ * 충전소 점검앱 v8 — Google Apps Script
  *
  * 사용법:
  * 1. 구글 시트 → 확장 프로그램 → Apps Script
@@ -24,12 +24,26 @@ function setupDrive() {
 
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action;
-  var payload = { ok: true, version: 'v7', message: '충전소 점검 서버 정상' };
+  var p = e.parameter || {};
+  var payload = { ok: true, version: 'v8', message: '충전소 점검 서버 정상' };
   if (action === 'progress') {
     payload.progress = loadProgress_();
+    payload.locks = loadLocks_();
   }
   if (action === 'record') {
-    payload.record = loadRecord_(e.parameter || {});
+    payload.record = loadRecord_(p);
+  }
+  if (action === 'count') {
+    payload.count = folderFileCount_(ensureZoneFolder_(p));
+  }
+  if (action === 'lock') {
+    payload.lock = takeLock_(p);
+  }
+  if (action === 'unlock') {
+    payload.unlocked = releaseLock_(p);
+  }
+  if (action === 'heartbeat') {
+    payload.lock = refreshLock_(p);
   }
   var cb = e && e.parameter && e.parameter.callback;
   if (cb) {
@@ -75,7 +89,7 @@ function doPost(e) {
     var action = data.action || 'complete';
 
     if (action === 'ping') {
-      return json_({ ok: true, version: 'v7' });
+      return json_({ ok: true, version: 'v8' });
     }
 
     if (action === 'photo') {
@@ -291,6 +305,102 @@ function sanitize_(name) {
     .replace(/\s+/g, ' ')
     .trim()
     .substring(0, 80);
+}
+
+var LOCK_MS = 2 * 60 * 60 * 1000;
+
+function lockKey_(p) {
+  return 'lock:' + [p.city || '', p.station || '', p.zone || ''].join('|');
+}
+
+function takeLock_(p) {
+  var props = PropertiesService.getScriptProperties();
+  var key = lockKey_(p);
+  var now = Date.now();
+  var inspector = String(p.inspector || '').trim();
+  if (!inspector || !p.station || !p.zone) {
+    return { ok: false, reason: 'missing' };
+  }
+  var raw = props.getProperty(key);
+  if (raw) {
+    try {
+      var lock = JSON.parse(raw);
+      if (lock.expires > now && lock.inspector && lock.inspector !== inspector) {
+        return { ok: false, lockedBy: lock.inspector, started: lock.started };
+      }
+    } catch (err) {}
+  }
+  props.setProperty(key, JSON.stringify({
+    inspector: inspector,
+    started: now,
+    expires: now + LOCK_MS,
+    city: p.city || '',
+    station: p.station || '',
+    zone: p.zone || ''
+  }));
+  return { ok: true, inspector: inspector };
+}
+
+function refreshLock_(p) {
+  var props = PropertiesService.getScriptProperties();
+  var key = lockKey_(p);
+  var raw = props.getProperty(key);
+  var inspector = String(p.inspector || '').trim();
+  var now = Date.now();
+  if (!raw) return takeLock_(p);
+  try {
+    var lock = JSON.parse(raw);
+    if (lock.inspector === inspector) {
+      lock.expires = now + LOCK_MS;
+      props.setProperty(key, JSON.stringify(lock));
+      return { ok: true, inspector: inspector };
+    }
+    if (lock.expires > now) {
+      return { ok: false, lockedBy: lock.inspector, started: lock.started };
+    }
+  } catch (err) {}
+  return takeLock_(p);
+}
+
+function releaseLock_(p) {
+  var props = PropertiesService.getScriptProperties();
+  var key = lockKey_(p);
+  var raw = props.getProperty(key);
+  if (!raw) return true;
+  try {
+    var lock = JSON.parse(raw);
+    var inspector = String(p.inspector || '').trim();
+    if (lock.inspector && inspector && lock.inspector !== inspector && lock.expires > Date.now()) {
+      return false;
+    }
+  } catch (err) {}
+  props.deleteProperty(key);
+  return true;
+}
+
+function loadLocks_() {
+  var props = PropertiesService.getScriptProperties();
+  var all = props.getProperties();
+  var now = Date.now();
+  var out = [];
+  Object.keys(all).forEach(function (k) {
+    if (k.indexOf('lock:') !== 0) return;
+    try {
+      var lock = JSON.parse(all[k]);
+      if (!lock.expires || lock.expires < now) {
+        props.deleteProperty(k);
+        return;
+      }
+      out.push({
+        city: lock.city || '',
+        station: lock.station || '',
+        zone: lock.zone || '',
+        inspector: lock.inspector || '',
+        started: lock.started || 0
+      });
+    } catch (err) {}
+  });
+  return out;
 }
 
 function json_(obj) {

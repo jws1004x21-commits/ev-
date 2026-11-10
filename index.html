@@ -116,6 +116,15 @@
             opacity: 1;
         }
         .zone-card.completed.selected { background: #4a3500; border-color: #fde68a; }
+        .zone-card.busy {
+            border: 3px solid #fb923c;
+            background: #431407;
+            opacity: 1;
+        }
+        .zone-card .badge.busy {
+            background: #fb923c;
+            color: #111;
+        }
         .zone-card .zone-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
         .zone-card .zone-info { font-size: 11px; color: #888; }
         .zone-card .zone-done-who { font-size: 13px; font-weight: 700; color: #fde68a; margin-top: 6px; }
@@ -828,6 +837,14 @@
             font-weight: 800;
             padding: 8px 12px;
         }
+        .zone-pill.busy {
+            background: #7c2d12;
+            color: #fdba74;
+            border: 2px solid #fb923c;
+            font-size: 13px;
+            font-weight: 800;
+            padding: 8px 12px;
+        }
         .zone-pill.left { background: #431407; color: #fdba74; border: 1px solid #f97316; font-weight: 600; }
         .legend { font-size: 11px; color: #888; margin-bottom: 10px; }
 
@@ -917,7 +934,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.12</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.13</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 앱을 새로고침 하세요.
@@ -1269,7 +1286,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.12';
+        const APP_VERSION = '4.13';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -1296,6 +1313,7 @@
             currentGPS: null,
             inspector: '',
             teamProgress: [],
+            zoneLocks: [],
             editing: false,
             originalDate: ''
         };
@@ -1382,9 +1400,75 @@
 
         function driveCountLine(stats) {
             const s = stats || drivePhotoStats();
+            if (s.folder != null) {
+                if (s.folder < s.total) return `사진 ${s.total}장 · 드라이브 폴더 ${s.folder}장 확인 · 부족 ${s.total - s.folder}장`;
+                return `사진 ${s.total}장 · 드라이브 폴더 ${s.folder}장 확인됨`;
+            }
             if (s.pending) return `사진 ${s.total}장 · 드라이브 전송 ${s.sent}장 · 올리는 중 ${s.pending}장`;
             if (s.fail) return `사진 ${s.total}장 · 드라이브 전송 ${s.sent}장 · 실패 ${s.fail}장`;
             return `사진 ${s.total}장 · 드라이브 전송 ${s.sent}장`;
+        }
+
+        function waitMs(ms) {
+            return new Promise((resolve) => setTimeout(resolve, ms));
+        }
+
+        function lockQuery() {
+            const loc = currentLocationFields();
+            return 'station=' + encodeURIComponent(loc.station || '')
+                + '&zone=' + encodeURIComponent(loc.zone || '')
+                + '&city=' + encodeURIComponent(loc.city || '')
+                + '&region=' + encodeURIComponent(loc.region || '')
+                + '&inspector=' + encodeURIComponent(currentInspectorName());
+        }
+
+        async function claimZoneLock() {
+            const res = await googleJsonp('action=lock&' + lockQuery(), 12000);
+            const lock = res.ok && res.data && res.data.lock;
+            if (!lock) return { ok: true, unsure: true };
+            return lock;
+        }
+
+        async function releaseZoneLock() {
+            try { await googleJsonp('action=unlock&' + lockQuery(), 8000); } catch (err) {}
+        }
+
+        let lockBeatTimer = 0;
+        function startLockHeartbeat() {
+            stopLockHeartbeat();
+            lockBeatTimer = setInterval(() => {
+                if (document.getElementById('inspectScreen').classList.contains('hidden')) {
+                    stopLockHeartbeat();
+                    return;
+                }
+                googleJsonp('action=heartbeat&' + lockQuery(), 8000);
+            }, 4 * 60 * 1000);
+        }
+        function stopLockHeartbeat() {
+            if (lockBeatTimer) clearInterval(lockBeatTimer);
+            lockBeatTimer = 0;
+        }
+
+        async function confirmDriveFolderCount(expected) {
+            let last = null;
+            for (let i = 0; i < 6; i++) {
+                const loc = currentLocationFields();
+                const q = 'action=count'
+                    + '&station=' + encodeURIComponent(loc.station || '')
+                    + '&zone=' + encodeURIComponent(loc.zone || '')
+                    + '&city=' + encodeURIComponent(loc.city || '')
+                    + '&region=' + encodeURIComponent(loc.region || '');
+                const res = await googleJsonp(q, 10000);
+                if (res.ok && res.data && typeof res.data.count === 'number') {
+                    last = res.data.count;
+                    if (last >= expected) return { count: last, confirmed: true };
+                } else if (res.ok && res.data && res.data.record && Array.isArray(res.data.record.photos)) {
+                    last = res.data.record.photos.length;
+                    if (last >= expected) return { count: last, confirmed: true };
+                }
+                await waitMs(2000);
+            }
+            return { count: last, confirmed: last != null };
         }
 
         let currentPhotoId = null;
@@ -1793,6 +1877,7 @@
                     photoCount: h.photoCount,
                     driveOk: h.driveOk,
                     driveFail: h.driveFail,
+                    driveConfirmed: h.driveConfirmed,
                     v220: h.v220,
                     v380: h.v380,
                     ground: h.ground,
@@ -1990,15 +2075,21 @@
             grid.innerHTML = '';
             zones.forEach((zone, idx) => {
                 const info = zoneDoneInfo(state.station, state.city, zone, idx);
+                const busy = zoneLockInfo(state.station, state.city, zone, idx);
                 const card = document.createElement('div');
-                card.className = `zone-card ${info.done ? 'completed' : ''}`;
+                card.className = `zone-card ${info.done ? 'completed' : ''} ${busy && !busy.mine && !info.done ? 'busy' : ''}`;
                 const who = [info.who, info.date].filter(Boolean).join(' · ');
+                let badge = '';
+                if (info.done) badge = '<div class="badge">이미 완료</div>';
+                else if (busy && !busy.mine) badge = `<div class="badge busy">점검 중 · ${busy.inspector || ''}</div>`;
+                else if (busy && busy.mine) badge = '<div class="badge busy">내가 점검 중</div>';
                 card.innerHTML = `
-                    ${info.done ? '<div class="badge">이미 완료</div>' : ''}
+                    ${badge}
                     <div class="zone-title">거점${idx + 1}</div>
                     <div class="zone-info">${zone.name}</div>
                     <div class="zone-info">${zone.chargers}대 · ${zone.maker || '제조사 미상'}</div>
                     ${info.done ? `<div class="zone-done-who">${who || '다른 사람이 이미 찍었습니다'}</div>` : ''}
+                    ${!info.done && busy && !busy.mine ? `<div class="zone-done-who">${busy.inspector}님이 찍고 있습니다</div>` : ''}
                 `;
                 card.onclick = () => selectZone(zone, idx);
                 grid.appendChild(card);
@@ -2022,6 +2113,7 @@
                 serialList.classList.add('hidden');
             }
             const info = zoneDoneInfo(state.station, state.city, zone, idx);
+            const busy = zoneLockInfo(state.station, state.city, zone, idx);
             const startBtn = document.getElementById('startBtn');
             const warn = document.getElementById('zoneDoneWarn');
             startBtn.disabled = false;
@@ -2030,10 +2122,14 @@
                 warn.classList.remove('hidden');
                 warn.innerHTML = `이미 완료된 거점입니다${who ? `<br>${who}` : ''}<br>다른 사람이 찍은 것과 섞이지 않게, 수정만 하세요.`;
                 startBtn.textContent = '이미 완료 · 수정하기';
+            } else if (busy && !busy.mine) {
+                warn.classList.remove('hidden');
+                warn.innerHTML = `${busy.inspector || '다른 사람'}님이 이 거점을 찍고 있습니다.<br>끝나면 들어가세요.`;
+                startBtn.textContent = '다른 사람이 찍는 중';
             } else {
                 warn.classList.add('hidden');
                 warn.textContent = '';
-                startBtn.textContent = '점검 시작';
+                startBtn.textContent = busy && busy.mine ? '이어서 점검' : '점검 시작';
             }
         }
 
@@ -2067,12 +2163,16 @@
         document.getElementById('startBtn').addEventListener('click', async () => {
             if (!requireInspectorName()) return;
             const zone = state.selectedZone;
-            if (!lastProgressFetch || Date.now() - lastProgressFetch > 20000) {
-                document.getElementById('startBtn').disabled = true;
-                document.getElementById('startBtn').textContent = '다른 사람 완료 확인 중...';
-                try { await fetchTeamProgress(true); } catch (err) {}
-                document.getElementById('startBtn').disabled = false;
-                selectZone(zone, state.selectedZoneIdx);
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = true;
+            startBtn.textContent = '다른 사람 확인 중...';
+            try { await fetchTeamProgress(true); } catch (err) {}
+            startBtn.disabled = false;
+            selectZone(zone, state.selectedZoneIdx);
+            const busy = zoneLockInfo(state.station, state.city, zone, state.selectedZoneIdx);
+            if (busy && !busy.mine) {
+                alert(`${busy.inspector || '다른 사람'}님이 이 거점을 찍고 있습니다.\n끝나면 들어가세요.`);
+                return;
             }
             const info = zoneDoneInfo(state.station, state.city, zone, state.selectedZoneIdx);
             if (info.done) {
@@ -2109,6 +2209,16 @@
                 clearMeterFields();
                 inspectZoneKey = key;
             }
+            startBtn.disabled = true;
+            startBtn.textContent = '거점 잠그는 중...';
+            const lock = await claimZoneLock();
+            startBtn.disabled = false;
+            if (!lock.ok) {
+                alert(`${lock.lockedBy || '다른 사람'}님이 이 거점을 찍고 있습니다.\n끝나면 들어가세요.`);
+                try { await fetchTeamProgress(true); } catch (err) {}
+                selectZone(zone, state.selectedZoneIdx);
+                return;
+            }
             document.getElementById('uploadStatus').textContent = '';
             showInspectScreen();
             persistWorking();
@@ -2128,6 +2238,7 @@
             syncInspectorFields(state.inspector || '');
             renderChecklist();
             updateGPSDisplay();
+            startLockHeartbeat();
         }
 
         function findLocalRecord(station, zoneId) {
@@ -2197,6 +2308,15 @@
             fillMeterFields(record);
             state.originalDate = record.date || '';
             inspectZoneKey = currentZoneKey();
+            const lock = await claimZoneLock();
+            if (!lock.ok) {
+                state.editing = false;
+                alert(`${lock.lockedBy || '다른 사람'}님이 이 거점을 수정 중입니다.\n끝나면 들어가세요.`);
+                try { await fetchTeamProgress(true); } catch (err) {}
+                renderZones(stationData.zones);
+                selectZone(state.selectedZone, idx);
+                return;
+            }
             document.getElementById('uploadStatus').textContent = '드라이브 사진 불러오는 중...';
             showInspectScreen();
             persistWorking();
@@ -3182,9 +3302,19 @@
                     return;
                 }
 
+                status.textContent = '드라이브 폴더에서 장수 확인 중...';
+                const folder = await confirmDriveFolderCount(drive.total);
+                if (folder.count != null) {
+                    record.driveOk = folder.count;
+                    record.driveFail = Math.max(0, drive.total - folder.count);
+                    record.driveConfirmed = folder.confirmed;
+                    failed = record.driveFail;
+                    status.textContent = driveCountLine({ total: drive.total, sent: drive.sent, fail: record.driveFail, folder: folder.count });
+                }
+
                 const already = !state.editing && isZoneDone(state.station, state.city, zone, state.selectedZoneIdx);
                 if (already) {
-                    record.upload = `시트에 이미 있는 거점 (중복 생략) · 드라이브 전송 ${drive.sent}장`;
+                    record.upload = `시트에 이미 있는 거점 (중복 생략) · 드라이브 ${record.driveOk}장`;
                 } else {
                     status.textContent = state.editing ? '구글 시트 같은 줄을 수정 중...' : '구글 시트에 기록 중...';
                     await postGoogle({
@@ -3208,9 +3338,11 @@
                         insul: record.insul
                     });
                     record.upload = state.editing
-                        ? (failed ? `시트 수정 · 드라이브 전송 ${drive.sent}장 · 실패 ${failed}장` : `시트 수정 저장 · 드라이브 전송 ${drive.sent}장`)
-                        : (failed ? `시트 전송 · 드라이브 전송 ${drive.sent}장 · 실패 ${failed}장` : `시트 저장 · 드라이브 전송 ${drive.sent}장`);
+                        ? (failed ? `시트 수정 · 드라이브 ${record.driveOk}장 · 부족 ${failed}장` : `시트 수정 저장 · 드라이브 ${record.driveOk}장 확인`)
+                        : (failed ? `시트 전송 · 드라이브 ${record.driveOk}장 · 부족 ${failed}장` : `시트 저장 · 드라이브 ${record.driveOk}장 확인`);
                 }
+                stopLockHeartbeat();
+                await releaseZoneLock();
             } catch (err) {
                 record.upload = '구글 전송 실패 (폰에만 저장됨)';
                 alert('구글 전송에 실패했습니다. 기록은 이 폰에 남아 있습니다.');
@@ -3258,8 +3390,11 @@
             btn.textContent = '이 거점 점검 완료';
             status.textContent = '';
 
-            const driveLine = `사진 ${record.photoCount || 0}장 중 드라이브 전송 ${record.driveOk || 0}장` +
-                (record.driveFail ? `\n실패 ${record.driveFail}장 (다시 올리기)` : '');
+            const driveLine = record.driveConfirmed
+                ? (`사진 ${record.photoCount || 0}장\n드라이브 폴더에서 ${record.driveOk || 0}장 확인됨` +
+                    (record.driveFail ? `\n부족 ${record.driveFail}장. 설정에서 다시 올리기 하세요.` : ''))
+                : (`사진 ${record.photoCount || 0}장 중 드라이브 전송 ${record.driveOk || 0}장` +
+                    (record.driveFail ? `\n실패 ${record.driveFail}장 (다시 올리기)` : '\n폴더 확인은 되지 않았습니다.'));
             const msg = (record.upload || '').indexOf('중복') >= 0
                 ? `이미 시트에 있는 거점입니다. 한 줄만 유지합니다.\n${driveLine}`
                 : (record.upload || '').indexOf('수정') >= 0
@@ -3273,6 +3408,8 @@
         document.getElementById('backBtn').addEventListener('click', () => {
             stopLiveCamera();
             persistWorking();
+            stopLockHeartbeat();
+            if (!state.editing && totalPhotoCount() === 0) releaseZoneLock();
             document.getElementById('inspectScreen').classList.add('hidden');
             document.getElementById('selectScreen').classList.remove('hidden');
             renderCompletedList();
@@ -3362,6 +3499,20 @@
             return zoneDoneInfo(station, city, zone, idx).done;
         }
 
+        function zoneLockInfo(station, city, zone, idx) {
+            const label = `거점${idx + 1}: ${zone && zone.name ? zone.name : ''}`;
+            const lock = (state.zoneLocks || []).find((row) => {
+                if (row.station !== station) return false;
+                if (city && row.city && !cityMatches(row.city, city)) return false;
+                const parsed = parseSheetZone(row.zone);
+                return row.zone === label || (parsed.zoneName && zone && parsed.zoneName === zone.name) ||
+                    (parsed.zoneIndex && idx >= 0 && parsed.zoneIndex === idx + 1);
+            });
+            if (!lock) return null;
+            const mine = !!(lock.inspector && lock.inspector === currentInspectorName());
+            return { inspector: lock.inspector || '', started: lock.started || 0, mine };
+        }
+
         function zoneDoneInfo(station, city, zone, idx) {
             const zoneId = zone && zone.id;
             const hit = (h) => h.station === station && h.zoneId === zoneId && cityMatches(h.city, city);
@@ -3396,7 +3547,8 @@
                         chargers: z.chargers,
                         done: info.done,
                         who: info.who,
-                        date: info.date
+                        date: info.date,
+                        busy: zoneLockInfo(name, city, z, idx)
                     };
                 });
                 const done = zoneRows.filter((z) => z.done).length;
@@ -3457,6 +3609,7 @@
                 if (!raw) return;
                 const parsed = JSON.parse(raw);
                 state.teamProgress = parsed.rows || [];
+                state.zoneLocks = parsed.locks || [];
                 updateRouteSyncStatus(parsed.at);
             } catch (err) {
                 state.teamProgress = [];
@@ -3500,13 +3653,18 @@
                 return;
             }
             if (!Array.isArray(probe.data.progress)) {
-                updateRouteSyncStatus(null, '구글 스크립트를 v7로 다시 배포해야 팀 진행·수정이 됩니다.');
+                updateRouteSyncStatus(null, '구글 스크립트를 v8로 다시 배포해야 팀 진행·수정이 됩니다.');
                 updateStats();
                 return;
             }
             lastProgressFetch = Date.now();
             state.teamProgress = probe.data.progress;
-            localStorage.setItem('teamProgressV1', JSON.stringify({ at: lastProgressFetch, rows: state.teamProgress }));
+            state.zoneLocks = Array.isArray(probe.data.locks) ? probe.data.locks : [];
+            localStorage.setItem('teamProgressV1', JSON.stringify({
+                at: lastProgressFetch,
+                rows: state.teamProgress,
+                locks: state.zoneLocks
+            }));
             updateRouteSyncStatus(lastProgressFetch);
             updateStats();
             renderRoutePlan();
@@ -3595,8 +3753,11 @@
 
         function zonePills(it) {
             return `<div class="zone-pills">${it.zoneRows.map((z) => {
-                const cls = z.done ? 'ok' : 'left';
-                const mark = z.done ? `이미 완료${z.who ? ' · ' + z.who : ''}` : '남음';
+                const busy = z.busy && !z.busy.mine && !z.done;
+                const cls = z.done ? 'ok' : (busy ? 'busy' : 'left');
+                const mark = z.done
+                    ? `이미 완료${z.who ? ' · ' + z.who : ''}`
+                    : (busy ? `점검 중 · ${z.busy.inspector || ''}` : '남음');
                 return `<button type="button" class="zone-pill ${cls}" onclick='jumpToZone(${JSON.stringify(it.region)}, ${JSON.stringify(it.city)}, ${JSON.stringify(it.name)}, ${z.idx})'>${z.done ? '✓' : '●'} ${z.name} · ${mark}</button>`;
             }).join('')}</div>`;
         }
