@@ -1,4 +1,4 @@
-// v4.6: 1:1 viewfinder except overview, torch, type switcher
+// v4.7: meter review, blur warn, missing-item checklist
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

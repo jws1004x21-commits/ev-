@@ -280,7 +280,7 @@
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.94);
-            z-index: 500;
+            z-index: 700;
             display: flex;
             flex-direction: column;
             padding: 8px 8px 16px;
@@ -708,6 +708,84 @@
         .zone-pill.left { background: #431407; color: #fdba74; border: 1px solid #f97316; font-weight: 600; }
         .legend { font-size: 11px; color: #888; margin-bottom: 10px; }
 
+        .meter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 14px;
+        }
+        .meter-grid .form-group { margin-bottom: 0; }
+        .meter-hint {
+            grid-column: 1 / -1;
+            font-size: 12px;
+            color: #fdba74;
+            min-height: 16px;
+        }
+        .live-camera-warn {
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            top: calc(78px + env(safe-area-inset-top, 0px));
+            z-index: 4;
+            background: #7c2d12;
+            color: #ffedd5;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            text-align: center;
+        }
+        .thumb-status.blur { color: #fdba74; }
+        .review-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.72);
+            z-index: 550;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .review-sheet {
+            width: 100%;
+            max-width: 520px;
+            max-height: 92vh;
+            overflow: auto;
+            background: #16162a;
+            border-radius: 16px 16px 0 0;
+            padding: 16px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+        }
+        .review-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+        .review-sub { font-size: 13px; color: #aaa; margin-bottom: 12px; }
+        .review-block {
+            background: #1f1f35;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        .review-block h4 { font-size: 14px; margin-bottom: 4px; }
+        .review-guide { font-size: 12px; color: #fdba74; margin-bottom: 8px; }
+        .review-thumbs {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 6px;
+        }
+        .review-thumbs img {
+            width: 88px;
+            height: 88px;
+            object-fit: cover;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+        .review-missing {
+            background: #431407;
+            color: #fdba74;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
         @media (max-width: 360px) {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
@@ -716,7 +794,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.6</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.7</div>
     </div>
 
     <div class="container">
@@ -801,6 +879,28 @@
                         <div id="editBanner" class="edit-banner hidden">완료된 거점입니다. 바꿀 사진·메모만 고치면 시트 같은 줄이 덮어씌워집니다.</div>
                         <div id="zonePhotoTotal" style="font-size:12px;color:#4ade80;margin-bottom:10px;">이 거점 사진 0장</div>
                         <div id="checklist"></div>
+                        <div class="form-group" style="margin-top:16px;">
+                            <label class="form-label">측정값 (선택 · 사진 숫자 확인용)</label>
+                            <div class="meter-grid">
+                                <div class="form-group">
+                                    <label class="form-label">전압 220 (V)</label>
+                                    <input type="number" inputmode="decimal" class="form-input" id="meterV220" placeholder="예: 221">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">전압 380 (V)</label>
+                                    <input type="number" inputmode="decimal" class="form-input" id="meterV380" placeholder="예: 381">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">접지저항 (Ω)</label>
+                                    <input type="number" inputmode="decimal" class="form-input" id="meterGround" placeholder="예: 2.1">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">절연저항 (MΩ)</label>
+                                    <input type="number" inputmode="decimal" class="form-input" id="meterInsul" placeholder="예: 120">
+                                </div>
+                                <div class="meter-hint" id="meterHint"></div>
+                            </div>
+                        </div>
                         <div class="form-group" style="margin-top:16px;">
                             <label class="form-label">📝 특이사항 메모</label>
                             <textarea class="form-textarea" id="memoInput" placeholder="이상 발견 시 내용을 기록하세요..."></textarea>
@@ -977,12 +1077,23 @@
             </div>
             <div class="cam-ratio" id="liveCameraRatio">1:1</div>
         </div>
+        <div class="live-camera-warn hidden" id="liveCameraWarn"></div>
         <div class="live-camera-hint" id="liveCameraHint">네모 안에 맞추고 빨간 버튼을 누르세요</div>
         <div class="live-camera-types" id="liveCameraTypes"></div>
         <div class="live-camera-bottom">
             <button type="button" class="cam-side" id="liveCameraClose">닫기</button>
             <button type="button" class="cam-shutter" id="liveCameraShutter" aria-label="촬영"></button>
             <img class="live-camera-thumb" id="liveCameraThumb" alt="">
+        </div>
+    </div>
+
+    <div id="reviewOverlay" class="review-overlay hidden">
+        <div class="review-sheet">
+            <div class="review-title" id="reviewTitle">완료 전 확인</div>
+            <div class="review-sub" id="reviewSub"></div>
+            <div id="reviewBody"></div>
+            <button class="btn btn-primary" id="reviewGo">이상 없음 · 완료</button>
+            <button class="btn btn-secondary" id="reviewBack">돌아가기</button>
         </div>
     </div>
 
@@ -1089,6 +1200,7 @@
                     uploaded: !!item.uploaded,
                     failed: !!item.failed,
                     cancelled: false,
+                    blurry: !!item.blurry,
                     label: item.label,
                     filename: item.filename
                 }));
@@ -1107,6 +1219,7 @@
                         selectedZone: state.selectedZone,
                         selectedZoneIdx: state.selectedZoneIdx,
                         memo: (document.getElementById('memoInput') || {}).value || '',
+                        meters: readMeterFields(),
                         inspector: state.inspector,
                         photoData: snapshotPhotos(),
                         inspecting: !document.getElementById('inspectScreen').classList.contains('hidden'),
@@ -1131,6 +1244,7 @@
             if (w.inspector && !state.inspector) state.inspector = w.inspector;
             fillLocationSelects();
             document.getElementById('memoInput').value = w.memo || '';
+            fillMeterFields(w.meters);
             inspectZoneKey = currentZoneKey();
             if (w.inspecting || totalPhotoCount() > 0) {
                 showInspectScreen();
@@ -1705,6 +1819,7 @@
                 state.photoData = {};
                 photoTypes.forEach(p => { state.photoData[p.id] = []; });
                 document.getElementById('memoInput').value = '';
+                clearMeterFields();
                 inspectZoneKey = key;
             }
             document.getElementById('uploadStatus').textContent = '';
@@ -1868,6 +1983,7 @@
 
         function thumbStatus(item) {
             if (item.uploading) return '<div class="thumb-status">올리는 중</div>';
+            if (item.blurry) return '<div class="thumb-status blur">흐림·다시</div>';
             if (item.failed) return '<div class="thumb-status fail">실패·재시도</div>';
             if (item.remote) return '<div class="thumb-status">드라이브</div>';
             if (item.uploaded) return '<div class="thumb-status">업로드됨</div>';
@@ -1925,6 +2041,171 @@
             return photoId === 'overview';
         }
 
+        function isMeterType(photoId) {
+            return photoId === 'voltage' || photoId === 'resistance' || photoId === 'insulation';
+        }
+
+        function cameraHintFor(photoId) {
+            if (photoId === 'voltage') return '380V·220V 숫자가 또렷하게 나오게 찍으세요';
+            if (photoId === 'resistance') return '접지저항 숫자가 또렷하게 · 값이 이상하면 다시';
+            if (photoId === 'insulation') return '절연저항 숫자가 또렷하게 · 너무 낮으면 다시';
+            if (photoId === 'overview') return '충전소 전체가 나오게 찍으세요 · 빨간 버튼';
+            return '흰 네모 안에 맞추면 1:1로 저장됩니다 · 빨간 버튼';
+        }
+
+        function showCameraWarn(msg) {
+            const el = document.getElementById('liveCameraWarn');
+            if (!el) return;
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            clearTimeout(showCameraWarn.timer);
+            showCameraWarn.timer = setTimeout(() => el.classList.add('hidden'), 3500);
+        }
+
+        function blurScore(dataUrl) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const w = 64;
+                    const h = 64;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    const d = ctx.getImageData(0, 0, w, h).data;
+                    const g = new Float32Array(w * h);
+                    for (let i = 0; i < w * h; i++) {
+                        g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+                    }
+                    let sum = 0;
+                    let sum2 = 0;
+                    let n = 0;
+                    for (let y = 1; y < h - 1; y++) {
+                        for (let x = 1; x < w - 1; x++) {
+                            const i = y * w + x;
+                            const lap = 4 * g[i] - g[i - 1] - g[i + 1] - g[i - w] - g[i + w];
+                            sum += lap;
+                            sum2 += lap * lap;
+                            n += 1;
+                        }
+                    }
+                    const mean = sum / n;
+                    resolve(sum2 / n - mean * mean);
+                };
+                img.onerror = () => resolve(999);
+                img.src = dataUrl;
+            });
+        }
+
+        function readMeterFields() {
+            return {
+                v220: (document.getElementById('meterV220') || {}).value || '',
+                v380: (document.getElementById('meterV380') || {}).value || '',
+                ground: (document.getElementById('meterGround') || {}).value || '',
+                insul: (document.getElementById('meterInsul') || {}).value || ''
+            };
+        }
+
+        function fillMeterFields(m) {
+            m = m || {};
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+            set('meterV220', m.v220);
+            set('meterV380', m.v380);
+            set('meterGround', m.ground);
+            set('meterInsul', m.insul);
+            updateMeterHint();
+        }
+
+        function clearMeterFields() {
+            fillMeterFields({});
+        }
+
+        function updateMeterHint() {
+            const el = document.getElementById('meterHint');
+            if (!el) return;
+            const n = (id) => {
+                const v = parseFloat((document.getElementById(id) || {}).value);
+                return Number.isFinite(v) ? v : null;
+            };
+            const v220 = n('meterV220');
+            const v380 = n('meterV380');
+            const g = n('meterGround');
+            const ins = n('meterInsul');
+            const msgs = [];
+            if (v220 !== null && (v220 < 198 || v220 > 242)) msgs.push('220V대가 198~242 밖입니다. 사진·측정을 다시 보세요.');
+            if (v380 !== null && (v380 < 342 || v380 > 418)) msgs.push('380V대가 342~418 밖입니다. 사진·측정을 다시 보세요.');
+            if (g !== null && g > 100) msgs.push('접지저항이 높습니다. 다시 측정·촬영하세요.');
+            if (ins !== null && ins < 1) msgs.push('절연저항이 낮습니다. 다시 확인하세요.');
+            el.textContent = msgs.join(' ');
+        }
+
+        function meterLineForMemo() {
+            const m = readMeterFields();
+            const parts = [];
+            if (m.v220) parts.push('220V=' + m.v220);
+            if (m.v380) parts.push('380V=' + m.v380);
+            if (m.ground) parts.push('접지=' + m.ground + 'Ω');
+            if (m.insul) parts.push('절연=' + m.insul + 'MΩ');
+            return parts.length ? ('측정: ' + parts.join(', ')) : '';
+        }
+
+        function missingRequired() {
+            return photoTypes.filter((p) => p.required && photosOf(p.id).length === 0);
+        }
+
+        function closeReview() {
+            document.getElementById('reviewOverlay').classList.add('hidden');
+        }
+
+        function openReview(mode) {
+            const overlay = document.getElementById('reviewOverlay');
+            const title = document.getElementById('reviewTitle');
+            const sub = document.getElementById('reviewSub');
+            const body = document.getElementById('reviewBody');
+            const go = document.getElementById('reviewGo');
+            const missing = missingRequired();
+            if (mode === 'missing' || missing.length) {
+                title.textContent = '빠진 사진이 있습니다';
+                sub.textContent = '아래만 찍으면 완료할 수 있습니다.';
+                body.innerHTML = missing.map((p) =>
+                    `<div class="review-missing">${p.label} — 아직 없음
+                        <button type="button" class="btn btn-primary" style="margin-top:8px;" data-shot="${p.id}">이 항목 촬영</button>
+                    </div>`
+                ).join('');
+                go.classList.add('hidden');
+            } else {
+                const meterGuide = {
+                    voltage: '380V·220V 숫자가 읽히나요? 보통 220은 198~242, 380은 342~418 근처입니다.',
+                    resistance: '접지저항 숫자가 읽히나요? 값이 너무 높으면 다시 측정·촬영하세요.',
+                    insulation: '절연저항 숫자가 읽히나요? 값이 너무 낮으면 다시 확인하세요.'
+                };
+                title.textContent = '전압·저항·절연 사진 확인';
+                sub.textContent = '사진을 눌러 확대하세요. 숫자가 흐리거나 이상하면 다시 찍기.';
+                const hints = updateMeterHint && (document.getElementById('meterHint') || {}).textContent;
+                body.innerHTML = ['voltage', 'resistance', 'insulation'].map((id) => {
+                    const type = photoTypes.find((p) => p.id === id);
+                    const shots = photosOf(id);
+                    const thumbs = shots.map((item, i) => {
+                        const src = item.data || item.thumb;
+                        const blur = item.blurry ? ' · 흐림' : '';
+                        return src
+                            ? `<img src="${src}" alt="${type.label}" onclick="openLightbox('${id}', ${i})">`
+                            : `<div class="remote-ph">${item.filename || ''}${blur}</div>`;
+                    }).join('') || '<div style="color:#aaa;font-size:12px;">사진 없음</div>';
+                    return `<div class="review-block">
+                        <h4>${type.label} · ${shots.length}장</h4>
+                        <div class="review-guide">${meterGuide[id]}</div>
+                        <div class="review-thumbs">${thumbs}</div>
+                        <button type="button" class="btn btn-secondary btn-small" data-shot="${id}" style="margin-top:8px;">다시 찍기</button>
+                    </div>`;
+                }).join('') + (hints ? `<div class="review-guide">${hints}</div>` : '');
+                go.classList.remove('hidden');
+                go.textContent = '이상 없음 · 완료';
+            }
+            overlay.classList.remove('hidden');
+        }
+
         function layoutSquareGuide() {
             const frame = document.getElementById('liveCameraFrame');
             const sq = document.getElementById('liveCameraSquare');
@@ -1940,9 +2221,7 @@
             document.getElementById('liveCameraTitle').textContent = type ? type.label : '촬영';
             document.getElementById('liveCameraCount').textContent = (type ? photosOf(type.id).length : 0) + '장';
             document.getElementById('liveCameraRatio').textContent = full ? '풀샷' : '1:1';
-            document.getElementById('liveCameraHint').textContent = full
-                ? '충전소 전체가 나오게 찍으세요 · 빨간 버튼'
-                : '흰 네모 안에 맞추면 1:1로 저장됩니다 · 빨간 버튼';
+            document.getElementById('liveCameraHint').textContent = cameraHintFor(currentPhotoId);
             document.getElementById('liveCamera').classList.toggle('is-full', full);
             const box = document.getElementById('liveCameraTypes');
             box.innerHTML = photoTypes.map((p) => {
@@ -1992,6 +2271,8 @@
             video.srcObject = null;
             document.getElementById('liveCamera').classList.add('hidden');
             document.getElementById('liveCameraShutter').disabled = false;
+            const warn = document.getElementById('liveCameraWarn');
+            if (warn) warn.classList.add('hidden');
         }
 
         function captureCanvasFromVideo(video) {
@@ -2191,12 +2472,14 @@
                 if (!isFullShot(photoId)) dataUrl = await cropCenterSquare(dataUrl);
                 const full = await compressImage(dataUrl, meter ? 1920 : 1600, meter ? 0.85 : 0.75);
                 const thumb = await compressImage(full, 720, 0.6);
+                const blurry = meter && (await blurScore(full)) < 55;
                 const item = {
                     thumb,
                     data: full,
                     uploading: true,
                     uploaded: false,
                     failed: false,
+                    blurry,
                     label: type.label,
                     filename: nextPhotoFilename(type)
                 };
@@ -2204,6 +2487,7 @@
                 added += 1;
                 renderChecklist();
                 enqueueUpload(item);
+                if (blurry) showCameraWarn('숫자가 흐릴 수 있습니다. 다시 찍어 주세요.');
             }
             if (navigator.vibrate) navigator.vibrate(50);
             persistWorking();
@@ -2382,15 +2666,19 @@
         }
 
         function checkCanComplete() {
-            const allDone = photoTypes.filter(p => p.required).every(p => photosOf(p.id).length > 0);
+            const missing = missingRequired();
             const pending = photosStillUploading();
             const btn = document.getElementById('completeZoneBtn');
-            btn.disabled = !allDone || pending || completingLock;
-            btn.textContent = pending ? '사진 올리는 중...' : (state.editing ? '수정 저장' : '이 거점 점검 완료');
+            btn.disabled = pending || completingLock;
+            btn.textContent = pending
+                ? '사진 올리는 중...'
+                : missing.length
+                    ? `빠진 사진 ${missing.length}개`
+                    : (state.editing ? '수정 저장' : '이 거점 점검 완료');
             const warn = document.getElementById('requiredWarning');
-            if (!allDone) {
+            if (missing.length) {
                 warn.classList.remove('hidden');
-                warn.textContent = '⚠️ 필수 사진은 종류마다 최소 1장씩 촬영해야 완료할 수 있습니다';
+                warn.textContent = '⚠️ 아직 없음: ' + missing.map((p) => p.label).join(', ');
             } else if (pending) {
                 warn.classList.remove('hidden');
                 warn.textContent = '⚠️ 사진이 드라이브에 다 올라간 뒤에 완료할 수 있습니다';
@@ -2412,11 +2700,34 @@
             return `거점${record.zoneIndex}: ${record.zoneName}`;
         }
 
-        document.getElementById('completeZoneBtn').addEventListener('click', async () => {
+        async function maybeComplete() {
             stopLiveCamera();
             if (completingLock || photosStillUploading()) return;
+            if (missingRequired().length) {
+                openReview('missing');
+                return;
+            }
+            openReview('meters');
+        }
+
+        document.getElementById('completeZoneBtn').addEventListener('click', () => maybeComplete());
+        document.getElementById('reviewBack').addEventListener('click', closeReview);
+        document.getElementById('reviewGo').addEventListener('click', () => {
+            closeReview();
+            finishComplete();
+        });
+        document.getElementById('reviewBody').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-shot]');
+            if (!btn) return;
+            closeReview();
+            takePhoto(btn.getAttribute('data-shot'), 'camera');
+        });
+
+        async function finishComplete() {
+            if (completingLock || photosStillUploading()) return;
             const zone = state.selectedZone;
-            const memo = document.getElementById('memoInput').value.trim();
+            const measured = meterLineForMemo();
+            const memo = [document.getElementById('memoInput').value.trim(), measured].filter(Boolean).join('\n');
             const btn = document.getElementById('completeZoneBtn');
             const status = document.getElementById('uploadStatus');
             completingLock = true;
@@ -2546,7 +2857,7 @@
                         ? `점검은 저장됐습니다. 사진 ${failed}장은 구글 업로드에 실패했을 수 있습니다.`
                         : `점검 완료. 시트에 기록하고 사진 ${photoCount}장을 드라이브에 올렸습니다.`;
             alert(msg);
-        });
+        }
 
         document.getElementById('backBtn').addEventListener('click', () => {
             stopLiveCamera();
@@ -2557,6 +2868,14 @@
         });
         document.getElementById('saveToPhoneBtn').addEventListener('click', savePhotosToPhone);
         document.getElementById('memoInput').addEventListener('input', persistWorking);
+        ['meterV220', 'meterV380', 'meterGround', 'meterInsul'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input', () => {
+                updateMeterHint();
+                persistWorking();
+            });
+        });
 
         function renderCompletedList() {
             const section = document.getElementById('completedSection');
