@@ -1,4 +1,4 @@
-// v4.8: daily zip pack with excel and photos for sharing
+// v4.9: tap shots in camera to review 1:1 photos
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

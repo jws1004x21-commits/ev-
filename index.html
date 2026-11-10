@@ -499,6 +499,39 @@
             box-shadow: 0 0 0 4px rgba(255,255,255,0.25);
         }
         .live-camera-bottom .cam-shutter:disabled { opacity: 0.5; }
+        .live-camera-film {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 148px;
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 0 12px 8px;
+            z-index: 2;
+            -webkit-overflow-scrolling: touch;
+            min-height: 58px;
+        }
+        .live-camera-film img {
+            width: 54px;
+            height: 54px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #fff;
+            flex-shrink: 0;
+            background: #222;
+        }
+        .live-camera-types { bottom: 210px; }
+        .live-camera-hint { bottom: 258px; }
+        .live-camera-frame { bottom: 220px; }
+        .live-camera-thumb-wrap {
+            width: 64px;
+            height: 64px;
+            padding: 0;
+            border: none;
+            background: transparent;
+            position: relative;
+        }
         .live-camera-thumb {
             width: 64px;
             height: 64px;
@@ -511,7 +544,7 @@
             position: absolute;
             left: 0;
             right: 0;
-            bottom: 198px;
+            bottom: 258px;
             text-align: center;
             color: #ddd;
             font-size: 13px;
@@ -794,7 +827,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.8</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.9</div>
     </div>
 
     <div class="container">
@@ -1085,10 +1118,13 @@
         <div class="live-camera-warn hidden" id="liveCameraWarn"></div>
         <div class="live-camera-hint" id="liveCameraHint">네모 안에 맞추고 빨간 버튼을 누르세요</div>
         <div class="live-camera-types" id="liveCameraTypes"></div>
+        <div class="live-camera-film" id="liveCameraFilm"></div>
         <div class="live-camera-bottom">
             <button type="button" class="cam-side" id="liveCameraClose">닫기</button>
             <button type="button" class="cam-shutter" id="liveCameraShutter" aria-label="촬영"></button>
-            <img class="live-camera-thumb" id="liveCameraThumb" alt="">
+            <button type="button" class="live-camera-thumb-wrap" id="liveCameraThumbBtn" aria-label="방금 사진 확인">
+                <img class="live-camera-thumb" id="liveCameraThumb" alt="">
+            </button>
         </div>
     </div>
 
@@ -2237,6 +2273,25 @@
             }).join('');
             layoutSquareGuide();
             refreshTorchButton();
+            renderLiveCameraFilm();
+        }
+
+        function renderLiveCameraFilm() {
+            const el = document.getElementById('liveCameraFilm');
+            if (!el) return;
+            const shots = currentPhotoId ? photosOf(currentPhotoId) : [];
+            el.innerHTML = shots.map((item, i) => {
+                const src = item.thumb || item.data;
+                if (!src) return '';
+                return `<img src="${src}" data-idx="${i}" alt="확인">`;
+            }).join('');
+        }
+
+        function openLastCameraShot() {
+            if (!currentPhotoId) return;
+            const shots = photosOf(currentPhotoId);
+            if (!shots.length) return;
+            openLightbox(currentPhotoId, shots.length - 1);
         }
 
         function cameraTrack() {
@@ -2301,9 +2356,10 @@
             const side = Math.max(32, Math.min(sw, sh, video.videoWidth, video.videoHeight));
             sx = Math.max(0, Math.min(sx, video.videoWidth - side));
             sy = Math.max(0, Math.min(sy, video.videoHeight - side));
-            canvas.width = Math.round(side);
-            canvas.height = Math.round(side);
-            ctx.drawImage(video, sx, sy, side, side, 0, 0, canvas.width, canvas.height);
+            const out = Math.round(side);
+            canvas.width = out;
+            canvas.height = out;
+            ctx.drawImage(video, sx, sy, side, side, 0, 0, out, out);
             return canvas;
         }
 
@@ -2511,6 +2567,12 @@
         document.getElementById('liveCameraShutter').addEventListener('click', captureLiveShot);
         document.getElementById('liveCameraClose').addEventListener('click', stopLiveCamera);
         document.getElementById('liveCameraTorch').addEventListener('click', toggleTorch);
+        document.getElementById('liveCameraThumbBtn').addEventListener('click', openLastCameraShot);
+        document.getElementById('liveCameraFilm').addEventListener('click', (e) => {
+            const img = e.target.closest('img[data-idx]');
+            if (!img || !currentPhotoId) return;
+            openLightbox(currentPhotoId, Number(img.getAttribute('data-idx')));
+        });
         document.getElementById('liveCameraTypes').addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-id]');
             if (!btn) return;
@@ -2551,6 +2613,9 @@
             closeLightbox();
             renderChecklist();
             persistWorking();
+            if (cameraStream && !document.getElementById('liveCamera').classList.contains('hidden')) {
+                updateLiveCameraHud();
+            }
             if (item.filename) {
                 postGoogle({
                     action: 'deletePhoto',
