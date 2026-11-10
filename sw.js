@@ -1,4 +1,4 @@
-// v4.10: one-file HTML share for today's inspection
+// v4.11: selectable 1:1, zoom, torch, native camera
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

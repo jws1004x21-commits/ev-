@@ -362,7 +362,7 @@
             position: absolute;
             left: 12px;
             right: 12px;
-            top: calc(78px + env(safe-area-inset-top, 0px));
+            top: calc(118px + env(safe-area-inset-top, 0px));
             bottom: 168px;
             pointer-events: none;
             z-index: 1;
@@ -433,6 +433,28 @@
             align-items: center;
             justify-content: center;
         }
+        .live-camera-tools {
+            position: absolute;
+            top: calc(64px + env(safe-area-inset-top, 0px));
+            left: 8px;
+            right: 8px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            z-index: 2;
+        }
+        .live-camera-tools button {
+            height: 36px;
+            padding: 0 10px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(40,40,40,0.92);
+            color: #eee;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .live-camera-tools button.on { background: #f59e0b; color: #111; }
         .live-camera-flash {
             position: absolute;
             inset: 0;
@@ -827,7 +849,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.10</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.11</div>
     </div>
 
     <div class="container">
@@ -1109,12 +1131,17 @@
         </div>
         <div class="live-camera-flash" id="liveCameraFlash"></div>
         <div class="live-camera-top">
-            <button type="button" class="cam-icon hidden" id="liveCameraTorch">라이트</button>
-            <div>
+            <div style="width:100%;text-align:center;">
                 <div class="cam-title" id="liveCameraTitle">촬영</div>
                 <div class="cam-count" id="liveCameraCount">0장</div>
             </div>
-            <div class="cam-ratio" id="liveCameraRatio">1:1</div>
+        </div>
+        <div class="live-camera-tools">
+            <button type="button" id="liveCameraRatio">1:1</button>
+            <button type="button" id="liveCameraZoomOut">줌-</button>
+            <button type="button" id="liveCameraZoomIn">줌+</button>
+            <button type="button" id="liveCameraTorch">라이트</button>
+            <button type="button" id="liveCameraNative">폰카메라</button>
         </div>
         <div class="live-camera-warn hidden" id="liveCameraWarn"></div>
         <div class="live-camera-hint" id="liveCameraHint">네모 안에 맞추고 빨간 버튼을 누르세요</div>
@@ -2078,6 +2105,8 @@
         let cameraStream = null;
         let shutterBusy = false;
         let torchOn = false;
+        let cameraSquare = true;
+        let cameraZoom = 1;
 
         function isFullShot(photoId) {
             return photoId === 'overview';
@@ -2088,9 +2117,9 @@
         }
 
         function cameraHintFor(photoId) {
-            if (photoId === 'voltage') return '380V·220V 숫자가 또렷하게 나오게 찍으세요';
-            if (photoId === 'resistance') return '접지저항 숫자가 또렷하게 · 값이 이상하면 다시';
-            if (photoId === 'insulation') return '절연저항 숫자가 또렷하게 · 너무 낮으면 다시';
+            if (photoId === 'voltage') return '380V·220V 숫자가 또렷하게 · 위 버튼으로 1:1/줌/폰카메라 선택';
+            if (photoId === 'resistance') return '접지저항 숫자가 또렷하게 · 위 버튼으로 1:1/줌/폰카메라 선택';
+            if (photoId === 'insulation') return '절연저항 숫자가 또렷하게 · 위 버튼으로 1:1/줌/폰카메라 선택';
             if (photoId === 'overview') return '충전소 전체가 나오게 찍으세요 · 빨간 버튼';
             return '흰 네모 안에 맞추면 1:1로 저장됩니다 · 빨간 버튼';
         }
@@ -2259,12 +2288,13 @@
 
         function updateLiveCameraHud() {
             const type = photoTypes.find((p) => p.id === currentPhotoId);
-            const full = isFullShot(currentPhotoId);
             document.getElementById('liveCameraTitle').textContent = type ? type.label : '촬영';
             document.getElementById('liveCameraCount').textContent = (type ? photosOf(type.id).length : 0) + '장';
-            document.getElementById('liveCameraRatio').textContent = full ? '풀샷' : '1:1';
+            const ratioBtn = document.getElementById('liveCameraRatio');
+            ratioBtn.textContent = cameraSquare ? '1:1' : '풀샷';
+            ratioBtn.classList.toggle('on', cameraSquare);
             document.getElementById('liveCameraHint').textContent = cameraHintFor(currentPhotoId);
-            document.getElementById('liveCamera').classList.toggle('is-full', full);
+            document.getElementById('liveCamera').classList.toggle('is-full', !cameraSquare);
             const box = document.getElementById('liveCameraTypes');
             box.innerHTML = photoTypes.map((p) => {
                 const n = photosOf(p.id).length;
@@ -2274,6 +2304,7 @@
             }).join('');
             layoutSquareGuide();
             refreshTorchButton();
+            refreshZoomButtons();
             renderLiveCameraFilm();
         }
 
@@ -2299,32 +2330,76 @@
             return cameraStream && cameraStream.getVideoTracks()[0];
         }
 
+        function cameraCaps() {
+            const track = cameraTrack();
+            return track && track.getCapabilities ? (track.getCapabilities() || {}) : {};
+        }
+
         function refreshTorchButton() {
             const btn = document.getElementById('liveCameraTorch');
-            const track = cameraTrack();
-            const caps = track && track.getCapabilities && track.getCapabilities();
-            const ok = !!(caps && caps.torch);
-            btn.classList.toggle('hidden', !ok);
             btn.classList.toggle('on', torchOn);
             btn.textContent = torchOn ? '라이트켜짐' : '라이트';
         }
 
+        function refreshZoomButtons() {
+            const caps = cameraCaps();
+            const has = !!(caps.zoom);
+            document.getElementById('liveCameraZoomIn').textContent = has ? ('줌+ ' + cameraZoom.toFixed(1)) : '줌+';
+        }
+
         async function toggleTorch() {
-            const track = cameraTrack();
-            if (!track || !track.getCapabilities || !track.getCapabilities().torch) return;
+            const caps = cameraCaps();
+            if (!caps.torch) {
+                showCameraWarn('이 폰은 앱 안에서 라이트가 안 됩니다. 폰카메라를 누르세요.');
+                return;
+            }
             try {
                 torchOn = !torchOn;
-                await track.applyConstraints({ advanced: [{ torch: torchOn }] });
+                await cameraTrack().applyConstraints({ advanced: [{ torch: torchOn }] });
             } catch (err) {
                 torchOn = false;
+                showCameraWarn('라이트를 켤 수 없습니다. 폰카메라를 누르세요.');
             }
             refreshTorchButton();
+        }
+
+        async function bumpCameraZoom(dir) {
+            const caps = cameraCaps();
+            if (!caps.zoom) {
+                showCameraWarn('이 폰은 앱 안에서 줌이 안 됩니다. 폰카메라를 누르면 줌을 쓸 수 있습니다.');
+                return;
+            }
+            const min = Number(caps.zoom.min || 1);
+            const max = Number(caps.zoom.max || 1);
+            const step = Number(caps.zoom.step || 0.2);
+            cameraZoom = Math.min(max, Math.max(min, cameraZoom + dir * Math.max(step, 0.2)));
+            try {
+                await cameraTrack().applyConstraints({ advanced: [{ zoom: cameraZoom }] });
+            } catch (err) {
+                try {
+                    await cameraTrack().applyConstraints({ zoom: cameraZoom });
+                } catch (err2) {
+                    showCameraWarn('줌을 바꿀 수 없습니다. 폰카메라를 누르세요.');
+                }
+            }
+            refreshZoomButtons();
+        }
+
+        function toggleCameraSquare() {
+            cameraSquare = !cameraSquare;
+            updateLiveCameraHud();
+        }
+
+        function openNativeCamera() {
+            stopLiveCamera();
+            document.getElementById('cameraInput').click();
         }
 
         function stopLiveCamera() {
             shutterBusy = false;
             torchOn = false;
             const video = document.getElementById('liveCameraVideo');
+            cameraZoom = 1;
             if (cameraStream) {
                 cameraStream.getTracks().forEach((t) => t.stop());
                 cameraStream = null;
@@ -2339,7 +2414,7 @@
         function captureCanvasFromVideo(video) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            if (isFullShot(currentPhotoId)) {
+            if (!cameraSquare) {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 ctx.drawImage(video, 0, 0);
@@ -2396,6 +2471,7 @@
 
         async function startLiveCamera(photoId) {
             currentPhotoId = photoId;
+            cameraSquare = !isFullShot(photoId);
             if (cameraStream && !document.getElementById('liveCamera').classList.contains('hidden')) {
                 updateLiveCameraHud();
                 return;
@@ -2449,7 +2525,7 @@
                 const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
                 if (blob) {
                     const file = new File([blob], 'shot.jpg', { type: 'image/jpeg' });
-                    const added = await addFiles([file]);
+                    const added = await addFiles([file], cameraSquare);
                     if (added > 0) {
                         document.getElementById('liveCameraThumb').src = URL.createObjectURL(blob);
                         updateLiveCameraHud();
@@ -2522,16 +2598,17 @@
             persistWorking();
         }
 
-        async function addFiles(fileList) {
+        async function addFiles(fileList, square) {
             const photoId = currentPhotoId;
             const type = photoTypes.find(p => p.id === photoId);
             if (!photoId || !type || !fileList || !fileList.length) return 0;
+            if (square === undefined) square = cameraSquare;
             const meter = ['voltage', 'resistance', 'insulation'].includes(photoId);
             let added = 0;
             for (const file of fileList) {
                 if (!file.type.startsWith('image/')) continue;
                 let dataUrl = await readFile(file);
-                if (!isFullShot(photoId)) dataUrl = await cropCenterSquare(dataUrl);
+                if (square) dataUrl = await cropCenterSquare(dataUrl);
                 const full = await compressImage(dataUrl, meter ? 1920 : 1600, meter ? 0.85 : 0.75);
                 const thumb = await compressImage(full, 720, 0.6);
                 const blurry = meter && (await blurScore(full)) < 55;
@@ -2568,6 +2645,20 @@
         document.getElementById('liveCameraShutter').addEventListener('click', captureLiveShot);
         document.getElementById('liveCameraClose').addEventListener('click', stopLiveCamera);
         document.getElementById('liveCameraTorch').addEventListener('click', toggleTorch);
+        document.getElementById('liveCameraRatio').addEventListener('click', toggleCameraSquare);
+        document.getElementById('liveCameraZoomIn').addEventListener('click', () => bumpCameraZoom(1));
+        document.getElementById('liveCameraZoomOut').addEventListener('click', () => bumpCameraZoom(-1));
+        document.getElementById('liveCameraNative').addEventListener('click', openNativeCamera);
+        document.getElementById('liveCameraVideo').addEventListener('click', async (e) => {
+            const caps = cameraCaps();
+            if (!caps.pointsOfInterest) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            try {
+                await cameraTrack().applyConstraints({ advanced: [{ pointsOfInterest: [{ x, y }] }] });
+            } catch (err) {}
+        });
         document.getElementById('liveCameraThumbBtn').addEventListener('click', openLastCameraShot);
         document.getElementById('liveCameraFilm').addEventListener('click', (e) => {
             const img = e.target.closest('img[data-idx]');
@@ -2578,6 +2669,7 @@
             const btn = e.target.closest('button[data-id]');
             if (!btn) return;
             currentPhotoId = btn.getAttribute('data-id');
+            cameraSquare = !isFullShot(currentPhotoId);
             updateLiveCameraHud();
         });
         window.addEventListener('resize', () => {
@@ -2597,13 +2689,13 @@
                     n += 1;
                 });
             }
-            await addFiles(list);
+            await addFiles(list, cameraSquare);
         });
 
         document.getElementById('galleryInput').addEventListener('change', async (e) => {
             const list = Array.from(e.target.files || []);
             e.target.value = '';
-            await addFiles(list);
+            await addFiles(list, !isFullShot(currentPhotoId));
         });
 
         function deletePhoto(photoId, index) {
