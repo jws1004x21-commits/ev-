@@ -1,4 +1,4 @@
-// v4.11: selectable 1:1, zoom, torch, native camera
+// v4.12: drive count, inspector required, meter sheet cols, already-done, update banner
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

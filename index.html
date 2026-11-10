@@ -110,18 +110,79 @@
         }
 
         .zone-card.selected { border-color: #4ade80; background: #1a2e1a; }
-        .zone-card.completed { border-color: #22c55e; opacity: 0.7; }
+        .zone-card.completed {
+            border: 3px solid #facc15;
+            background: #3f2e00;
+            opacity: 1;
+        }
+        .zone-card.completed.selected { background: #4a3500; border-color: #fde68a; }
         .zone-card .zone-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
         .zone-card .zone-info { font-size: 11px; color: #888; }
+        .zone-card .zone-done-who { font-size: 13px; font-weight: 700; color: #fde68a; margin-top: 6px; }
         .zone-card .badge {
             display: inline-block;
-            background: #22c55e;
-            color: #000;
-            font-size: 9px;
-            padding: 2px 6px;
+            background: #facc15;
+            color: #111;
+            font-size: 15px;
+            font-weight: 800;
+            padding: 6px 10px;
             border-radius: 8px;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
         }
+        .update-banner {
+            display: none;
+            background: #1d4ed8;
+            color: #fff;
+            padding: 12px 14px;
+            font-size: 15px;
+            font-weight: 800;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 900;
+        }
+        .update-banner.show { display: block; }
+        .update-banner button {
+            margin-left: 8px;
+            background: #fff;
+            color: #1d4ed8;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-weight: 800;
+        }
+        .inspector-need {
+            background: #431407;
+            border: 1px solid #f97316;
+            color: #fdba74;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        .zone-done-warn {
+            background: #422006;
+            border: 3px solid #facc15;
+            color: #fde68a;
+            padding: 14px 12px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 800;
+            line-height: 1.45;
+            margin: 12px 0;
+        }
+        .drive-count {
+            background: #0f2a1a;
+            border: 1px solid #22c55e;
+            color: #86efac;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 14px;
+            font-weight: 700;
+            margin: 8px 0 12px;
+        }
+        .drive-count.fail { background: #431407; border-color: #f97316; color: #fdba74; }
 
         .btn {
             width: 100%;
@@ -759,7 +820,14 @@
             cursor: pointer;
             max-width: 100%;
         }
-        .zone-pill.ok { background: #14532d; color: #86efac; }
+        .zone-pill.ok {
+            background: #422006;
+            color: #fde68a;
+            border: 2px solid #facc15;
+            font-size: 13px;
+            font-weight: 800;
+            padding: 8px 12px;
+        }
         .zone-pill.left { background: #431407; color: #fdba74; border: 1px solid #f97316; font-weight: 600; }
         .legend { font-size: 11px; color: #888; margin-bottom: 10px; }
 
@@ -849,11 +917,22 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle">대전팀 26하반기 정기점검 v4.11</div>
+        <div class="subtitle">대전팀 26하반기 정기점검 v4.12</div>
+    </div>
+    <div id="updateBanner" class="update-banner">
+        새 버전이 있습니다. 앱을 새로고침 하세요.
+        <button type="button" id="updateReloadBtn">지금 새로고침</button>
     </div>
 
     <div class="container">
         <div id="tab-home" class="tab-content active">
+            <div class="card" style="margin-bottom:12px;">
+                <div class="card-header">점검자 이름 (필수)</div>
+                <div class="card-body">
+                    <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
+                    <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
+                </div>
+            </div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-value" id="todayCount">0</div>
@@ -916,6 +995,7 @@
                         </div>
                     </div>
 
+                    <div id="zoneDoneWarn" class="zone-done-warn hidden"></div>
                     <button class="btn btn-primary" id="startBtn" disabled>점검 시작</button>
                 </div>
             </div>
@@ -932,7 +1012,11 @@
                         <div style="font-weight:600;font-size:14px;margin-bottom:4px;">사진 촬영 — 장수 제한 없음</div>
                         <div style="font-size:12px;color:#aaa;margin-bottom:8px;">전압·저항·절연 등은 1:1 네모에 맞춰 찍힙니다. 전체샷만 화면 전체입니다. 카메라는 닫지 말고 위 항목만 바꿔도 됩니다.</div>
                         <div id="editBanner" class="edit-banner hidden">완료된 거점입니다. 바꿀 사진·메모만 고치면 시트 같은 줄이 덮어씌워집니다.</div>
-                        <div id="zonePhotoTotal" style="font-size:12px;color:#4ade80;margin-bottom:10px;">이 거점 사진 0장</div>
+                        <div class="form-group" style="margin-bottom:10px;">
+                            <label class="form-label">점검자 이름 (필수)</label>
+                            <input type="text" class="form-input" id="inspectInspector" placeholder="이름 없으면 완료 안 됩니다" autocomplete="name">
+                        </div>
+                        <div id="zonePhotoTotal" class="drive-count">이 거점 사진 0장 · 드라이브 전송 0장</div>
                         <div id="checklist"></div>
                         <div class="form-group" style="margin-top:16px;">
                             <label class="form-label">측정값 (선택 · 사진 숫자 확인용)</label>
@@ -1185,6 +1269,7 @@
 
     <script src="station_data.js"></script>
     <script>
+        const APP_VERSION = '4.12';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -1215,10 +1300,98 @@
             originalDate: ''
         };
 
+        function currentInspectorName() {
+            const ids = ['homeInspector', 'inspectInspector', 'inspectorName'];
+            for (let i = 0; i < ids.length; i++) {
+                const el = document.getElementById(ids[i]);
+                const v = el && String(el.value || '').trim();
+                if (v) return v;
+            }
+            return String(state.inspector || '').trim();
+        }
+
+        function syncInspectorFields(name) {
+            const v = String(name == null ? currentInspectorName() : name).trim();
+            state.inspector = v;
+            ['homeInspector', 'inspectInspector', 'inspectorName'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el && el.value !== v) el.value = v;
+            });
+            const need = document.getElementById('inspectorNeed');
+            if (need) need.classList.toggle('hidden', !!v);
+        }
+
+        function requireInspectorName() {
+            const name = currentInspectorName();
+            syncInspectorFields(name);
+            if (name) {
+                saveState();
+                return true;
+            }
+            alert('점검자 이름을 먼저 입력하세요. 빈 이름으로는 완료할 수 없습니다.');
+            const inspectHidden = document.getElementById('inspectScreen').classList.contains('hidden');
+            const insp = document.getElementById('inspectInspector');
+            const home = document.getElementById('homeInspector');
+            if (!inspectHidden && insp) insp.focus();
+            else if (home) {
+                showTab('home');
+                home.focus();
+            }
+            return false;
+        }
+
+        function bindInspectorInputs() {
+            ['homeInspector', 'inspectInspector', 'inspectorName'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('input', () => {
+                    syncInspectorFields(el.value);
+                    saveState();
+                    persistWorking();
+                    checkCanComplete();
+                });
+            });
+        }
+
+        function versionCheckUrl() {
+            const path = location.pathname.replace(/[^/]+$/, '');
+            return path + 'version.json?t=' + Date.now();
+        }
+
+        async function checkAppVersion() {
+            try {
+                const res = await fetch(versionCheckUrl(), { cache: 'no-store' });
+                if (!res.ok) return;
+                const data = await res.json();
+                const remote = String(data.version || '').trim();
+                const banner = document.getElementById('updateBanner');
+                if (!banner) return;
+                if (remote && remote !== APP_VERSION) banner.classList.add('show');
+                else banner.classList.remove('show');
+            } catch (err) {}
+        }
+
+        function drivePhotoStats() {
+            const all = allPhotos();
+            const total = all.length;
+            const sent = all.filter((p) => p.uploaded && !p.failed).length;
+            const fail = all.filter((p) => p.failed || (p.data && !p.uploaded && !p.uploading)).length;
+            const pending = all.filter((p) => p.uploading || (p.data && !p.uploaded && !p.failed)).length;
+            return { total, sent, fail, pending };
+        }
+
+        function driveCountLine(stats) {
+            const s = stats || drivePhotoStats();
+            if (s.pending) return `사진 ${s.total}장 · 드라이브 전송 ${s.sent}장 · 올리는 중 ${s.pending}장`;
+            if (s.fail) return `사진 ${s.total}장 · 드라이브 전송 ${s.sent}장 · 실패 ${s.fail}장`;
+            return `사진 ${s.total}장 · 드라이브 전송 ${s.sent}장`;
+        }
+
         let currentPhotoId = null;
         let lightboxTarget = null;
         let idb = null;
         let persistTimer = null;
+        let lastProgressFetch = 0;
 
         function idbReady() {
             if (idb) return Promise.resolve(idb);
@@ -1311,6 +1484,7 @@
             state.selectedZoneIdx = w.selectedZoneIdx || 0;
             state.photoData = w.photoData || {};
             if (w.inspector && !state.inspector) state.inspector = w.inspector;
+            syncInspectorFields(state.inspector || '');
             fillLocationSelects();
             document.getElementById('memoInput').value = w.memo || '';
             fillMeterFields(w.meters);
@@ -1557,14 +1731,25 @@
             renderCompletedList();
             renderHistory();
             startGPS();
-            document.getElementById('inspectorName').value = state.inspector || '';
+            syncInspectorFields(state.inspector || '');
+            bindInspectorInputs();
             try {
                 await restoreWorking();
             } catch (err) {
                 console.warn(err);
             }
+            syncInspectorFields(state.inspector || '');
             updateLocalBackupStatus();
             fetchTeamProgress(false).catch(() => {});
+            checkAppVersion();
+            setInterval(checkAppVersion, 60000);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') checkAppVersion();
+            });
+            const reloadBtn = document.getElementById('updateReloadBtn');
+            if (reloadBtn) {
+                reloadBtn.addEventListener('click', () => location.reload());
+            }
         }
 
         function loadState() {
@@ -1606,6 +1791,12 @@
                     memo: h.memo,
                     address: h.address,
                     photoCount: h.photoCount,
+                    driveOk: h.driveOk,
+                    driveFail: h.driveFail,
+                    v220: h.v220,
+                    v380: h.v380,
+                    ground: h.ground,
+                    insul: h.insul,
                     upload: h.upload
                 })),
                 todayInspected: state.todayInspected,
@@ -1798,14 +1989,16 @@
             const grid = document.getElementById('zoneGrid');
             grid.innerHTML = '';
             zones.forEach((zone, idx) => {
-                const isCompleted = isZoneDone(state.station, state.city, zone, idx);
+                const info = zoneDoneInfo(state.station, state.city, zone, idx);
                 const card = document.createElement('div');
-                card.className = `zone-card ${isCompleted ? 'completed' : ''}`;
+                card.className = `zone-card ${info.done ? 'completed' : ''}`;
+                const who = [info.who, info.date].filter(Boolean).join(' · ');
                 card.innerHTML = `
-                    ${isCompleted ? '<div class="badge">완료</div>' : ''}
+                    ${info.done ? '<div class="badge">이미 완료</div>' : ''}
                     <div class="zone-title">거점${idx + 1}</div>
                     <div class="zone-info">${zone.name}</div>
                     <div class="zone-info">${zone.chargers}대 · ${zone.maker || '제조사 미상'}</div>
+                    ${info.done ? `<div class="zone-done-who">${who || '다른 사람이 이미 찍었습니다'}</div>` : ''}
                 `;
                 card.onclick = () => selectZone(zone, idx);
                 grid.appendChild(card);
@@ -1828,10 +2021,20 @@
             } else {
                 serialList.classList.add('hidden');
             }
-            const done = isZoneDone(state.station, state.city, zone, idx);
+            const info = zoneDoneInfo(state.station, state.city, zone, idx);
             const startBtn = document.getElementById('startBtn');
+            const warn = document.getElementById('zoneDoneWarn');
             startBtn.disabled = false;
-            startBtn.textContent = done ? '완료 건 수정' : '점검 시작';
+            if (info.done) {
+                const who = [info.who, info.date].filter(Boolean).join(' · ');
+                warn.classList.remove('hidden');
+                warn.innerHTML = `이미 완료된 거점입니다${who ? `<br>${who}` : ''}<br>다른 사람이 찍은 것과 섞이지 않게, 수정만 하세요.`;
+                startBtn.textContent = '이미 완료 · 수정하기';
+            } else {
+                warn.classList.add('hidden');
+                warn.textContent = '';
+                startBtn.textContent = '점검 시작';
+            }
         }
 
         let inspectZoneKey = '';
@@ -1861,10 +2064,21 @@
             return [state.station, state.selectedZone && state.selectedZone.id, state.selectedZoneIdx].join('|');
         }
 
-        document.getElementById('startBtn').addEventListener('click', () => {
+        document.getElementById('startBtn').addEventListener('click', async () => {
+            if (!requireInspectorName()) return;
             const zone = state.selectedZone;
-            const done = isZoneDone(state.station, state.city, zone, state.selectedZoneIdx);
-            if (done) {
+            if (!lastProgressFetch || Date.now() - lastProgressFetch > 20000) {
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('startBtn').textContent = '다른 사람 완료 확인 중...';
+                try { await fetchTeamProgress(true); } catch (err) {}
+                document.getElementById('startBtn').disabled = false;
+                selectZone(zone, state.selectedZoneIdx);
+            }
+            const info = zoneDoneInfo(state.station, state.city, zone, state.selectedZoneIdx);
+            if (info.done) {
+                const who = [info.who, info.date].filter(Boolean).join(' · ');
+                if (!confirm(`이미 완료된 거점입니다${who ? ` (${who})` : ''}.\n수정으로 들어가면 같은 줄을 덮어씁니다.`)) return;
+                const local = findLocalRecord(state.station, zone.id) || {};
                 startEdit({
                     region: state.region,
                     city: state.city,
@@ -1875,9 +2089,13 @@
                     chargers: zone.chargers,
                     maker: zone.maker,
                     serials: zone.serials,
-                    memo: (findLocalRecord(state.station, zone.id) || {}).memo || '',
-                    date: (findLocalRecord(state.station, zone.id) || {}).date || '',
-                    inspector: state.inspector
+                    memo: local.memo || '',
+                    date: local.date || info.date || '',
+                    inspector: state.inspector,
+                    v220: local.v220,
+                    v380: local.v380,
+                    ground: local.ground,
+                    insul: local.insul
                 });
                 return;
             }
@@ -1907,6 +2125,7 @@
             document.getElementById('makerInfo').textContent = zone.maker || '미상';
             document.getElementById('editBanner').classList.toggle('hidden', !state.editing);
             document.getElementById('completeZoneBtn').textContent = state.editing ? '수정 저장' : '이 거점 점검 완료';
+            syncInspectorFields(state.inspector || '');
             renderChecklist();
             updateGPSDisplay();
         }
@@ -1975,6 +2194,7 @@
             state.photoData = {};
             photoTypes.forEach((p) => { state.photoData[p.id] = []; });
             document.getElementById('memoInput').value = record.memo || '';
+            fillMeterFields(record);
             state.originalDate = record.date || '';
             inspectZoneKey = currentZoneKey();
             document.getElementById('uploadStatus').textContent = '드라이브 사진 불러오는 중...';
@@ -1999,6 +2219,15 @@
             }
             if (rec.memo) document.getElementById('memoInput').value = rec.memo;
             if (rec.date) state.originalDate = rec.date;
+            if (rec.inspector && !currentInspectorName()) syncInspectorFields(rec.inspector);
+            if (rec.v220 || rec.v380 || rec.ground || rec.insul) {
+                fillMeterFields({
+                    v220: rec.v220,
+                    v380: rec.v380,
+                    ground: rec.ground,
+                    insul: rec.insul
+                });
+            }
             (rec.photos || []).forEach((file) => {
                 const type = matchPhotoTypeByName(file.name);
                 photosOf(type.id).push({
@@ -2063,10 +2292,9 @@
             const list = document.getElementById('checklist');
             list.innerHTML = '';
             const totalEl = document.getElementById('zonePhotoTotal');
-            const pending = allPhotos().filter(p => p.uploading || p.failed).length;
-            totalEl.textContent = pending
-                ? `이 거점 사진 ${totalPhotoCount()}장 · ${pending}장 처리 중`
-                : `이 거점 사진 ${totalPhotoCount()}장 · 장수 제한 없음`;
+            const stats = drivePhotoStats();
+            totalEl.textContent = driveCountLine(stats);
+            totalEl.classList.toggle('fail', stats.fail > 0);
             photoTypes.forEach(photo => {
                 const shots = photosOf(photo.id);
                 const block = document.createElement('div');
@@ -2831,15 +3059,22 @@
         function checkCanComplete() {
             const missing = missingRequired();
             const pending = photosStillUploading();
+            const named = !!currentInspectorName();
             const btn = document.getElementById('completeZoneBtn');
-            btn.disabled = pending || completingLock;
-            btn.textContent = pending
-                ? '사진 올리는 중...'
-                : missing.length
-                    ? `빠진 사진 ${missing.length}개`
-                    : (state.editing ? '수정 저장' : '이 거점 점검 완료');
+            if (!btn) return;
+            btn.disabled = pending || completingLock || !named;
+            btn.textContent = !named
+                ? '점검자 이름 필요'
+                : pending
+                    ? '사진 올리는 중...'
+                    : missing.length
+                        ? `빠진 사진 ${missing.length}개`
+                        : (state.editing ? '수정 저장' : '이 거점 점검 완료');
             const warn = document.getElementById('requiredWarning');
-            if (missing.length) {
+            if (!named) {
+                warn.classList.remove('hidden');
+                warn.textContent = '⚠️ 점검자 이름을 적어야 완료할 수 있습니다';
+            } else if (missing.length) {
                 warn.classList.remove('hidden');
                 warn.textContent = '⚠️ 아직 없음: ' + missing.map((p) => p.label).join(', ');
             } else if (pending) {
@@ -2865,6 +3100,7 @@
 
         async function maybeComplete() {
             stopLiveCamera();
+            if (!requireInspectorName()) return;
             if (completingLock || photosStillUploading()) return;
             if (missingRequired().length) {
                 openReview('missing');
@@ -2888,20 +3124,15 @@
 
         async function finishComplete() {
             if (completingLock || photosStillUploading()) return;
+            if (!requireInspectorName()) return;
             const zone = state.selectedZone;
+            const meters = readMeterFields();
             const measured = meterLineForMemo();
             const memo = [document.getElementById('memoInput').value.trim(), measured].filter(Boolean).join('\n');
             const btn = document.getElementById('completeZoneBtn');
             const status = document.getElementById('uploadStatus');
             completingLock = true;
             btn.disabled = true;
-            if (!state.inspector) {
-                const name = prompt('점검자 이름을 입력하세요');
-                if (name) {
-                    state.inspector = name.trim();
-                    document.getElementById('inspectorName').value = state.inspector;
-                }
-            }
 
             const photoCount = totalPhotoCount();
             const record = {
@@ -2920,7 +3151,11 @@
                 region: state.region,
                 city: state.city,
                 address: STATION_DATA[state.region][state.city][state.station].address,
-                photoCount
+                photoCount,
+                v220: meters.v220,
+                v380: meters.v380,
+                ground: meters.ground,
+                insul: meters.insul
             };
 
             btn.disabled = true;
@@ -2934,7 +3169,12 @@
                     status.textContent = `사진 재시도 ${i + 1}/${pending.length}`;
                     await uploadPhotoNow(pending[i]);
                 }
-                failed = allPhotos().filter(p => p.failed || !p.uploaded).length;
+                const drive = drivePhotoStats();
+                failed = drive.fail;
+                record.driveOk = drive.sent;
+                record.driveFail = drive.fail;
+                record.photoCount = drive.total;
+                status.textContent = driveCountLine(drive);
                 if (photosStillUploading()) {
                     status.textContent = '사진이 아직 올라가는 중입니다.';
                     completingLock = false;
@@ -2944,7 +3184,7 @@
 
                 const already = !state.editing && isZoneDone(state.station, state.city, zone, state.selectedZoneIdx);
                 if (already) {
-                    record.upload = '시트에 이미 있는 거점 (중복 생략)';
+                    record.upload = `시트에 이미 있는 거점 (중복 생략) · 드라이브 전송 ${drive.sent}장`;
                 } else {
                     status.textContent = state.editing ? '구글 시트 같은 줄을 수정 중...' : '구글 시트에 기록 중...';
                     await postGoogle({
@@ -2961,11 +3201,15 @@
                         gps: record.gps ? `${record.gps.lat}, ${record.gps.lng}` : '',
                         memo: record.memo || '',
                         address: record.address || '',
-                        photoCount
+                        photoCount: record.photoCount,
+                        v220: record.v220,
+                        v380: record.v380,
+                        ground: record.ground,
+                        insul: record.insul
                     });
                     record.upload = state.editing
-                        ? (failed ? `시트 수정, 사진 실패 ${failed}장` : `시트 수정 저장 · 사진 ${photoCount}장`)
-                        : (failed ? `시트 전송, 사진 실패 ${failed}장 / 전체 ${photoCount}장` : `시트+드라이브 ${photoCount}장`);
+                        ? (failed ? `시트 수정 · 드라이브 전송 ${drive.sent}장 · 실패 ${failed}장` : `시트 수정 저장 · 드라이브 전송 ${drive.sent}장`)
+                        : (failed ? `시트 전송 · 드라이브 전송 ${drive.sent}장 · 실패 ${failed}장` : `시트 저장 · 드라이브 전송 ${drive.sent}장`);
                 }
             } catch (err) {
                 record.upload = '구글 전송 실패 (폰에만 저장됨)';
@@ -3014,13 +3258,15 @@
             btn.textContent = '이 거점 점검 완료';
             status.textContent = '';
 
+            const driveLine = `사진 ${record.photoCount || 0}장 중 드라이브 전송 ${record.driveOk || 0}장` +
+                (record.driveFail ? `\n실패 ${record.driveFail}장 (다시 올리기)` : '');
             const msg = (record.upload || '').indexOf('중복') >= 0
-                ? '이미 시트에 있는 거점입니다. 한 줄만 유지합니다.'
+                ? `이미 시트에 있는 거점입니다. 한 줄만 유지합니다.\n${driveLine}`
                 : (record.upload || '').indexOf('수정') >= 0
-                    ? (failed ? `수정은 저장됐습니다. 사진 ${failed}장은 업로드 실패일 수 있습니다.` : '수정 저장 완료. 시트 같은 줄을 덮어썼습니다.')
+                    ? (failed ? `수정은 저장됐습니다.\n${driveLine}` : `수정 저장 완료. 시트 같은 줄을 덮어썼습니다.\n${driveLine}`)
                     : failed
-                        ? `점검은 저장됐습니다. 사진 ${failed}장은 구글 업로드에 실패했을 수 있습니다.`
-                        : `점검 완료. 시트에 기록하고 사진 ${photoCount}장을 드라이브에 올렸습니다.`;
+                        ? `점검은 저장됐습니다.\n${driveLine}`
+                        : `점검 완료.\n${driveLine}`;
             alert(msg);
         }
 
@@ -3057,7 +3303,11 @@
                         <div style="font-weight:500;">${item.station} - 거점${item.zoneIndex}</div>
                         <div style="font-size:11px;color:#888;">
                             ${item.zoneName} (${item.chargers}대) · ${item.time}
-                            ${item.photoCount ? ` · 사진 ${item.photoCount}장` : ''}
+                            <br><b style="color:${item.driveFail ? '#fdba74' : '#86efac'}">${
+                                item.driveOk != null
+                                    ? `사진 ${item.photoCount || 0}장 · 드라이브 전송 ${item.driveOk}장${item.driveFail ? ` · 실패 ${item.driveFail}장` : ''}`
+                                    : (item.photoCount ? `사진 ${item.photoCount}장` : '')
+                            }</b>
                             ${item.memo ? '<br>📝 ' + item.memo : ''}
                         </div>
                         <button type="button" class="btn btn-secondary edit-btn" onclick="startEditCompleted(${i})">수정</button>
@@ -3109,16 +3359,27 @@
         }
 
         function isZoneDone(station, city, zone, idx) {
+            return zoneDoneInfo(station, city, zone, idx).done;
+        }
+
+        function zoneDoneInfo(station, city, zone, idx) {
             const zoneId = zone && zone.id;
             const hit = (h) => h.station === station && h.zoneId === zoneId && cityMatches(h.city, city);
-            if ((state.allHistory || []).some(hit) || (state.completedZones || []).some(hit)) return true;
-            return (state.teamProgress || []).some((row) => {
+            const local = (state.allHistory || []).find(hit) || (state.completedZones || []).find(hit);
+            if (local) {
+                return { done: true, who: local.inspector || '', date: local.date || '', source: 'local' };
+            }
+            const team = (state.teamProgress || []).find((row) => {
                 if (row.station !== station) return false;
                 if (!cityMatches(row.city, city)) return false;
                 const parsed = parseSheetZone(row.zone);
                 return (parsed.zoneName && zone && parsed.zoneName === zone.name) ||
                     (parsed.zoneIndex && idx >= 0 && parsed.zoneIndex === idx + 1);
             });
+            if (team) {
+                return { done: true, who: team.inspector || '', date: team.date || '', source: 'team' };
+            }
+            return { done: false, who: '', date: '', source: '' };
         }
 
         function collectRouteStations(region, city) {
@@ -3126,13 +3387,18 @@
             if (!stations) return [];
             return Object.keys(stations).map((name) => {
                 const data = stations[name];
-                const zoneRows = data.zones.map((z, idx) => ({
-                    id: z.id,
-                    name: z.name,
-                    idx,
-                    chargers: z.chargers,
-                    done: isZoneDone(name, city, z, idx)
-                }));
+                const zoneRows = data.zones.map((z, idx) => {
+                    const info = zoneDoneInfo(name, city, z, idx);
+                    return {
+                        id: z.id,
+                        name: z.name,
+                        idx,
+                        chargers: z.chargers,
+                        done: info.done,
+                        who: info.who,
+                        date: info.date
+                    };
+                });
                 const done = zoneRows.filter((z) => z.done).length;
                 return {
                     region,
@@ -3173,7 +3439,6 @@
         }
 
         let routePlan = { region: '', city: '', teams: [] };
-        let lastProgressFetch = 0;
         let completingLock = false;
 
         function updateRouteSyncStatus(at, extra) {
@@ -3235,7 +3500,7 @@
                 return;
             }
             if (!Array.isArray(probe.data.progress)) {
-                updateRouteSyncStatus(null, '구글 스크립트를 v6로 다시 배포해야 팀 진행·수정이 됩니다.');
+                updateRouteSyncStatus(null, '구글 스크립트를 v7로 다시 배포해야 팀 진행·수정이 됩니다.');
                 updateStats();
                 return;
             }
@@ -3245,6 +3510,14 @@
             updateRouteSyncStatus(lastProgressFetch);
             updateStats();
             renderRoutePlan();
+            if (state.station && STATION_DATA[state.region] && STATION_DATA[state.region][state.city] && STATION_DATA[state.region][state.city][state.station]) {
+                const data = STATION_DATA[state.region][state.city][state.station];
+                const inspectHidden = document.getElementById('inspectScreen').classList.contains('hidden');
+                if (inspectHidden) {
+                    renderZones(data.zones);
+                    if (state.selectedZone) selectZone(state.selectedZone, state.selectedZoneIdx);
+                }
+            }
         }
 
         function suggestedTeamCount(n) {
@@ -3323,7 +3596,7 @@
         function zonePills(it) {
             return `<div class="zone-pills">${it.zoneRows.map((z) => {
                 const cls = z.done ? 'ok' : 'left';
-                const mark = z.done ? '완료' : '남음';
+                const mark = z.done ? `이미 완료${z.who ? ' · ' + z.who : ''}` : '남음';
                 return `<button type="button" class="zone-pill ${cls}" onclick='jumpToZone(${JSON.stringify(it.region)}, ${JSON.stringify(it.city)}, ${JSON.stringify(it.name)}, ${z.idx})'>${z.done ? '✓' : '●'} ${z.name} · ${mark}</button>`;
             }).join('')}</div>`;
         }
@@ -3593,7 +3866,11 @@
         }
 
         function saveSettings() {
-            state.inspector = document.getElementById('inspectorName').value.trim();
+            syncInspectorFields(document.getElementById('inspectorName').value);
+            if (!state.inspector) {
+                alert('점검자 이름을 입력하세요.');
+                return;
+            }
             saveState();
             alert('설정이 저장되었습니다.');
         }
@@ -3762,7 +4039,7 @@
         }
 
         function dailyCsv(items) {
-            const headers = ['날짜', '시간', '지역', '시군', '충전소', '거점', '충전기수', '제조사', '점검자', 'GPS', '메모', '사진수', '사진폴더'];
+            const headers = ['날짜', '시간', '지역', '시군', '충전소', '거점', '충전기수', '제조사', '점검자', 'GPS', '메모', '사진수', '드라이브전송', '드라이브실패', '전압220', '전압380', '접지저항', '절연저항', '사진폴더'];
             const rows = items.map((it) => {
                 const r = it.record;
                 const zone = `거점${r.zoneIndex}: ${r.zoneName}`;
@@ -3771,7 +4048,8 @@
                     r.date, r.time, r.region, r.city, r.station, zone,
                     r.chargers, r.maker || '', r.inspector || '',
                     r.gps ? `${r.gps.lat},${r.gps.lng}` : '',
-                    r.memo || '', r.photoCount || 0, folder
+                    r.memo || '', r.photoCount || 0, r.driveOk != null ? r.driveOk : '', r.driveFail || 0,
+                    r.v220 || '', r.v380 || '', r.ground || '', r.insul || '', folder
                 ];
             });
             return '\uFEFF' + [headers, ...rows]

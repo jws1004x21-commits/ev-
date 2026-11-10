@@ -1,5 +1,5 @@
 /**
- * 충전소 점검앱 v6 — Google Apps Script
+ * 충전소 점검앱 v7 — Google Apps Script
  *
  * 사용법:
  * 1. 구글 시트 → 확장 프로그램 → Apps Script
@@ -24,7 +24,7 @@ function setupDrive() {
 
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action;
-  var payload = { ok: true, version: 'v6', message: '충전소 점검 서버 정상' };
+  var payload = { ok: true, version: 'v7', message: '충전소 점검 서버 정상' };
   if (action === 'progress') {
     payload.progress = loadProgress_();
   }
@@ -75,7 +75,7 @@ function doPost(e) {
     var action = data.action || 'complete';
 
     if (action === 'ping') {
-      return json_({ ok: true, version: 'v6' });
+      return json_({ ok: true, version: 'v7' });
     }
 
     if (action === 'photo') {
@@ -105,14 +105,18 @@ function doPost(e) {
       data.memo || '',
       data.address || '',
       data.photoCount || photoCount,
-      folder.getUrl()
+      folder.getUrl(),
+      data.v220 || '',
+      data.v380 || '',
+      data.ground || '',
+      data.insul || ''
     ];
     var existingRow = findRow_(sheet, data.station, data.zone);
     if (action === 'update' || existingRow) {
       if (existingRow) {
         if (!data.date) rowValues[0] = sheet.getRange(existingRow, 1).getDisplayValue();
         rowValues[12] = photoCount;
-        sheet.getRange(existingRow, 1, 1, 14).setValues([rowValues]);
+        sheet.getRange(existingRow, 1, 1, 18).setValues([rowValues]);
         return json_({ ok: true, updated: true, folderUrl: folder.getUrl(), photoCount: photoCount });
       }
     }
@@ -174,7 +178,8 @@ function loadRecord_(p) {
   var row = findRow_(sheet, station, zone);
   var rec = { found: false, station: station, zone: zone, photos: [] };
   if (row) {
-    var values = sheet.getRange(row, 1, 1, 14).getDisplayValues()[0];
+    var lastCol = Math.max(sheet.getLastColumn(), 14);
+    var values = sheet.getRange(row, 1, 1, lastCol).getDisplayValues()[0];
     rec.found = true;
     rec.date = values[0];
     rec.time = values[1];
@@ -185,6 +190,10 @@ function loadRecord_(p) {
     rec.address = values[11];
     rec.photoCount = values[12];
     rec.folderUrl = values[13];
+    rec.v220 = values[14] || '';
+    rec.v380 = values[15] || '';
+    rec.ground = values[16] || '';
+    rec.insul = values[17] || '';
   }
   rec.photos = listPhotos_({
     region: rec.region || p.region,
@@ -210,12 +219,21 @@ function listPhotos_(data) {
 }
 
 function ensureHeader_(sheet) {
+  var headers = [
+    '점검일', '점검시간', '점검자', '지역', '시군', '충전소명', '거점',
+    '충전기수', '제조사', 'GPS', '메모', '주소', '사진수', '사진폴더',
+    '전압220', '전압380', '접지저항', '절연저항'
+  ];
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow([
-      '점검일', '점검시간', '점검자', '지역', '시군', '충전소명', '거점',
-      '충전기수', '제조사', 'GPS', '메모', '주소', '사진수', '사진폴더'
-    ]);
-    sheet.getRange(1, 1, 1, 14).setFontWeight('bold');
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, 18).setFontWeight('bold');
+    return;
+  }
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var row1 = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+  if (String(row1[14] || '') !== '전압220') {
+    sheet.getRange(1, 15, 1, 4).setValues([['전압220', '전압380', '접지저항', '절연저항']]);
+    sheet.getRange(1, 15, 1, 4).setFontWeight('bold');
   }
 }
 
