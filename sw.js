@@ -1,4 +1,4 @@
-// v4.33: safer MCCB close-up read without breaking real 175A
+// v4.34: prefer 50A/75A MCCB ratings used on site
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
