@@ -419,23 +419,24 @@
             inset: 0;
             background: #000;
             z-index: 600;
+            overflow: hidden;
+            touch-action: none;
         }
         .live-camera video {
             position: absolute;
             inset: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
             background: #000;
+            touch-action: none;
+            transform-origin: center center;
         }
-        .live-camera-frame {
+        .live-camera-gesture {
             position: absolute;
-            left: 12px;
-            right: 12px;
-            top: calc(118px + env(safe-area-inset-top, 0px));
-            bottom: 168px;
-            pointer-events: none;
+            inset: 0;
             z-index: 1;
+            touch-action: none;
         }
         .live-camera.is-full .live-camera-frame { display: none; }
         .live-camera-square {
@@ -615,7 +616,7 @@
         }
         .live-camera-types { bottom: 210px; }
         .live-camera-hint { bottom: 258px; }
-        .live-camera-frame { bottom: 220px; }
+        .live-camera-frame { display: none; }
         .live-camera-thumb-wrap {
             width: 64px;
             height: 64px;
@@ -661,6 +662,24 @@
             margin: 8px 0;
             min-height: 18px;
         }
+
+        .daily-log {
+            overflow-x: auto;
+            margin-top: 8px;
+        }
+        .daily-log table {
+            border-collapse: collapse;
+            font-size: 12px;
+            min-width: 760px;
+            width: 100%;
+        }
+        .daily-log th, .daily-log td {
+            border: 1px solid #333;
+            padding: 5px 6px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .daily-log th { background: #1f1f35; }
 
         .bottom-nav {
             position: fixed;
@@ -1027,7 +1046,7 @@
                             <div class="text">충전기 <strong id="chargerCount"></strong>대 | 제조사: <span id="makerInfo"></span></div>
                         </div>
                         <div style="font-weight:600;font-size:14px;margin-bottom:4px;">사진 촬영 — 장수 제한 없음</div>
-                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">전압·저항·절연 등은 1:1 네모에 맞춰 찍힙니다. 전체샷만 화면 전체입니다. 카메라는 닫지 말고 위 항목만 바꿔도 됩니다.</div>
+                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">화면 전체가 저장됩니다. 숫자는 줌으로 키워서 찍으세요. 카메라는 닫지 말고 위 항목만 바꿔도 됩니다.</div>
                         <div id="editBanner" class="edit-banner hidden">완료된 거점입니다. 바꿀 사진·메모만 고치면 시트 같은 줄이 덮어씌워집니다.</div>
                         <div class="form-group" style="margin-bottom:10px;">
                             <label class="form-label">점검자 이름 (필수)</label>
@@ -1053,6 +1072,18 @@
                                 <div class="form-group">
                                     <label class="form-label">절연저항 (MΩ)</label>
                                     <input type="number" inputmode="decimal" class="form-input" id="meterInsul" placeholder="예: 120">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">MCCB용량</label>
+                                    <input type="text" class="form-input" id="logMccb" placeholder="예: 75A">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">계량기번호</label>
+                                    <input type="text" class="form-input" id="logMeterNo" placeholder="현장 계량기 번호">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">충전기번호</label>
+                                    <input type="text" class="form-input" id="logChargerNo" placeholder="예: 1~4">
                                 </div>
                                 <div class="meter-hint" id="meterHint"></div>
                             </div>
@@ -1144,10 +1175,17 @@
             <div class="card">
                 <div class="card-header">📋 점검 내역</div>
                 <div class="card-body">
-                    <button class="btn btn-primary btn-small" onclick="exportTodayReport()" style="margin-bottom:8px;">📤 오늘 점검 카톡으로 보내기</button>
-                    <button class="btn btn-secondary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📁 원본 사진 폴더(zip)</button>
+                    <button class="btn btn-primary btn-small" onclick="syncAndShowDailyLog()" style="margin-bottom:8px;">🔄 동기화 후 오늘 점검일지</button>
+                    <button class="btn btn-secondary btn-small" onclick="shareDailyLog()" style="margin-bottom:8px;">📤 점검일지 카톡으로</button>
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label class="form-label">점검일</label>
+                        <input type="date" class="form-input" id="logDate">
+                    </div>
+                    <div id="dailyLog" class="daily-log"></div>
+                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">동기화는 대표 구글 시트를 다시 받아 최신으로 바꿉니다. 폰마다 구글 로그인은 필요 없습니다. 전체 기록은 시트에 그대로 쌓이고, 점검일지는 고른 날짜만 보여 줍니다. 같은 거점은 한 줄을 덮어씁니다.</div>
+                    <button class="btn btn-secondary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📁 오늘 폴더로 저장</button>
                     <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📋 전체 기록만 엑셀</button>
-                    <div style="font-size:12px;color:#aaa;margin-bottom:12px;">카톡 보내기는 파일 하나입니다. 받는 사람이 그 파일을 열면 기록과 사진이 바로 보입니다. 압축을 풀 필요 없습니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin-bottom:12px;">카톡에는 그날 zip 하나를 보냅니다. 받는 사람이 압축을 풀면 시/군 · 충전소 · 거점 폴더로 사진이 정리되고, 점검목록.html 에서 사진이 보입니다. 컴퓨터는 아래 폴더 저장을 누르면 압축 없이 폴더가 만들어집니다.</div>
                     <div id="historyList"></div>
                 </div>
             </div>
@@ -1173,8 +1211,8 @@
                         <div class="title">시트 + 드라이브</div>
                         <div class="text">
                             점검 완료 시 구글 시트에 기록이 추가되고, 사진은
-                            <b>내 드라이브 / 전기차충전소점검_대전팀 / 점검사진</b>
-                            폴더에 충전소·거점별로 저장됩니다.
+                            <b>내 드라이브 / 전기차충전소점검_대전팀 / 점검사진 / 지역 / 시군 / 충전소 / 거점1_장소</b>
+                            폴더에 거점별로 저장됩니다.
                         </div>
                     </div>
                     <div class="text" style="font-size:12px;color:#aaa;margin-bottom:10px;" id="localBackupStatus">
@@ -1227,6 +1265,7 @@
 
     <div id="liveCamera" class="live-camera hidden">
         <video id="liveCameraVideo" autoplay playsinline muted></video>
+        <div id="liveCameraGesture" class="live-camera-gesture"></div>
         <div class="live-camera-frame" id="liveCameraFrame">
             <div class="live-camera-square" id="liveCameraSquare"></div>
         </div>
@@ -1238,7 +1277,6 @@
             </div>
         </div>
         <div class="live-camera-tools">
-            <button type="button" id="liveCameraRatio">1:1</button>
             <button type="button" id="liveCameraZoomOut">줌-</button>
             <button type="button" id="liveCameraZoomIn">줌+</button>
             <button type="button" id="liveCameraTorch">라이트</button>
@@ -1286,7 +1324,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.13';
+        const APP_VERSION = '4.17';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -1453,11 +1491,14 @@
             let last = null;
             for (let i = 0; i < 6; i++) {
                 const loc = currentLocationFields();
+                const drive = driveFolderFields(loc);
                 const q = 'action=count'
-                    + '&station=' + encodeURIComponent(loc.station || '')
-                    + '&zone=' + encodeURIComponent(loc.zone || '')
-                    + '&city=' + encodeURIComponent(loc.city || '')
-                    + '&region=' + encodeURIComponent(loc.region || '');
+                    + '&station=' + encodeURIComponent(drive.station || '')
+                    + '&zone=' + encodeURIComponent(drive.zone || '')
+                    + '&zoneFolder=' + encodeURIComponent(drive.zoneFolder || '')
+                    + '&zoneLabel=' + encodeURIComponent(drive.zoneLabel || '')
+                    + '&city=' + encodeURIComponent(drive.city || '')
+                    + '&region=' + encodeURIComponent(drive.region || '');
                 const res = await googleJsonp(q, 10000);
                 if (res.ok && res.data && typeof res.data.count === 'number') {
                     last = res.data.count;
@@ -1528,7 +1569,8 @@
                     cancelled: false,
                     blurry: !!item.blurry,
                     label: item.label,
-                    filename: item.filename
+                    filename: item.filename,
+                    location: item.location || null
                 }));
             });
             return out;
@@ -1745,8 +1787,9 @@
             }
             const files = items.map((item, i) => dataUrlToFile(item.data, exportPhotoName(item, i)));
             const zipName = `${state.station || '충전소'}_거점${(state.selectedZoneIdx || 0) + 1}_점검사진.zip`;
+            const zoneFolder = folderSafe('거점' + ((state.selectedZoneIdx || 0) + 1) + '_' + ((state.selectedZone && state.selectedZone.name) || ''));
             const zipBytes = buildZip(items.map((item, i) => ({
-                name: exportPhotoName(item, i),
+                name: zoneFolder + '/' + exportPhotoName(item, i),
                 bytes: dataUrlToBytes(item.data)
             })));
             downloadFileToPhone(new File([zipBytes], zipName, { type: 'application/zip' }));
@@ -1769,7 +1812,7 @@
                     if (err && err.name === 'AbortError') return;
                 }
             }
-            alert(`사진 ${files.length}장을 앱 순서대로 ${zipName} 에 담았습니다. 파일 앱 또는 다운로드에서 확인하세요.`);
+            alert(`사진 ${files.length}장을 ${zoneFolder} 폴더에 담아 ${zipName} 으로 저장했습니다. 압축을 풀면 거점 폴더가 나옵니다.`);
         }
 
         async function retryPendingUploads() {
@@ -2224,6 +2267,20 @@
             persistWorking();
         });
 
+        function chargerNoDefault() {
+            const zones = STATION_DATA[state.region]
+                && STATION_DATA[state.region][state.city]
+                && STATION_DATA[state.region][state.city][state.station]
+                && STATION_DATA[state.region][state.city][state.station].zones;
+            const zone = state.selectedZone;
+            if (!zones || !zone) return '';
+            let start = 1;
+            for (let i = 0; i < (state.selectedZoneIdx || 0); i++) start += Number(zones[i].chargers) || 0;
+            const count = Number(zone.chargers) || 1;
+            const end = start + count - 1;
+            return start === end ? String(start) : (start + '~' + end);
+        }
+
         function showInspectScreen() {
             document.getElementById('selectScreen').classList.add('hidden');
             document.getElementById('inspectScreen').classList.remove('hidden');
@@ -2235,6 +2292,8 @@
             document.getElementById('makerInfo').textContent = zone.maker || '미상';
             document.getElementById('editBanner').classList.toggle('hidden', !state.editing);
             document.getElementById('completeZoneBtn').textContent = state.editing ? '수정 저장' : '이 거점 점검 완료';
+            const chargerNo = document.getElementById('logChargerNo');
+            if (chargerNo && !chargerNo.value) chargerNo.value = chargerNoDefault();
             syncInspectorFields(state.inspector || '');
             renderChecklist();
             updateGPSDisplay();
@@ -2325,9 +2384,11 @@
 
         async function loadDriveRecord() {
             const zone = zoneLabel({ zoneIndex: state.selectedZoneIdx + 1, zoneName: state.selectedZone.name });
+            const folder = zoneFolderName(state.selectedZoneIdx, state.selectedZone.name);
             const q = 'action=record'
                 + '&station=' + encodeURIComponent(state.station)
                 + '&zone=' + encodeURIComponent(zone)
+                + '&zoneFolder=' + encodeURIComponent(folder)
                 + '&region=' + encodeURIComponent(state.region)
                 + '&city=' + encodeURIComponent(state.city);
             const res = await googleJsonp(q, 15000);
@@ -2340,12 +2401,15 @@
             if (rec.memo) document.getElementById('memoInput').value = rec.memo;
             if (rec.date) state.originalDate = rec.date;
             if (rec.inspector && !currentInspectorName()) syncInspectorFields(rec.inspector);
-            if (rec.v220 || rec.v380 || rec.ground || rec.insul) {
+            if (rec.v220 || rec.v380 || rec.ground || rec.insul || rec.mccb || rec.meterNo || rec.chargerNo) {
                 fillMeterFields({
                     v220: rec.v220,
                     v380: rec.v380,
                     ground: rec.ground,
-                    insul: rec.insul
+                    insul: rec.insul,
+                    mccb: rec.mccb,
+                    meterNo: rec.meterNo,
+                    chargerNo: rec.chargerNo
                 });
             }
             (rec.photos || []).forEach((file) => {
@@ -2389,13 +2453,34 @@
             return allPhotos().length;
         }
 
+        function zoneFolderName(index, name) {
+            const n = (Number(index) || 0) + 1;
+            const tail = String(name || '').trim();
+            return tail ? `거점${n}_${tail}` : `거점${n}`;
+        }
+
+        function driveFolderFields(loc) {
+            const src = loc || currentLocationFields();
+            const folder = src.zoneFolder || src.zone;
+            return {
+                region: src.region,
+                city: src.city,
+                station: src.station,
+                zone: folder,
+                zoneFolder: folder,
+                zoneLabel: src.zone
+            };
+        }
+
         function currentLocationFields() {
             const zone = state.selectedZone;
+            const idx = state.selectedZoneIdx || 0;
             return {
                 region: state.region,
                 city: state.city,
                 station: state.station,
-                zone: `거점${(state.selectedZoneIdx || 0) + 1}: ${zone ? zone.name : ''}`
+                zone: `거점${idx + 1}: ${zone ? zone.name : ''}`,
+                zoneFolder: zoneFolderName(idx, zone && zone.name)
             };
         }
 
@@ -2453,7 +2538,7 @@
         let cameraStream = null;
         let shutterBusy = false;
         let torchOn = false;
-        let cameraSquare = true;
+        let cameraSquare = false;
         let cameraZoom = 1;
 
         function isFullShot(photoId) {
@@ -2465,11 +2550,12 @@
         }
 
         function cameraHintFor(photoId) {
-            if (photoId === 'voltage') return '380V·220V 숫자가 또렷하게 · 위 버튼으로 1:1/줌/폰카메라 선택';
-            if (photoId === 'resistance') return '접지저항 숫자가 또렷하게 · 위 버튼으로 1:1/줌/폰카메라 선택';
-            if (photoId === 'insulation') return '절연저항 숫자가 또렷하게 · 위 버튼으로 1:1/줌/폰카메라 선택';
-            if (photoId === 'overview') return '충전소 전체가 나오게 찍으세요 · 빨간 버튼';
-            return '흰 네모 안에 맞추면 1:1로 저장됩니다 · 빨간 버튼';
+            const zoom = '두 손가락 또는 위아래로 드래그하면 줌';
+            if (photoId === 'voltage') return '380V·220V 숫자가 또렷하게 · ' + zoom;
+            if (photoId === 'resistance') return '접지저항 숫자가 또렷하게 · ' + zoom;
+            if (photoId === 'insulation') return '절연저항 숫자가 또렷하게 · ' + zoom;
+            if (photoId === 'overview') return '충전소 전체가 나오게 · ' + zoom;
+            return '화면 전체가 저장됩니다 · ' + zoom;
         }
 
         function showCameraWarn(msg) {
@@ -2522,7 +2608,10 @@
                 v220: (document.getElementById('meterV220') || {}).value || '',
                 v380: (document.getElementById('meterV380') || {}).value || '',
                 ground: (document.getElementById('meterGround') || {}).value || '',
-                insul: (document.getElementById('meterInsul') || {}).value || ''
+                insul: (document.getElementById('meterInsul') || {}).value || '',
+                mccb: (document.getElementById('logMccb') || {}).value || '',
+                meterNo: (document.getElementById('logMeterNo') || {}).value || '',
+                chargerNo: (document.getElementById('logChargerNo') || {}).value || ''
             };
         }
 
@@ -2533,6 +2622,9 @@
             set('meterV380', m.v380);
             set('meterGround', m.ground);
             set('meterInsul', m.insul);
+            set('logMccb', m.mccb);
+            set('logMeterNo', m.meterNo);
+            set('logChargerNo', m.chargerNo);
             updateMeterHint();
         }
 
@@ -2638,11 +2730,8 @@
             const type = photoTypes.find((p) => p.id === currentPhotoId);
             document.getElementById('liveCameraTitle').textContent = type ? type.label : '촬영';
             document.getElementById('liveCameraCount').textContent = (type ? photosOf(type.id).length : 0) + '장';
-            const ratioBtn = document.getElementById('liveCameraRatio');
-            ratioBtn.textContent = cameraSquare ? '1:1' : '풀샷';
-            ratioBtn.classList.toggle('on', cameraSquare);
             document.getElementById('liveCameraHint').textContent = cameraHintFor(currentPhotoId);
-            document.getElementById('liveCamera').classList.toggle('is-full', !cameraSquare);
+            document.getElementById('liveCamera').classList.add('is-full');
             const box = document.getElementById('liveCameraTypes');
             box.innerHTML = photoTypes.map((p) => {
                 const n = photosOf(p.id).length;
@@ -2650,7 +2739,6 @@
                 const name = String(p.label).replace(/^\d+\.\s*/, '');
                 return `<button type="button" class="${on}" data-id="${p.id}">${name}${n ? ' ' + n : ''}</button>`;
             }).join('');
-            layoutSquareGuide();
             refreshTorchButton();
             refreshZoomButtons();
             renderLiveCameraFilm();
@@ -2690,9 +2778,59 @@
         }
 
         function refreshZoomButtons() {
+            const label = '줌+ ' + cameraZoom.toFixed(1);
+            document.getElementById('liveCameraZoomIn').textContent = label;
+        }
+
+        function cameraZoomRange() {
             const caps = cameraCaps();
-            const has = !!(caps.zoom);
-            document.getElementById('liveCameraZoomIn').textContent = has ? ('줌+ ' + cameraZoom.toFixed(1)) : '줌+';
+            const min = Number(caps.zoom && caps.zoom.min);
+            const max = Number(caps.zoom && caps.zoom.max);
+            if (caps.zoom && max > min) {
+                return { min: Number.isFinite(min) ? min : 1, max, hardware: true };
+            }
+            return { min: 1, max: 4, hardware: false };
+        }
+
+        function applyViewScale() {
+            const video = document.getElementById('liveCameraVideo');
+            if (!video) return;
+            const range = cameraZoomRange();
+            video.style.transform = range.hardware ? '' : ('scale(' + cameraZoom + ')');
+        }
+
+        let zoomApplyTimer = 0;
+        let zoomPending = null;
+
+        async function applyCameraZoom(value) {
+            const range = cameraZoomRange();
+            const next = Math.min(range.max, Math.max(range.min, Number(value) || range.min));
+            cameraZoom = next;
+            refreshZoomButtons();
+            if (!range.hardware) {
+                applyViewScale();
+                return;
+            }
+            zoomPending = cameraZoom;
+            if (zoomApplyTimer) return;
+            zoomApplyTimer = setTimeout(async () => {
+                zoomApplyTimer = 0;
+                const z = zoomPending;
+                zoomPending = null;
+                const track = cameraTrack();
+                if (!track || z == null) return;
+                try {
+                    await track.applyConstraints({ advanced: [{ zoom: z }] });
+                } catch (err) {
+                    try { await track.applyConstraints({ zoom: z }); } catch (err2) {}
+                }
+            }, 40);
+        }
+
+        async function bumpCameraZoom(dir) {
+            const range = cameraZoomRange();
+            const span = Math.max(0.15, (range.max - range.min) / 8);
+            await applyCameraZoom(cameraZoom + dir * span);
         }
 
         async function toggleTorch() {
@@ -2711,27 +2849,6 @@
             refreshTorchButton();
         }
 
-        async function bumpCameraZoom(dir) {
-            const caps = cameraCaps();
-            if (!caps.zoom) {
-                showCameraWarn('이 폰은 앱 안에서 줌이 안 됩니다. 폰카메라를 누르면 줌을 쓸 수 있습니다.');
-                return;
-            }
-            const min = Number(caps.zoom.min || 1);
-            const max = Number(caps.zoom.max || 1);
-            const step = Number(caps.zoom.step || 0.2);
-            cameraZoom = Math.min(max, Math.max(min, cameraZoom + dir * Math.max(step, 0.2)));
-            try {
-                await cameraTrack().applyConstraints({ advanced: [{ zoom: cameraZoom }] });
-            } catch (err) {
-                try {
-                    await cameraTrack().applyConstraints({ zoom: cameraZoom });
-                } catch (err2) {
-                    showCameraWarn('줌을 바꿀 수 없습니다. 폰카메라를 누르세요.');
-                }
-            }
-            refreshZoomButtons();
-        }
 
         function toggleCameraSquare() {
             cameraSquare = !cameraSquare;
@@ -2748,6 +2865,7 @@
             torchOn = false;
             const video = document.getElementById('liveCameraVideo');
             cameraZoom = 1;
+            if (video) video.style.transform = '';
             if (cameraStream) {
                 cameraStream.getTracks().forEach((t) => t.stop());
                 cameraStream = null;
@@ -2762,28 +2880,15 @@
         function captureCanvasFromVideo(video) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            if (!cameraSquare) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0);
-                return canvas;
-            }
-            const vRect = video.getBoundingClientRect();
-            const sq = document.getElementById('liveCameraSquare').getBoundingClientRect();
-            const scale = Math.max(vRect.width / video.videoWidth, vRect.height / video.videoHeight);
-            const originX = vRect.left + (vRect.width - video.videoWidth * scale) / 2;
-            const originY = vRect.top + (vRect.height - video.videoHeight * scale) / 2;
-            let sx = (sq.left - originX) / scale;
-            let sy = (sq.top - originY) / scale;
-            let sw = sq.width / scale;
-            let sh = sq.height / scale;
-            const side = Math.max(32, Math.min(sw, sh, video.videoWidth, video.videoHeight));
-            sx = Math.max(0, Math.min(sx, video.videoWidth - side));
-            sy = Math.max(0, Math.min(sy, video.videoHeight - side));
-            const out = Math.round(side);
-            canvas.width = out;
-            canvas.height = out;
-            ctx.drawImage(video, sx, sy, side, side, 0, 0, out, out);
+            const range = cameraZoomRange();
+            const scale = range.hardware ? 1 : Math.max(1, cameraZoom);
+            const sw = video.videoWidth / scale;
+            const sh = video.videoHeight / scale;
+            const sx = (video.videoWidth - sw) / 2;
+            const sy = (video.videoHeight - sh) / 2;
+            canvas.width = Math.max(1, Math.round(sw));
+            canvas.height = Math.max(1, Math.round(sh));
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
             return canvas;
         }
 
@@ -2819,7 +2924,7 @@
 
         async function startLiveCamera(photoId) {
             currentPhotoId = photoId;
-            cameraSquare = !isFullShot(photoId);
+            cameraSquare = false;
             if (cameraStream && !document.getElementById('liveCamera').classList.contains('hidden')) {
                 updateLiveCameraHud();
                 return;
@@ -2854,6 +2959,8 @@
             video.muted = true;
             video.srcObject = stream;
             try { await video.play(); } catch (err) {}
+            cameraZoom = cameraZoomRange().min;
+            applyViewScale();
             document.getElementById('liveCameraThumb').removeAttribute('src');
             document.getElementById('liveCamera').classList.remove('hidden');
             updateLiveCameraHud();
@@ -2873,7 +2980,7 @@
                 const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
                 if (blob) {
                     const file = new File([blob], 'shot.jpg', { type: 'image/jpeg' });
-                    const added = await addFiles([file], cameraSquare);
+                    const added = await addFiles([file], false);
                     if (added > 0) {
                         document.getElementById('liveCameraThumb').src = URL.createObjectURL(blob);
                         updateLiveCameraHud();
@@ -2915,28 +3022,49 @@
             uploadQueue = uploadQueue.then(() => uploadPhotoNow(item)).catch(() => {});
         }
 
+        async function confirmUploadedFile(loc, filename) {
+            const q = 'action=record'
+                + '&station=' + encodeURIComponent(loc.station || '')
+                + '&zone=' + encodeURIComponent(loc.zone || '')
+                + '&zoneFolder=' + encodeURIComponent(loc.zoneFolder || '')
+                + '&zoneLabel=' + encodeURIComponent(loc.zoneLabel || '')
+                + '&region=' + encodeURIComponent(loc.region || '')
+                + '&city=' + encodeURIComponent(loc.city || '');
+            for (let i = 0; i < 4; i++) {
+                await waitMs(1500);
+                const res = await googleJsonp(q, 20000);
+                const photos = res.ok && res.data && res.data.record && res.data.record.photos;
+                if (!Array.isArray(photos)) return null;
+                if (photos.some((p) => p.name === filename)) return true;
+            }
+            return false;
+        }
+
         async function uploadPhotoNow(item) {
             if (item.cancelled || !item.data || item.uploaded) return;
             item.uploading = true;
             item.failed = false;
             renderChecklist();
+            const loc = driveFolderFields(item.location || currentLocationFields());
             try {
                 await postGoogle({
                     action: 'photo',
-                    ...currentLocationFields(),
+                    ...loc,
                     label: item.label,
                     filename: item.filename,
                     data: item.data
                 });
+                const seen = await confirmUploadedFile(loc, item.filename);
                 if (item.cancelled) {
                     await postGoogle({
                         action: 'deletePhoto',
-                        ...currentLocationFields(),
+                        ...loc,
                         filename: item.filename
                     });
                     return;
                 }
-                item.uploaded = true;
+                item.uploaded = seen !== false;
+                item.failed = seen === false;
                 item.uploading = false;
             } catch (err) {
                 item.uploading = false;
@@ -2968,7 +3096,8 @@
                     failed: false,
                     blurry,
                     label: type.label,
-                    filename: nextPhotoFilename(type)
+                    filename: nextPhotoFilename(type),
+                    location: currentLocationFields()
                 };
                 photosOf(photoId).push(item);
                 added += 1;
@@ -2993,11 +3122,68 @@
         document.getElementById('liveCameraShutter').addEventListener('click', captureLiveShot);
         document.getElementById('liveCameraClose').addEventListener('click', stopLiveCamera);
         document.getElementById('liveCameraTorch').addEventListener('click', toggleTorch);
-        document.getElementById('liveCameraRatio').addEventListener('click', toggleCameraSquare);
         document.getElementById('liveCameraZoomIn').addEventListener('click', () => bumpCameraZoom(1));
         document.getElementById('liveCameraZoomOut').addEventListener('click', () => bumpCameraZoom(-1));
         document.getElementById('liveCameraNative').addEventListener('click', openNativeCamera);
-        document.getElementById('liveCameraVideo').addEventListener('click', async (e) => {
+        const camGesture = { pointers: new Map(), mode: '', startDist: 0, startZoom: 1, startY: 0, moved: false };
+        let camIgnoreClick = false;
+
+        function camPointerDist() {
+            const pts = [...camGesture.pointers.values()];
+            if (pts.length < 2) return 0;
+            return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        }
+
+        const liveVideo = document.getElementById('liveCameraGesture');
+        liveVideo.addEventListener('pointerdown', (e) => {
+            if (camGesture.pointers.size === 0) camIgnoreClick = false;
+            camGesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            try { liveVideo.setPointerCapture(e.pointerId); } catch (err) {}
+            if (camGesture.pointers.size >= 2) {
+                camGesture.mode = 'pinch';
+                camGesture.startDist = camPointerDist();
+                camGesture.startZoom = cameraZoom;
+                camGesture.moved = true;
+            } else {
+                camGesture.mode = 'drag';
+                camGesture.startY = e.clientY;
+                camGesture.startZoom = cameraZoom;
+                camGesture.moved = false;
+            }
+        });
+        liveVideo.addEventListener('pointermove', (e) => {
+            if (!camGesture.pointers.has(e.pointerId)) return;
+            camGesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (camGesture.mode === 'pinch' && camGesture.pointers.size >= 2 && camGesture.startDist > 8) {
+                applyCameraZoom(camGesture.startZoom * (camPointerDist() / camGesture.startDist));
+            } else if (camGesture.mode === 'drag' && camGesture.pointers.size === 1) {
+                const dy = camGesture.startY - e.clientY;
+                if (Math.abs(dy) < 14) return;
+                camGesture.moved = true;
+                const range = cameraZoomRange();
+                const span = Math.max(0.6, range.max - range.min);
+                applyCameraZoom(camGesture.startZoom + (dy / 240) * span);
+            }
+        });
+        function endCamPointer(e) {
+            camGesture.pointers.delete(e.pointerId);
+            if (camGesture.moved) camIgnoreClick = true;
+            if (camGesture.pointers.size < 2) camGesture.startDist = 0;
+            if (camGesture.pointers.size === 0) camGesture.mode = '';
+        }
+        liveVideo.addEventListener('pointerup', endCamPointer);
+        liveVideo.addEventListener('pointercancel', endCamPointer);
+        liveVideo.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const range = cameraZoomRange();
+            const step = Math.max(0.12, (range.max - range.min) / 10);
+            applyCameraZoom(cameraZoom + (e.deltaY < 0 ? step : -step));
+        }, { passive: false });
+        liveVideo.addEventListener('click', async (e) => {
+            if (camIgnoreClick) {
+                camIgnoreClick = false;
+                return;
+            }
             const caps = cameraCaps();
             if (!caps.pointsOfInterest) return;
             const rect = e.currentTarget.getBoundingClientRect();
@@ -3017,7 +3203,7 @@
             const btn = e.target.closest('button[data-id]');
             if (!btn) return;
             currentPhotoId = btn.getAttribute('data-id');
-            cameraSquare = !isFullShot(currentPhotoId);
+            cameraSquare = false;
             updateLiveCameraHud();
         });
         window.addEventListener('resize', () => {
@@ -3037,13 +3223,13 @@
                     n += 1;
                 });
             }
-            await addFiles(list, cameraSquare);
+            await addFiles(list, false);
         });
 
         document.getElementById('galleryInput').addEventListener('change', async (e) => {
             const list = Array.from(e.target.files || []);
             e.target.value = '';
-            await addFiles(list, !isFullShot(currentPhotoId));
+            await addFiles(list, false);
         });
 
         function deletePhoto(photoId, index) {
@@ -3060,7 +3246,7 @@
             if (item.filename) {
                 postGoogle({
                     action: 'deletePhoto',
-                    ...currentLocationFields(),
+                    ...driveFolderFields(item.location || currentLocationFields()),
                     filename: item.filename
                 }).catch(() => {});
             }
@@ -3275,7 +3461,10 @@
                 v220: meters.v220,
                 v380: meters.v380,
                 ground: meters.ground,
-                insul: meters.insul
+                insul: meters.insul,
+                mccb: meters.mccb,
+                meterNo: meters.meterNo,
+                chargerNo: meters.chargerNo || chargerNoDefault()
             };
 
             btn.disabled = true;
@@ -3335,7 +3524,10 @@
                         v220: record.v220,
                         v380: record.v380,
                         ground: record.ground,
-                        insul: record.insul
+                        insul: record.insul,
+                        mccb: record.mccb,
+                        meterNo: record.meterNo,
+                        chargerNo: record.chargerNo
                     });
                     record.upload = state.editing
                         ? (failed ? `시트 수정 · 드라이브 ${record.driveOk}장 · 부족 ${failed}장` : `시트 수정 저장 · 드라이브 ${record.driveOk}장 확인`)
@@ -3676,6 +3868,108 @@
                     if (state.selectedZone) selectZone(state.selectedZone, state.selectedZoneIdx);
                 }
             }
+            const logBox = document.getElementById('dailyLog');
+            if (logBox && logBox.dataset.open === '1') renderDailyLog();
+        }
+
+        function logDateValue() {
+            const input = document.getElementById('logDate');
+            if (input && !input.value) input.value = todayStamp();
+            return (input && input.value) || todayStamp();
+        }
+
+        function rowsForDailyLog(date) {
+            const rows = [];
+            const seen = new Set();
+            const add = (row) => {
+                const key = (row.station || '') + '|' + String(row.zoneIndex || row.zone || '');
+                if (seen.has(key)) return;
+                seen.add(key);
+                rows.push(row);
+            };
+            (state.teamProgress || []).forEach((row) => {
+                if (String(row.date || '').substring(0, 10) !== date) return;
+                const parsed = parseSheetZone(row.zone);
+                add({
+                    station: row.station,
+                    zoneIndex: parsed.zoneIndex || '',
+                    chargers: row.chargers || '',
+                    chargerNo: row.chargerNo || '',
+                    mccb: row.mccb || '',
+                    ground: row.ground || '',
+                    meterNo: row.meterNo || '',
+                    note: [parsed.zoneName, row.memo].filter(Boolean).join(' · '),
+                    inspector: row.inspector || '',
+                    city: row.city || ''
+                });
+            });
+            (state.completedZones || []).forEach((h) => {
+                if (String(h.date || '').substring(0, 10) !== date) return;
+                add({
+                    station: h.station,
+                    zoneIndex: h.zoneIndex || '',
+                    chargers: h.chargers || '',
+                    chargerNo: h.chargerNo || '',
+                    mccb: h.mccb || '',
+                    ground: h.ground || '',
+                    meterNo: h.meterNo || '',
+                    note: [h.zoneName, h.memo].filter(Boolean).join(' · '),
+                    inspector: h.inspector || '',
+                    city: h.city || ''
+                });
+            });
+            rows.sort((a, b) => String(a.city).localeCompare(String(b.city), 'ko')
+                || String(a.station).localeCompare(String(b.station), 'ko')
+                || Number(a.zoneIndex || 0) - Number(b.zoneIndex || 0));
+            return rows;
+        }
+
+        function dailyLogText(date, rows) {
+            const lines = ['전기차 충전소 점검일지', '점검일: ' + date, ''];
+            lines.push(['국소명', '거점', '충전기수', '충전기번호', 'MCCB용량', '접지저항', '계량기번호', '비고', '점검자'].join('\t'));
+            rows.forEach((r) => {
+                lines.push([
+                    r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.note, r.inspector
+                ].join('\t'));
+            });
+            if (!rows.length) lines.push('이 날짜에 시트·이 폰 완료 기록이 없습니다.');
+            return lines.join('\n');
+        }
+
+        function renderDailyLog() {
+            const box = document.getElementById('dailyLog');
+            if (!box) return;
+            box.dataset.open = '1';
+            const date = logDateValue();
+            const rows = rowsForDailyLog(date);
+            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>접지저항</th><th>계량기번호</th><th>비고</th><th>점검자</th></tr>';
+            const body = rows.map((r) => '<tr>' + [r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.note, r.inspector]
+                .map((cell) => '<td>' + String(cell || '').replace(/</g, '&lt;') + '</td>').join('') + '</tr>').join('');
+            box.innerHTML = '<div style="font-size:13px;margin-bottom:6px;">점검일 ' + date + ' · ' + rows.length + '거점 · 시트와 이 폰 기록을 합쳤습니다.</div>'
+                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="9">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
+        }
+
+        async function syncAndShowDailyLog() {
+            const box = document.getElementById('dailyLog');
+            if (box) box.textContent = '구글 시트에서 최신 기록을 가져오는 중...';
+            await fetchTeamProgress(true);
+            renderDailyLog();
+        }
+
+        async function shareDailyLog() {
+            const date = logDateValue();
+            const rows = rowsForDailyLog(date);
+            const text = dailyLogText(date, rows);
+            try {
+                if (navigator.share) {
+                    await navigator.share({ title: '점검일지 ' + date, text });
+                    return;
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') return;
+            }
+            const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
+            downloadFileToPhone(new File([blob], '점검일지_' + date + '.txt', { type: 'text/plain' }));
         }
 
         function suggestedTeamCount(n) {
@@ -3716,6 +4010,8 @@
             document.getElementById('routeShareBtn').addEventListener('click', shareRoutePlan);
             document.getElementById('routeDownloadBtn').addEventListener('click', downloadRoutePlan);
             document.getElementById('routeSyncBtn').addEventListener('click', () => fetchTeamProgress(true));
+            const logDate = document.getElementById('logDate');
+            if (logDate) logDate.addEventListener('change', () => renderDailyLog());
             loadCachedProgress();
         }
 
@@ -4084,8 +4380,9 @@
 
                 const probe = await probeGoogleVersion();
                 const ver = probe.ok && probe.data && String(probe.data.version || '');
-                const isV3 = /^v[3-9]/.test(ver);
-                lines.push(testLine(isV3, isV3
+                const verNum = Number(String(ver).replace(/^v/i, ''));
+                const scriptOk = verNum >= 3;
+                lines.push(testLine(scriptOk, scriptOk
                     ? '구글 Apps Script ' + ver + ' 확인'
                     : '구글 Apps Script가 구버전입니다. 사진이 드라이브에 안 들어갑니다.'));
 
@@ -4093,7 +4390,9 @@
                     region: '테스트',
                     city: '테스트',
                     station: '자동테스트',
-                    zone: '거점1: 자동확인'
+                    zone: '거점1_자동확인',
+                    zoneFolder: '거점1_자동확인',
+                    zoneLabel: '거점1: 자동확인'
                 };
                 for (let i = 0; i < photoTypes.length; i++) {
                     const type = photoTypes[i];
@@ -4115,7 +4414,7 @@
                     region: loc.region,
                     city: loc.city,
                     station: loc.station,
-                    zone: loc.zone,
+                    zone: '거점1: 자동확인',
                     chargers: 0,
                     maker: '테스트',
                     gps: '',
@@ -4123,12 +4422,12 @@
                     address: '',
                     photoCount: photoTypes.length
                 });
-                lines.push(testLine(true, isV3
+                lines.push(testLine(true, scriptOk
                     ? '테스트 사진 7장 + 시트 기록 전송 완료. 드라이브 폴더 전기차충전소점검_대전팀/점검사진/테스트/자동테스트 를 확인하세요.'
                     : '전송은 보냈지만 구버전 스크립트라 시트에만 남거나 사진이 없을 수 있습니다.'));
 
-                box.innerHTML = `<div class="info-box ${isV3 ? 'success' : 'warning'}"><div class="title">자동 테스트 결과</div></div>` + lines.join('');
-                status.textContent = isV3 ? '자동 테스트 완료' : '자동 테스트 완료 · Apps Script 재배포 필요';
+                box.innerHTML = `<div class="info-box ${scriptOk ? 'success' : 'warning'}"><div class="title">자동 테스트 결과</div></div>` + lines.join('');
+                status.textContent = scriptOk ? '자동 테스트 완료' : '자동 테스트 완료 · Apps Script 재배포 필요';
             } catch (err) {
                 lines.push(testLine(false, '테스트 중단: ' + err.message));
                 box.innerHTML = lines.join('');
@@ -4218,46 +4517,168 @@
                 .join('\n');
         }
 
+        function zoneDir(record) {
+            return ['사진', folderSafe(record.city), folderSafe(record.station), folderSafe('거점' + record.zoneIndex + '_' + record.zoneName)].join('/');
+        }
+
+        function htmlEscape(text) {
+            return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function relSrc(path) {
+            return String(path || '').split('/').map((part) => encodeURIComponent(part)).join('/');
+        }
+
+        function zonePhotoFiles(it) {
+            const dir = zoneDir(it.record);
+            const files = [];
+            photoTypes.forEach((type) => {
+                (it.photos[type.id] || []).forEach((p, i) => {
+                    if (!p.data || !String(p.data).startsWith('data:')) return;
+                    const safeLabel = String(type.label || type.id).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '');
+                    const name = p.filename || (String(i + 1).padStart(2, '0') + '_' + safeLabel + '.jpg');
+                    files.push({ path: dir + '/' + name, label: type.label, data: p.data });
+                });
+            });
+            return files;
+        }
+
         function dailyHtml(date, items) {
-            const blocks = items.map((it) => {
+            const cities = new Map();
+            items.forEach((it) => {
                 const r = it.record;
-                const zoneFolder = folderSafe('거점' + r.zoneIndex + '_' + r.zoneName);
-                const base = ['사진', folderSafe(r.city), folderSafe(r.station), zoneFolder].join('/');
-                const imgs = [];
-                photoTypes.forEach((type) => {
-                    (it.photos[type.id] || []).forEach((p) => {
-                        if (!p.data && !p.filename) return;
-                        const name = p.filename || (type.id + '.jpg');
-                        imgs.push(`<figure><img src="${base}/${name}" alt="${type.label}"><figcaption>${type.label}</figcaption></figure>`);
+                const city = r.city || '미지정';
+                const station = r.station || '충전소';
+                if (!cities.has(city)) cities.set(city, new Map());
+                const stations = cities.get(city);
+                if (!stations.has(station)) stations.set(station, []);
+                stations.get(station).push(it);
+            });
+            let body = '';
+            cities.forEach((stations, city) => {
+                body += '<h2>' + htmlEscape(city) + '</h2>';
+                stations.forEach((zones, station) => {
+                    body += '<h3>' + htmlEscape(station) + '</h3>';
+                    zones.forEach((it) => {
+                        const r = it.record;
+                        const dir = zoneDir(r);
+                        const shots = zonePhotoFiles(it);
+                        const imgs = shots.map((p) =>
+                            '<figure><a href="' + relSrc(p.path) + '"><img src="' + relSrc(p.path) + '" alt="' + htmlEscape(p.label) + '"></a><figcaption>' + htmlEscape(p.label) + '</figcaption></figure>'
+                        ).join('');
+                        const missing = shots.length ? '' : '<p>이 폰에 원본이 없는 사진입니다. 구글 드라이브의 거점 폴더에서 받으세요.</p>';
+                        body += '<section><h4>거점' + r.zoneIndex + ' ' + htmlEscape(r.zoneName || '') + '</h4>'
+                            + '<p>' + htmlEscape(r.date) + ' ' + htmlEscape(r.time || '') + ' · ' + (r.chargers || 0) + '대 · ' + htmlEscape(r.inspector || '') + ' · 사진 ' + shots.length + '장</p>'
+                            + '<p class="path">폴더: ' + htmlEscape(dir) + '</p>'
+                            + '<p>' + htmlEscape(r.memo || '') + '</p>'
+                            + '<div class="pics">' + (imgs || missing) + '</div></section>';
                     });
                 });
-                return `<section>
-                    <h2>${r.station} · 거점${r.zoneIndex} ${r.zoneName || ''}</h2>
-                    <p>${r.city || ''} · ${r.date} ${r.time || ''} · ${r.chargers || 0}대 · 점검자 ${r.inspector || ''} · 사진 ${r.photoCount || 0}장</p>
-                    <p>${(r.memo || '').replace(/</g, '&lt;')}</p>
-                    <div class="pics">${imgs.join('')}</div>
-                </section>`;
-            }).join('\n');
-            return `<!DOCTYPE html>
-<html lang="ko"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>대전팀 점검 ${date}</title>
-<style>
-body{font-family:sans-serif;background:#111;color:#eee;margin:0;padding:16px;}
-h1{font-size:20px;} h2{font-size:16px;margin:18px 0 6px;}
-p{color:#bbb;font-size:13px;white-space:pre-wrap;}
-section{border-top:1px solid #333;padding-top:8px;}
-.pics{display:flex;flex-wrap:wrap;gap:8px;}
-figure{margin:0;width:120px;}
-img{width:120px;height:120px;object-fit:cover;border-radius:8px;background:#222;}
-figcaption{font-size:11px;color:#9ca3af;text-align:center;}
-</style></head>
-<body>
-<h1>대전팀 점검 ${date}</h1>
-<p>거점 ${items.length}곳 · 압축을 푼 뒤 이 파일을 브라우저로 여세요. 사진은 시군/충전소/거점 폴더에도 있습니다.</p>
-${blocks}
-</body></html>`;
+            });
+            return '<!DOCTYPE html>\n<html lang="ko"><head><meta charset="utf-8">\n'
+                + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+                + '<title>대전팀 점검 ' + htmlEscape(date) + '</title>\n<style>\n'
+                + 'body{font-family:sans-serif;background:#111;color:#eee;margin:0;padding:16px;}\n'
+                + 'h1{font-size:20px;} h2{font-size:18px;margin:22px 0 8px;color:#86efac;}\n'
+                + 'h3{font-size:16px;margin:14px 0 4px;} h4{font-size:15px;margin:8px 0 4px;}\n'
+                + 'p{color:#bbb;font-size:13px;white-space:pre-wrap;}\n'
+                + '.path{color:#93c5fd;}\n'
+                + 'section{border-top:1px solid #333;padding-top:8px;margin-left:8px;}\n'
+                + '.pics{display:flex;flex-wrap:wrap;gap:8px;}\n'
+                + 'figure{margin:0;width:140px;}\n'
+                + 'img{width:140px;height:140px;object-fit:cover;border-radius:8px;background:#222;}\n'
+                + 'figcaption{font-size:11px;color:#9ca3af;text-align:center;}\n'
+                + '</style></head><body>\n'
+                + '<h1>대전팀 점검 ' + htmlEscape(date) + '</h1>\n'
+                + '<p>거점 ' + items.length + '곳. 압축을 푼 뒤 이 파일을 여세요. 사진은 시/군, 충전소, 거점 폴더에 있습니다.</p>\n'
+                + body + '\n</body></html>';
         }
+
+        async function fetchDrivePhoto(photo, record) {
+            const folder = '거점' + (record.zoneIndex || 1) + '_' + (record.zoneName || '');
+            const q = 'action=file'
+                + '&id=' + encodeURIComponent(photo.driveId || '')
+                + '&filename=' + encodeURIComponent(photo.filename || '')
+                + '&station=' + encodeURIComponent(record.station || '')
+                + '&zone=' + encodeURIComponent(folder)
+                + '&zoneFolder=' + encodeURIComponent(folder)
+                + '&region=' + encodeURIComponent(record.region || '')
+                + '&city=' + encodeURIComponent(record.city || '');
+            const res = await googleJsonp(q, 30000);
+            const file = res.ok && res.data && res.data.file;
+            if (file && file.ok && file.data) {
+                return 'data:' + (file.mime || 'image/jpeg') + ';base64,' + file.data;
+            }
+            if (!photo.driveId) return '';
+            try {
+                const resp = await fetch('https://drive.google.com/thumbnail?id=' + encodeURIComponent(photo.driveId) + '&sz=w1600');
+                if (!resp.ok) return '';
+                const blob = await resp.blob();
+                if (!blob.size) return '';
+                return await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result || '');
+                    reader.onerror = () => resolve('');
+                    reader.readAsDataURL(blob);
+                });
+            } catch (err) {
+                return '';
+            }
+        }
+
+        async function hydrateDrivePhotos(items) {
+            for (let i = 0; i < items.length; i++) {
+                const record = items[i].record || {};
+                const groups = items[i].photos || {};
+                const ids = Object.keys(groups);
+                for (let g = 0; g < ids.length; g++) {
+                    const list = groups[ids[g]] || [];
+                    for (let p = 0; p < list.length; p++) {
+                        const photo = list[p];
+                        if (photo.data && String(photo.data).startsWith('data:')) continue;
+                        if (!photo.driveId && !photo.filename) continue;
+                        const data = await fetchDrivePhoto(photo, record);
+                        if (data) photo.data = data;
+                    }
+                }
+            }
+        }
+
+        async function buildDailyBundle(pack) {
+            const stamp = pack.date || todayStamp();
+            const items = pack.items || [];
+            await hydrateDrivePhotos(items);
+            const readme = '1. 이 압축을 푸세요.\n2. 점검목록.html 을 브라우저로 여세요.\n3. 원본 사진은 사진 / 시군 / 충전소 / 거점 폴더에 있습니다.\n4. 이 파일은 그날 완료한 거점만 들어 있습니다.\n';
+            const entries = [
+                { name: '먼저읽기.txt', bytes: utf8Bytes(readme) },
+                { name: '점검목록.html', bytes: utf8Bytes(dailyHtml(stamp, items)) },
+                { name: '점검기록.csv', bytes: utf8Bytes(dailyCsv(items)) }
+            ];
+            items.forEach((it) => {
+                zonePhotoFiles(it).forEach((p) => {
+                    entries.push({ name: p.path, bytes: dataUrlToBytes(p.data) });
+                });
+            });
+            const zipName = '대전팀_점검_' + stamp + '.zip';
+            const zipFile = new File([buildZip(entries)], zipName, { type: 'application/zip' });
+            return { stamp, items, entries, zipFile, zipName };
+        }
+
+        async function writeBundleToDirectory(bundle) {
+            const root = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'documents' });
+            const day = await root.getDirectoryHandle('점검_' + bundle.stamp, { create: true });
+            for (const entry of bundle.entries) {
+                const parts = entry.name.split('/').filter(Boolean);
+                const fileName = parts.pop();
+                let dir = day;
+                for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true });
+                const handle = await dir.getFileHandle(fileName, { create: true });
+                const writable = await handle.createWritable();
+                await writable.write(new Blob([entry.bytes]));
+                await writable.close();
+            }
+        }
+
 
         async function loadTodayPack() {
             const date = todayStamp();
@@ -4269,63 +4690,6 @@ ${blocks}
             }
             if (!pack || !pack.items || !pack.items.length) return null;
             return pack;
-        }
-
-        function dailyStandaloneHtml(date, items) {
-            const rows = items.map((it) => {
-                const r = it.record;
-                return `<tr>
-                    <td>${r.city || ''}</td>
-                    <td>${r.station || ''}</td>
-                    <td>거점${r.zoneIndex} ${r.zoneName || ''}</td>
-                    <td>${r.chargers || 0}대</td>
-                    <td>${r.time || ''}</td>
-                    <td>${(r.memo || '').replace(/</g, '&lt;')}</td>
-                </tr>`;
-            }).join('');
-            const blocks = items.map((it) => {
-                const r = it.record;
-                const imgs = [];
-                photoTypes.forEach((type) => {
-                    (it.photos[type.id] || []).forEach((p) => {
-                        const src = p.thumb || p.data;
-                        if (!src || !String(src).startsWith('data:')) return;
-                        imgs.push(`<figure><img src="${src}" alt="${type.label}"><figcaption>${type.label}</figcaption></figure>`);
-                    });
-                });
-                return `<section>
-                    <h2>${r.station} · 거점${r.zoneIndex} ${r.zoneName || ''}</h2>
-                    <p>${r.city || ''} · ${r.date} ${r.time || ''} · ${r.chargers || 0}대 · ${r.inspector || ''} · 사진 ${r.photoCount || 0}장</p>
-                    <p>${(r.memo || '').replace(/</g, '&lt;')}</p>
-                    <div class="pics">${imgs.join('') || '<p>사진 없음</p>'}</div>
-                </section>`;
-            }).join('\n');
-            return `<!DOCTYPE html>
-<html lang="ko"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>대전팀 점검 ${date}</title>
-<style>
-body{font-family:sans-serif;background:#111;color:#eee;margin:0;padding:16px;}
-h1{font-size:20px;} h2{font-size:16px;margin:18px 0 6px;}
-p{color:#bbb;font-size:13px;white-space:pre-wrap;}
-table{border-collapse:collapse;width:100%;font-size:13px;margin:12px 0;}
-th,td{border:1px solid #333;padding:6px 8px;text-align:left;}
-th{background:#1f1f35;}
-section{border-top:1px solid #333;padding-top:8px;}
-.pics{display:flex;flex-wrap:wrap;gap:8px;}
-figure{margin:0;width:31%;max-width:140px;}
-img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#222;}
-figcaption{font-size:11px;color:#9ca3af;text-align:center;}
-</style></head>
-<body>
-<h1>대전팀 점검 ${date}</h1>
-<p>거점 ${items.length}곳 · 이 파일만 열면 됩니다. 압축 필요 없습니다. 사진을 누르면 이 화면에서 보입니다.</p>
-<table>
-<thead><tr><th>시군</th><th>충전소</th><th>거점</th><th>대수</th><th>시간</th><th>메모</th></tr></thead>
-<tbody>${rows}</tbody>
-</table>
-${blocks}
-</body></html>`;
         }
 
         async function shareOrSaveFile(file, text) {
@@ -4344,17 +4708,15 @@ ${blocks}
         async function exportTodayReport() {
             const pack = await loadTodayPack();
             if (!pack) {
-                alert('이 폰에서 완료한 거점이 아직 없습니다. 거점을 완료한 뒤에 보내면 사진이 들어갑니다.');
+                alert('이 폰에서 완료한 거점이 아직 없습니다. 거점을 완료한 뒤에 보내면 그날 폴더가 만들어집니다.');
                 return;
             }
-            const stamp = pack.date || todayStamp();
-            const html = dailyStandaloneHtml(stamp, pack.items);
-            const file = new File([html], `대전팀_점검_${stamp}.html`, { type: 'text/html' });
-            const list = pack.items.map((it) => `${it.record.city || ''} ${it.record.station} 거점${it.record.zoneIndex}`).join('\n');
-            const text = `오늘 점검 ${pack.items.length}곳\n${list}\n\n받은 파일을 열면 사진이 보입니다. 압축 필요 없습니다.`;
-            const shared = await shareOrSaveFile(file, text);
+            const bundle = await buildDailyBundle(pack);
+            const list = bundle.items.map((it) => (it.record.city || '') + ' ' + it.record.station + ' 거점' + it.record.zoneIndex).join('\n');
+        const text = bundle.stamp + ' 점검 ' + bundle.items.length + '곳\n' + list + '\n\n압축을 풀면 시군/충전소/거점 폴더로 정리됩니다. 점검목록.html 을 여세요.';
+            const shared = await shareOrSaveFile(bundle.zipFile, text);
             if (!shared) {
-                alert('파일을 저장했습니다. 카톡에서 파일을 첨부해 보내세요. 받는 사람은 그 파일만 열면 됩니다.');
+                alert(bundle.zipName + ' 을 저장했습니다. 카톡에서 이 zip을 보내세요. 받는 사람은 압축을 풀면 폴더로 정리됩니다.');
             }
         }
 
@@ -4364,42 +4726,18 @@ ${blocks}
                 alert('이 폰에서 완료한 거점이 아직 없습니다. 거점을 완료하면 그날 사진이 묶입니다.');
                 return;
             }
-            const stamp = pack.date || todayStamp();
-            const entries = [];
-            entries.push({ name: '점검기록.csv', bytes: utf8Bytes(dailyCsv(pack.items)) });
-            entries.push({ name: '점검목록.html', bytes: utf8Bytes(dailyHtml(stamp, pack.items)) });
-            entries.push({
-                name: '전달방법.txt',
-                bytes: utf8Bytes('1. 이 zip을 카톡/메일/USB로 보내세요.\n2. 받는 사람은 압축을 풉니다.\n3. 점검목록.html 을 열면 기록과 사진이 보입니다.\n4. 원본 사진은 사진/시군/충전소/거점 폴더에 있습니다.\n')
-            });
-            pack.items.forEach((it) => {
-                const r = it.record;
-                const zoneFolder = folderSafe('거점' + r.zoneIndex + '_' + r.zoneName);
-                const dir = ['사진', folderSafe(r.city), folderSafe(r.station), zoneFolder].join('/');
-                photoTypes.forEach((type) => {
-                    (it.photos[type.id] || []).forEach((p, i) => {
-                        if (!p.data) return;
-                        const name = p.filename || `${String(i + 1).padStart(2, '0')}_${type.label}.jpg`;
-                        entries.push({ name: dir + '/' + name, bytes: dataUrlToBytes(p.data) });
-                    });
-                });
-            });
-            const zipName = `대전팀_점검_${stamp}.zip`;
-            const zipFile = new File([buildZip(entries)], zipName, { type: 'application/zip' });
-            try {
-                if (navigator.canShare && navigator.canShare({ files: [zipFile] })) {
-                    await navigator.share({
-                        files: [zipFile],
-                        title: `대전팀 점검 ${stamp}`,
-                        text: `${pack.items.length}개 거점. 압축을 풀고 점검목록.html 을 여세요.`
-                    });
+            const bundle = await buildDailyBundle(pack);
+            if (window.showDirectoryPicker) {
+                try {
+                    await writeBundleToDirectory(bundle);
+                    alert('오늘 ' + bundle.items.length + '개 거점을 폴더로 저장했습니다.\n문서 폴더를 골랐다면 점검_' + bundle.stamp + ' / 사진 / 시군 / 충전소 / 거점 안에 있습니다. 점검사진 폴더에 넣으려면 저장 위치에서 그 폴더를 고르세요.');
                     return;
+                } catch (err) {
+                    if (err && err.name === 'AbortError') return;
                 }
-            } catch (err) {
-                if (err && err.name === 'AbortError') return;
             }
-            downloadFileToPhone(zipFile);
-            alert(`오늘 완료분 ${pack.items.length}개 거점을 ${zipName} 으로 저장했습니다. 파일 앱에서 카톡으로 보내면 됩니다. 받는 사람은 압축을 풀고 점검목록.html 을 여세요.`);
+            downloadFileToPhone(bundle.zipFile);
+            alert(bundle.zipName + ' 으로 저장했습니다. 압축을 풀면 시군 / 충전소 / 거점 폴더가 나옵니다.');
         }
 
         function exportData() {

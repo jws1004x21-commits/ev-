@@ -1,5 +1,5 @@
 /**
- * 충전소 점검앱 v8 — Google Apps Script
+ * 충전소 점검앱 v10 — Google Apps Script
  *
  * 사용법:
  * 1. 구글 시트 → 확장 프로그램 → Apps Script
@@ -10,7 +10,7 @@
  *    드라이브 저장 권한이 추가로 필요합니다.
  *
  * 저장 위치:
- * 내 드라이브 / 전기차충전소점검_대전팀 / 점검사진 / 지역 / 시군 / 충전소 / 거점
+ * 내 드라이브 / 전기차충전소점검_대전팀 / 점검사진 / 지역 / 시군 / 충전소 / 거점1_장소이름
  */
 
 var ROOT_FOLDER_NAME = '전기차충전소점검_대전팀';
@@ -25,13 +25,16 @@ function setupDrive() {
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action;
   var p = e.parameter || {};
-  var payload = { ok: true, version: 'v8', message: '충전소 점검 서버 정상' };
+  var payload = { ok: true, version: 'v10', message: '충전소 점검 서버 정상' };
   if (action === 'progress') {
     payload.progress = loadProgress_();
     payload.locks = loadLocks_();
   }
   if (action === 'record') {
     payload.record = loadRecord_(p);
+  }
+  if (action === 'file') {
+    payload.file = loadFileData_(p);
   }
   if (action === 'count') {
     payload.count = folderFileCount_(ensureZoneFolder_(p));
@@ -77,7 +80,12 @@ function loadProgress_() {
       zone: String(values[i][6] || ''),
       inspector: String(values[i][2] || ''),
       date: dateStr,
-      chargers: Number(values[i][7]) || 0
+      chargers: Number(values[i][7]) || 0,
+      ground: String(values[i][16] || ''),
+      mccb: String(values[i][18] || ''),
+      meterNo: String(values[i][19] || ''),
+      chargerNo: String(values[i][20] || ''),
+      memo: String(values[i][10] || '')
     });
   }
   return out;
@@ -89,7 +97,7 @@ function doPost(e) {
     var action = data.action || 'complete';
 
     if (action === 'ping') {
-      return json_({ ok: true, version: 'v8' });
+      return json_({ ok: true, version: 'v10' });
     }
 
     if (action === 'photo') {
@@ -123,14 +131,17 @@ function doPost(e) {
       data.v220 || '',
       data.v380 || '',
       data.ground || '',
-      data.insul || ''
+      data.insul || '',
+      data.mccb || '',
+      data.meterNo || '',
+      data.chargerNo || ''
     ];
     var existingRow = findRow_(sheet, data.station, data.zone);
     if (action === 'update' || existingRow) {
       if (existingRow) {
         if (!data.date) rowValues[0] = sheet.getRange(existingRow, 1).getDisplayValue();
         rowValues[12] = photoCount;
-        sheet.getRange(existingRow, 1, 1, 18).setValues([rowValues]);
+        sheet.getRange(existingRow, 1, 1, rowValues.length).setValues([rowValues]);
         return json_({ ok: true, updated: true, folderUrl: folder.getUrl(), photoCount: photoCount });
       }
     }
@@ -208,14 +219,43 @@ function loadRecord_(p) {
     rec.v380 = values[15] || '';
     rec.ground = values[16] || '';
     rec.insul = values[17] || '';
+    rec.mccb = values[18] || '';
+    rec.meterNo = values[19] || '';
+    rec.chargerNo = values[20] || '';
   }
   rec.photos = listPhotos_({
     region: rec.region || p.region,
     city: rec.city || p.city,
     station: station,
-    zone: zone
+    zone: zone,
+    zoneFolder: p.zoneFolder || '',
+    zoneLabel: p.zoneLabel || ''
   });
   return rec;
+}
+
+function loadFileData_(p) {
+  var file = null;
+  var id = String(p.id || '');
+  if (id) {
+    try { file = DriveApp.getFileById(id); } catch (err) { file = null; }
+  }
+  if (!file && p.filename) {
+    var folder = ensureZoneFolder_(p);
+    var found = folder.getFilesByName(sanitize_(p.filename));
+    if (found.hasNext()) file = found.next();
+  }
+  if (!file) return { ok: false };
+  var blob = file.getBlob();
+  var bytes = blob.getBytes();
+  if (bytes.length > 1500000) return { ok: false, error: 'too big', name: file.getName() };
+  return {
+    ok: true,
+    name: file.getName(),
+    id: file.getId(),
+    mime: blob.getContentType() || 'image/jpeg',
+    data: Utilities.base64Encode(bytes)
+  };
 }
 
 function listPhotos_(data) {
@@ -236,11 +276,12 @@ function ensureHeader_(sheet) {
   var headers = [
     '점검일', '점검시간', '점검자', '지역', '시군', '충전소명', '거점',
     '충전기수', '제조사', 'GPS', '메모', '주소', '사진수', '사진폴더',
-    '전압220', '전압380', '접지저항', '절연저항'
+    '전압220', '전압380', '접지저항', '절연저항',
+    'MCCB용량', '계량기번호', '충전기번호'
   ];
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
-    sheet.getRange(1, 1, 1, 18).setFontWeight('bold');
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
     return;
   }
   var lastCol = Math.max(sheet.getLastColumn(), 1);
@@ -248,6 +289,10 @@ function ensureHeader_(sheet) {
   if (String(row1[14] || '') !== '전압220') {
     sheet.getRange(1, 15, 1, 4).setValues([['전압220', '전압380', '접지저항', '절연저항']]);
     sheet.getRange(1, 15, 1, 4).setFontWeight('bold');
+  }
+  if (String(row1[18] || '') !== 'MCCB용량') {
+    sheet.getRange(1, 19, 1, 3).setValues([['MCCB용량', '계량기번호', '충전기번호']]);
+    sheet.getRange(1, 19, 1, 3).setFontWeight('bold');
   }
 }
 
@@ -268,28 +313,99 @@ function savePhoto_(data) {
   if (!data.data) {
     throw new Error('사진 데이터가 없습니다.');
   }
-  var folder = ensureZoneFolder_(data);
-  var raw = String(data.data);
-  var comma = raw.indexOf(',');
-  if (comma >= 0) raw = raw.substring(comma + 1);
-  var bytes = Utilities.base64Decode(raw);
-  var filename = sanitize_(data.filename || ((data.label || '사진') + '.jpg'));
-  if (!/\.jpe?g$/i.test(filename)) filename += '.jpg';
-  var existing = folder.getFilesByName(filename);
-  while (existing.hasNext()) {
-    existing.next().setTrashed(true);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    var folder = ensureZoneFolderUnlocked_(data);
+    var raw = String(data.data);
+    var comma = raw.indexOf(',');
+    if (comma >= 0) raw = raw.substring(comma + 1);
+    var bytes = Utilities.base64Decode(raw);
+    var filename = sanitize_(data.filename || ((data.label || '사진') + '.jpg'));
+    if (!/\.jpe?g$/i.test(filename)) filename += '.jpg';
+    var existing = folder.getFilesByName(filename);
+    while (existing.hasNext()) {
+      existing.next().setTrashed(true);
+    }
+    var file = folder.createFile(Utilities.newBlob(bytes, MimeType.JPEG, filename));
+    file.setName(filename);
+    forceIntoFolder_(file, folder);
+    return { url: file.getUrl(), folderUrl: folder.getUrl() };
+  } finally {
+    lock.releaseLock();
   }
-  var file = folder.createFile(Utilities.newBlob(bytes, MimeType.JPEG, filename));
-  return { url: file.getUrl(), folderUrl: folder.getUrl() };
+}
+
+function zoneFolderName_(data) {
+  var explicit = String(data.zoneFolder || '').trim();
+  if (explicit) return explicit;
+  var zone = String(data.zone || '').trim();
+  var matched = zone.match(/^거점\s*(\d+)\s*:\s*(.*)$/);
+  if (matched) {
+    var tail = String(matched[2] || '').trim();
+    return tail ? ('거점' + matched[1] + '_' + tail) : ('거점' + matched[1]);
+  }
+  return zone || '거점';
+}
+
+function childFolder_(parent, name) {
+  name = sanitize_(name);
+  if (!name) return null;
+  var it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : null;
+}
+
+function moveFolderFiles_(src, dest) {
+  if (!src || !dest || src.getId() === dest.getId()) return;
+  var files = src.getFiles();
+  while (files.hasNext()) {
+    var file = files.next();
+    if (dest.getFilesByName(file.getName()).hasNext()) continue;
+    file.moveTo(dest);
+  }
+}
+
+function forceIntoFolder_(file, folder) {
+  var parents = file.getParents();
+  var inDest = false;
+  var extra = false;
+  while (parents.hasNext()) {
+    var parent = parents.next();
+    if (parent.getId() === folder.getId()) inDest = true;
+    else extra = true;
+  }
+  if (!inDest || extra) file.moveTo(folder);
 }
 
 function ensureZoneFolder_(data) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    return ensureZoneFolderUnlocked_(data);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function ensureZoneFolderUnlocked_(data) {
   var root = getOrCreateFolder_(DriveApp.getRootFolder(), ROOT_FOLDER_NAME);
   var photos = getOrCreateFolder_(root, PHOTO_ROOT_NAME);
   var region = getOrCreateFolder_(photos, data.region || '미지정');
   var city = getOrCreateFolder_(region, data.city || '미지정');
   var station = getOrCreateFolder_(city, data.station || '미지정');
-  return getOrCreateFolder_(station, data.zone || '거점');
+  var wanted = sanitize_(zoneFolderName_(data)) || '거점';
+  var dest = childFolder_(station, wanted);
+  if (!dest) dest = station.createFolder(wanted);
+  absorbLegacyFolder_(station, dest, wanted, data.zone);
+  absorbLegacyFolder_(station, dest, wanted, data.zoneLabel);
+  return dest;
+}
+
+function absorbLegacyFolder_(station, dest, wanted, rawName) {
+  var legacy = sanitize_(String(rawName || ''));
+  if (!legacy || legacy === wanted) return;
+  var oldFolder = childFolder_(station, legacy);
+  if (oldFolder) moveFolderFiles_(oldFolder, dest);
 }
 
 function getOrCreateFolder_(parent, name) {

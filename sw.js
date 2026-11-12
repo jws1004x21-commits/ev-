@@ -1,4 +1,4 @@
-// v4.13: confirm Drive folder count, lock zone while inspecting
+// v4.17: confirm each Drive photo, pull Drive-only photos into the daily folder
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
