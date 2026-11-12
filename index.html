@@ -1201,13 +1201,13 @@
                 <div class="card-header">📋 점검 내역</div>
                 <div class="card-body">
                     <button class="btn btn-primary btn-small" onclick="syncAndShowDailyLog()" style="margin-bottom:8px;">🔄 동기화 후 오늘 점검일지</button>
-                    <button class="btn btn-secondary btn-small" onclick="shareDailyLog()" style="margin-bottom:8px;">📤 점검일지 카톡으로</button>
+                    <button class="btn btn-secondary btn-small" onclick="shareDailyLog()" style="margin-bottom:8px;">📤 일지 양식 사진으로 첨부</button>
                     <div class="form-group" style="margin-bottom:8px;">
                         <label class="form-label">점검일</label>
                         <input type="date" class="form-input" id="logDate">
                     </div>
                     <div id="dailyLog" class="daily-log"></div>
-                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">동기화는 대표 구글 시트를 다시 받아 최신으로 바꿉니다. 폰마다 구글 로그인은 필요 없습니다. 전체 기록은 시트에 그대로 쌓이고, 점검일지는 고른 날짜만 보여 줍니다. 같은 거점은 한 줄을 덮어씁니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">동기화는 대표 구글 시트를 다시 받아 최신으로 바꿉니다. 폰마다 구글 로그인은 필요 없습니다. 일지 첨부는 손으로 쓰던 표와 같은 칸의 사진입니다. 카톡에서 그 사진을 같이 보내면 됩니다. 같은 거점은 한 줄입니다.</div>
                     <button class="btn btn-secondary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📁 오늘 폴더로 저장</button>
                     <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📋 전체 기록만 엑셀</button>
                     <div style="font-size:12px;color:#aaa;margin-bottom:12px;">카톡에는 그날 zip 하나를 보냅니다. 받는 사람이 압축을 풀면 시/군 · 충전소 · 거점 폴더로 사진이 정리되고, 점검목록.html 에서 사진이 보입니다. 컴퓨터는 아래 폴더 저장을 누르면 압축 없이 폴더가 만들어집니다.</div>
@@ -1354,7 +1354,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.18';
+        const APP_VERSION = '4.19';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -3983,6 +3983,7 @@
                     mccb: row.mccb || '',
                     ground: row.ground || '',
                     meterNo: row.meterNo || '',
+                    place: parsed.zoneName || '',
                     note: [parsed.zoneName, row.memo].filter(Boolean).join(' · '),
                     inspector: row.inspector || '',
                     city: row.city || ''
@@ -3998,6 +3999,7 @@
                     mccb: h.mccb || '',
                     ground: h.ground || '',
                     meterNo: h.meterNo || '',
+                    place: h.zoneName || '',
                     note: [h.zoneName, h.memo].filter(Boolean).join(' · '),
                     inspector: h.inspector || '',
                     city: h.city || ''
@@ -4009,16 +4011,120 @@
             return rows;
         }
 
-        function dailyLogText(date, rows) {
-            const lines = ['전기차 충전소 점검일지', '점검일: ' + date, ''];
-            lines.push(['국소명', '거점', '충전기수', '충전기번호', 'MCCB용량', '접지저항', '계량기번호', '비고', '점검자'].join('\t'));
-            rows.forEach((r) => {
-                lines.push([
-                    r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.note, r.inspector
-                ].join('\t'));
+        function formDateLabel(date) {
+            const p = String(date || '').split('-');
+            if (p.length !== 3) return String(date || '');
+            return p[0] + '. ' + Number(p[1]) + '. ' + Number(p[2]);
+        }
+
+        function drawFormCell(ctx, text, x, y, w, h, bold) {
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(x, y, w, h);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x + 3, y + 2, Math.max(1, w - 6), Math.max(1, h - 4));
+            ctx.clip();
+            ctx.fillStyle = '#111';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            let size = bold ? 18 : 16;
+            const value = String(text || '');
+            const font = (bold ? 'bold ' : '') + size + 'px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
+            ctx.font = font;
+            const maxW = Math.max(8, w - 12);
+            while (size > 11 && ctx.measureText(value).width > maxW * 3) {
+                size -= 1;
+                ctx.font = (bold ? 'bold ' : '') + size + 'px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
+            }
+            const lines = [];
+            let line = '';
+            for (const ch of value) {
+                const trial = line + ch;
+                if (line && ctx.measureText(trial).width > maxW) {
+                    lines.push(line);
+                    line = ch;
+                } else {
+                    line = trial;
+                }
+            }
+            if (line) lines.push(line);
+            const show = lines.slice(0, 4);
+            const lh = size + 3;
+            let start = y + h / 2 - ((show.length - 1) * lh) / 2;
+            show.forEach((ln) => {
+                ctx.fillText(ln, x + w / 2, start);
+                start += lh;
             });
-            if (!rows.length) lines.push('이 날짜에 시트·이 폰 완료 기록이 없습니다.');
-            return lines.join('\n');
+            ctx.restore();
+        }
+
+        function dailyLogFormBlob(date, rows) {
+            const cols = [
+                { key: 'station', title: '국소명', w: 300, merge: true },
+                { key: 'zoneIndex', title: '거점', w: 72 },
+                { key: 'chargers', title: '충전기수', w: 96 },
+                { key: 'chargerNo', title: '충전기번호', w: 130 },
+                { key: 'mccb', title: 'MCCB용량', w: 120 },
+                { key: 'ground', title: '접지저항', w: 110 },
+                { key: 'meterNo', title: '계량기번호', w: 180 },
+                { key: 'place', title: '비고', w: 320 }
+            ];
+            const rowH = 58;
+            const headH = 62;
+            const titleH = 72;
+            const bodyCount = Math.max(16, rows.length);
+            const width = cols.reduce((sum, col) => sum + col.w, 0) + 2;
+            const height = titleH + headH + bodyCount * rowH + 2;
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = '#111';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 30px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
+            ctx.fillText('전기차 충전소 점검일지', 18, titleH / 2);
+            ctx.font = '22px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('점검일: ' + formDateLabel(date), width - 18, titleH / 2);
+            let x = 1;
+            cols.forEach((col) => {
+                drawFormCell(ctx, col.title, x, titleH, col.w, headH, true);
+                x += col.w;
+            });
+            const sheetRows = rows.slice();
+            while (sheetRows.length < bodyCount) sheetRows.push(null);
+            let i = 0;
+            while (i < sheetRows.length) {
+                const row = sheetRows[i];
+                let span = 1;
+                if (row) {
+                    while (i + span < rows.length && sheetRows[i + span] && sheetRows[i + span].station === row.station) span += 1;
+                }
+                x = 1;
+                const y = titleH + headH + i * rowH;
+                cols.forEach((col) => {
+                    if (col.merge) {
+                        drawFormCell(ctx, row ? row.station : '', x, y, col.w, rowH * span, false);
+                    }
+                    x += col.w;
+                });
+                for (let s = 0; s < span; s++) {
+                    const one = sheetRows[i + s];
+                    let cx = 1;
+                    cols.forEach((col) => {
+                        if (!col.merge) {
+                            drawFormCell(ctx, one ? one[col.key] : '', cx, y + s * rowH, col.w, rowH, false);
+                        }
+                        cx += col.w;
+                    });
+                }
+                i += span;
+            }
+            return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.92));
         }
 
         function renderDailyLog() {
@@ -4027,11 +4133,23 @@
             box.dataset.open = '1';
             const date = logDateValue();
             const rows = rowsForDailyLog(date);
-            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>접지저항</th><th>계량기번호</th><th>비고</th><th>점검자</th></tr>';
-            const body = rows.map((r) => '<tr>' + [r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.note, r.inspector]
+            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>접지저항</th><th>계량기번호</th><th>비고</th></tr>';
+            const body = rows.map((r) => '<tr>' + [r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.place]
                 .map((cell) => '<td>' + String(cell || '').replace(/</g, '&lt;') + '</td>').join('') + '</tr>').join('');
-            box.innerHTML = '<div style="font-size:13px;margin-bottom:6px;">점검일 ' + date + ' · ' + rows.length + '거점 · 시트와 이 폰 기록을 합쳤습니다.</div>'
-                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="9">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
+            box.innerHTML = '<div style="font-size:13px;margin-bottom:6px;">점검일 ' + formDateLabel(date) + ' · ' + rows.length + '거점 · 아래 사진을 카톡에 첨부합니다.</div>'
+                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="8">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
+            const token = String(Date.now());
+            box.dataset.formToken = token;
+            dailyLogFormBlob(date, rows).then((blob) => {
+                if (!blob || box.dataset.formToken !== token) return;
+                if (box._formUrl) URL.revokeObjectURL(box._formUrl);
+                box._formUrl = URL.createObjectURL(blob);
+                const img = document.createElement('img');
+                img.src = box._formUrl;
+                img.alt = '점검일지 양식';
+                img.style.cssText = 'width:100%;margin-top:10px;background:#fff;border-radius:8px;';
+                box.appendChild(img);
+            });
         }
 
         async function syncAndShowDailyLog() {
@@ -4044,17 +4162,18 @@
         async function shareDailyLog() {
             const date = logDateValue();
             const rows = rowsForDailyLog(date);
-            const text = dailyLogText(date, rows);
-            try {
-                if (navigator.share) {
-                    await navigator.share({ title: '점검일지 ' + date, text });
-                    return;
-                }
-            } catch (err) {
-                if (err && err.name === 'AbortError') return;
+            if (!rows.length) {
+                alert('이 날짜에 첨부할 거점이 없습니다. 동기화 후 다시 눌러 주세요.');
+                return;
             }
-            const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
-            downloadFileToPhone(new File([blob], '점검일지_' + date + '.txt', { type: 'text/plain' }));
+            const blob = await dailyLogFormBlob(date, rows);
+            if (!blob) {
+                alert('일지 사진을 만들지 못했습니다.');
+                return;
+            }
+            const file = new File([blob], '점검일지_' + date + '.jpg', { type: 'image/jpeg' });
+            const shared = await shareOrSaveFile(file, '전기차 충전소 점검일지 ' + formDateLabel(date));
+            if (!shared) alert('점검일지 사진을 저장했습니다. 카톡 대화에서 그 사진을 첨부하세요.');
         }
 
         function suggestedTeamCount(n) {
@@ -4733,12 +4852,27 @@
             const stamp = pack.date || todayStamp();
             const items = pack.items || [];
             await hydrateDrivePhotos(items);
-            const readme = '1. 이 압축을 푸세요.\n2. 점검목록.html 을 브라우저로 여세요.\n3. 원본 사진은 사진 / 시군 / 충전소 / 거점 폴더에 있습니다.\n4. 이 파일은 그날 완료한 거점만 들어 있습니다.\n';
+            const readme = '1. 점검일지.jpg 가 손으로 쓰던 일지 양식입니다. 보고할 때 이 사진을 같이 첨부하세요.\n2. 점검목록.html 을 브라우저로 여세요.\n3. 원본 사진은 사진 / 시군 / 충전소 / 거점 폴더에 있습니다.\n4. 이 파일은 그날 완료한 거점만 들어 있습니다.\n';
+            const formBlob = await dailyLogFormBlob(stamp, (items || []).map((it) => {
+                const record = it.record || {};
+                return {
+                    station: record.station || '',
+                    zoneIndex: record.zoneIndex || '',
+                    chargers: record.chargers || '',
+                    chargerNo: record.chargerNo || '',
+                    mccb: record.mccb || '',
+                    ground: record.ground || '',
+                    meterNo: record.meterNo || '',
+                    place: record.zoneName || ''
+                };
+            }));
+            const formBytes = formBlob ? new Uint8Array(await formBlob.arrayBuffer()) : null;
             const entries = [
                 { name: '먼저읽기.txt', bytes: utf8Bytes(readme) },
                 { name: '점검목록.html', bytes: utf8Bytes(dailyHtml(stamp, items)) },
                 { name: '점검기록.csv', bytes: utf8Bytes(dailyCsv(items)) }
             ];
+            if (formBytes && formBytes.length) entries.unshift({ name: '점검일지.jpg', bytes: formBytes });
             items.forEach((it) => {
                 zonePhotoFiles(it).forEach((p) => {
                     entries.push({ name: p.path, bytes: dataUrlToBytes(p.data) });
@@ -4798,7 +4932,7 @@
             }
             const bundle = await buildDailyBundle(pack);
             const list = bundle.items.map((it) => (it.record.city || '') + ' ' + it.record.station + ' 거점' + it.record.zoneIndex).join('\n');
-        const text = bundle.stamp + ' 점검 ' + bundle.items.length + '곳\n' + list + '\n\n압축을 풀면 시군/충전소/거점 폴더로 정리됩니다. 점검목록.html 을 여세요.';
+            const text = bundle.stamp + ' 점검 ' + bundle.items.length + '곳\n' + list + '\n\n압축 안의 점검일지.jpg 가 일지 양식입니다. 사진 폴더는 시군/충전소/거점 입니다.';
             const shared = await shareOrSaveFile(bundle.zipFile, text);
             if (!shared) {
                 alert(bundle.zipName + ' 을 저장했습니다. 카톡에서 이 zip을 보내세요. 받는 사람은 압축을 풀면 폴더로 정리됩니다.');

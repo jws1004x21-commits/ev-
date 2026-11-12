@@ -1,4 +1,4 @@
-// v4.18: 1:1 crop choice, camera types stay off the view
+// v4.19: daily log is attached as the paper form photo
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
