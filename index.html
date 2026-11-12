@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.59">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.60">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1156,10 +1156,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.59</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.60</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전 있음 · 상단이 v4.59이어야 최신
+        새 버전 있음 · 상단이 v4.60이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1171,8 +1171,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.59">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.59</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.60">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.60</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
                         <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
@@ -1206,10 +1206,10 @@
                 <div class="card-header">전체 자동 점검</div>
                 <div class="card-body">
                     <div class="text" style="font-size:12px;color:#aaa;margin-bottom:8px;">
-                        앱 기능·엑셀·지도·비상모드·보고 zip·시트 연결을 한 번에 확인합니다. <b>시트/드라이브에는 올리지 않습니다.</b><br>
-                        실제 사진 업로드까지 보려면 설정 → <b>아무 사진으로 자동 테스트</b>를 쓰세요.
+                        한 번에 확인: 앱 기능 · 엑셀 · 지도 · 비상모드 · 보고 zip · <b>더미 사진→드라이브</b> · <b>시트 기록</b> · <b>팀 동기화</b>.<br>
+                        테스트 행/폴더(<b>테스트/자동테스트</b>)는 나중에 지워도 됩니다.
                     </div>
-                    <button type="button" class="btn btn-primary" onclick="runHomeSelfCheck()">🧪 전체 자동 점검 실행</button>
+                    <button type="button" class="btn btn-primary" onclick="runHomeSelfCheck()">🧪 전체 자동 점검 실행 (더미사진+동기화 포함)</button>
                     <div id="homeSelfCheckResult" style="font-size:12px;color:#ccc;margin-top:10px;line-height:1.55;"></div>
                 </div>
             </div>
@@ -1758,9 +1758,9 @@
         </div>
     </div>
 
-    <script src="station_data.js?v=4.59"></script>
+    <script src="station_data.js?v=4.60"></script>
     <script>
-        const APP_VERSION = '4.59';
+        const APP_VERSION = '4.60';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
@@ -7224,13 +7224,115 @@
                 const probe = await probeGoogleVersion();
                 const ver = probe.ok && probe.data && String(probe.data.version || '');
                 const verNum = Number(String(ver).replace(/^v/i, ''));
-                add(probe.ok && verNum >= 3, probe.ok ? ('구글 Apps Script 연결 · ' + (ver || '버전미확인')) : '구글 Apps Script 연결 실패(인터넷/배포 확인)');
+                const scriptOk = probe.ok && verNum >= 3;
+                add(scriptOk, scriptOk ? ('구글 Apps Script 연결 · ' + (ver || '버전미확인')) : '구글 Apps Script 연결 실패(인터넷/배포 확인)');
 
-                try {
-                    await fetchTeamProgress(true);
-                    add(Array.isArray(state.teamProgress), '팀 동기화(시트 완료 목록 읽기) · ' + (state.teamProgress || []).length + '건');
-                } catch (err) {
-                    add(false, '팀 동기화 실패');
+                if (box) box.innerHTML = lines.join('<br>') + '<br>· 더미 사진 업로드·동기화 준비 중…';
+                const doUpload = confirm('더미 사진으로 시트·드라이브·팀 동기화까지 이어서 테스트할까요?\n\n· 테스트/자동테스트 폴더·행이 생깁니다 (나중에 지워도 됨)\n· 취소를 누르면 업로드 없이 여기까지 결과만 봅니다.');
+                if (doUpload) {
+                    if (!scriptOk) {
+                        add(false, '스크립트 연결 실패로 더미 업로드를 건너뜀');
+                    } else {
+                        const loc = {
+                            region: '테스트',
+                            city: '테스트',
+                            station: '자동테스트',
+                            zone: '거점1_자동확인',
+                            zoneFolder: '거점1_자동확인',
+                            zoneLabel: '거점1: 자동확인'
+                        };
+                        const stamp = Date.now().toString().slice(-6);
+                        let photoSent = 0;
+                        for (let i = 0; i < photoTypes.length; i++) {
+                            const type = photoTypes[i];
+                            if (box) box.innerHTML = lines.join('<br>') + '<br>· 더미 사진 전송 ' + (i + 1) + '/' + photoTypes.length + '…';
+                            try {
+                                await postGoogle({
+                                    action: 'photo',
+                                    ...loc,
+                                    label: type.label,
+                                    filename: '전체자동_' + stamp + '_' + type.id + '.jpg',
+                                    data: makeTestPhoto(type.label)
+                                });
+                                photoSent += 1;
+                            } catch (err) {}
+                        }
+                        add(photoSent === photoTypes.length, '더미 사진 드라이브 전송 ' + photoSent + '/' + photoTypes.length + '장');
+
+                        try {
+                            await postGoogle({
+                                action: 'complete',
+                                date: date,
+                                time: new Date().toLocaleTimeString(),
+                                inspector: currentInspectorName() || '전체자동점검',
+                                region: loc.region,
+                                city: loc.city,
+                                station: loc.station,
+                                zone: loc.zoneLabel,
+                                chargers: 0,
+                                maker: '테스트',
+                                gps: '',
+                                memo: '전체 자동 점검 더미 · stamp ' + stamp + ' · 이 행은 지워도 됩니다.',
+                                address: '',
+                                mccb: '75A',
+                                meterNo: '0252508',
+                                photoCount: photoSent
+                            });
+                            add(true, '시트에 더미 거점 완료 기록 전송');
+                        } catch (err) {
+                            add(false, '시트 더미 완료 기록 실패');
+                        }
+
+                        if (box) box.innerHTML = lines.join('<br>') + '<br>· 드라이브 폴더 개수 확인 중…';
+                        const prevRegion = state.region;
+                        const prevCity = state.city;
+                        const prevStation = state.station;
+                        const prevZone = state.selectedZone;
+                        const prevIdx = state.selectedZoneIdx;
+                        state.region = loc.region;
+                        state.city = loc.city;
+                        state.station = loc.station;
+                        state.selectedZone = { id: 'auto', name: '자동확인' };
+                        state.selectedZoneIdx = 0;
+                        try {
+                            const counted = await confirmDriveFolderCount(Math.max(1, photoSent));
+                            add(!!counted.confirmed || (counted.count != null && counted.count > 0),
+                                '드라이브 거점 폴더 사진 수 확인 → ' + (counted.count != null ? counted.count + '장' : '확인 불가'));
+                        } catch (err) {
+                            add(false, '드라이브 폴더 개수 확인 실패');
+                        }
+                        state.region = prevRegion;
+                        state.city = prevCity;
+                        state.station = prevStation;
+                        state.selectedZone = prevZone;
+                        state.selectedZoneIdx = prevIdx;
+
+                        if (box) box.innerHTML = lines.join('<br>') + '<br>· 팀 동기화(최신) 중…';
+                        try {
+                            await syncTeamNow(true);
+                            const rows = state.teamProgress || [];
+                            const found = rows.some((row) =>
+                                String(row.station || '') === '자동테스트'
+                                && String(row.date || '').substring(0, 10) === date
+                            );
+                            add(Array.isArray(rows), '팀 동기화 완료 · 전체 ' + rows.length + '건');
+                            add(found, found
+                                ? '동기화 목록에서 오늘 더미(자동테스트) 확인됨'
+                                : '동기화는 됐지만 오늘 자동테스트 행이 아직 안 보임(잠시 후 다시 동기화)');
+                        } catch (err) {
+                            add(false, '팀 동기화 실패');
+                        }
+                        note('드라이브 경로: 점검사진 / 테스트 / 테스트 / 자동테스트 / 거점1_자동확인');
+                        note('시트·드라이브 테스트 행/폴더는 지워도 됩니다.');
+                    }
+                } else {
+                    note('더미 업로드·동기화는 취소했습니다. (앱 기능 점검만 완료)');
+                    try {
+                        await syncTeamNow(true);
+                        add(Array.isArray(state.teamProgress), '팀 동기화만 실행 · ' + (state.teamProgress || []).length + '건');
+                    } catch (err) {
+                        add(false, '팀 동기화 실패');
+                    }
                 }
 
                 const file = new File([bytes], '자동점검_점검일지_' + date + '.xlsx', {
@@ -7238,17 +7340,14 @@
                 });
                 const shared = await shareOrSaveFile(file, '자동점검 점검일지 ' + formDateLabel(date));
                 add(true, shared ? '샘플 엑셀 공유/저장 창 열림' : '샘플 엑셀 저장 시도 완료');
-
-                note('이 점검은 시트/드라이브에 올리지 않았습니다.');
-                note('실제 사진 업로드 확인은 설정 → 아무 사진으로 자동 테스트.');
-                note(fail ? ('실패 ' + fail + '건 · 빨간 ❌ 항목을 알려주세요.') : '핵심 기능 자동 점검 통과.');
+                note(fail ? ('실패 ' + fail + '건 · 빨간 ❌ 항목을 알려주세요.') : '전체 자동 점검 통과.');
             } catch (err) {
                 add(false, '자동 점검 중단: ' + (err && err.message ? err.message : err));
             }
             if (box) box.innerHTML = lines.join('<br>');
             alert(fail
                 ? ('자동 점검 결과: 실패 ' + fail + '건. 화면의 ❌ 항목을 확인하세요.')
-                : '자동 점검 통과. 샘플 엑셀도 받아 두었습니다.');
+                : '전체 자동 점검 통과. 더미 업로드·동기화·샘플 엑셀까지 확인했습니다.');
         }
 
         function makeTestPhoto(label) {

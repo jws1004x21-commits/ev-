@@ -1,5 +1,5 @@
-// v4.59: expanded full auto self-check on home
-const SW_VER = '4.59';
+// v4.60: full auto-check includes dummy photo upload + team sync
+const SW_VER = '4.60';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
