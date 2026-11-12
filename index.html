@@ -955,8 +955,8 @@
             padding-bottom: 6px;
         }
         .review-thumbs img {
-            width: 88px;
-            height: 88px;
+            width: 132px;
+            height: 132px;
             object-fit: cover;
             border-radius: 8px;
             flex-shrink: 0;
@@ -1080,7 +1080,7 @@
                         <div id="zonePhotoTotal" class="drive-count">이 거점 사진 0장 · 드라이브 전송 0장</div>
                         <div id="checklist"></div>
                         <div class="form-group" style="margin-top:16px;">
-                            <label class="form-label">이 거점 일지 글자 · 사진 보고 입력하면 시트에 저장</label>
+                            <label class="form-label">이 거점만의 값 · 충전기 대수가 다르면 MCCB·계량기번호도 다릅니다</label>
                             <div class="meter-grid">
                                 <div class="form-group">
                                     <label class="form-label">전압 220 (V)</label>
@@ -1100,11 +1100,11 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">MCCB용량</label>
-                                    <input type="text" class="form-input" id="logMccb" placeholder="예: 75A">
+                                    <input type="text" class="form-input" id="logMccb" placeholder="이 거점 사진에 보이는 용량">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">계량기번호</label>
-                                    <input type="text" class="form-input" id="logMeterNo" placeholder="현장 계량기 번호">
+                                    <input type="text" class="form-input" id="logMeterNo" placeholder="이 거점 사진에 보이는 번호">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">충전기번호</label>
@@ -1353,7 +1353,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.20';
+        const APP_VERSION = '4.21';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -2717,45 +2717,48 @@
                 ).join('');
                 go.classList.add('hidden');
             } else {
-                const meterGuide = {
-                    voltage: '380V·220V 숫자가 읽히나요? 보통 220은 198~242, 380은 342~418 근처입니다.',
-                    resistance: '접지저항 숫자가 읽히나요? 값이 너무 높으면 다시 측정·촬영하세요.',
-                    insulation: '절연저항 숫자가 읽히나요? 값이 너무 낮으면 다시 확인하세요.'
-                };
-                title.textContent = '이 거점 사진 확인';
-                sub.textContent = '숫자를 보고 아래 칸에 적으면 이 거점 시트에 글자로 들어갑니다.';
-                const hints = updateMeterHint && (document.getElementById('meterHint') || {}).textContent;
-                const meterFields = [
-                    ['meterV220', '전압 220', '221'],
-                    ['meterV380', '전압 380', '380'],
-                    ['meterGround', '접지저항', '2'],
-                    ['logMccb', 'MCCB용량', '75A'],
-                    ['logMeterNo', '계량기번호', '계량기 번호'],
-                    ['logChargerNo', '충전기번호', '1~4']
-                ].map(([id, label, ph]) => {
+                const zone = state.selectedZone || {};
+                const count = zone.chargers || 0;
+                const numbers = (document.getElementById('logChargerNo') || {}).value || chargerNoDefault();
+                const fieldInput = (id, label, ph) => {
                     const val = String((document.getElementById(id) || {}).value || '').replace(/"/g, '&quot;');
                     return `<label class="form-label">${label}</label><input class="form-input" data-meter="${id}" value="${val}" placeholder="${ph}">`;
-                }).join('');
-                body.innerHTML = ['voltage', 'resistance', 'insulation'].map((id) => {
-                    const type = photoTypes.find((p) => p.id === id);
+                };
+                const thumbsOf = (id) => {
                     const shots = photosOf(id);
-                    const thumbs = shots.map((item, i) => {
+                    if (!shots.length) return '<div style="color:#aaa;font-size:12px;">이 거점 사진 없음</div>';
+                    return shots.map((item, i) => {
                         const src = item.data || item.thumb;
-                        const blur = item.blurry ? ' · 흐림' : '';
                         return src
-                            ? `<img src="${src}" alt="${type.label}" onclick="openLightbox('${id}', ${i})">`
-                            : `<div class="remote-ph">${item.filename || ''}${blur}</div>`;
-                    }).join('') || '<div style="color:#aaa;font-size:12px;">사진 없음</div>';
+                            ? `<img src="${src}" alt="" onclick="openLightbox('${id}', ${i})">`
+                            : `<div class="remote-ph">${item.filename || '사진'}</div>`;
+                    }).join('');
+                };
+                const blocks = [
+                    { id: 'panel', guide: '배전반 사진을 보고 MCCB 용량을 적으세요. 충전기 ' + count + '대인 이 거점 값입니다. 다른 거점과 다를 수 있습니다.', fields: [['logMccb', 'MCCB용량', '사진에 보이는 용량']] },
+                    { id: 'charger', guide: '충전기·계량기 사진을 보고 이 거점 번호만 적으세요. 충전기 ' + count + '대, 번호 ' + numbers + '.', fields: [['logMeterNo', '계량기번호', '사진에 보이는 번호'], ['logChargerNo', '충전기번호', numbers]] },
+                    { id: 'voltage', guide: '전압 사진을 크게 보고 적으세요.', fields: [['meterV220', '전압 220', '221'], ['meterV380', '전압 380', '380']] },
+                    { id: 'resistance', guide: '접지저항 사진을 보고 적으세요.', fields: [['meterGround', '접지저항', '2']] },
+                    { id: 'insulation', guide: '절연저항 사진을 보고 적으세요.', fields: [['meterInsul', '절연저항', '120']] }
+                ];
+                title.textContent = '이 거점 사진 보고 적기';
+                sub.textContent = '충전기 ' + count + '대 (' + numbers + '). MCCB·계량기번호는 대수마다 달라서 이 사진으로 확인합니다. 사진을 누르면 커집니다.';
+                body.innerHTML = blocks.map((block) => {
+                    const type = photoTypes.find((p) => p.id === block.id);
+                    const shots = photosOf(block.id);
                     return `<div class="review-block">
                         <h4>${type.label} · ${shots.length}장</h4>
-                        <div class="review-guide">${meterGuide[id]}</div>
-                        <div class="review-thumbs">${thumbs}</div>
-                        <button type="button" class="btn btn-secondary btn-small" data-shot="${id}" style="margin-top:8px;">다시 찍기</button>
+                        <div class="review-guide">${block.guide}</div>
+                        <div class="review-thumbs">${thumbsOf(block.id)}</div>
+                        <div class="meter-grid" style="margin-top:8px;">${block.fields.map((f) => fieldInput(f[0], f[1], f[2])).join('')}</div>
+                        <button type="button" class="btn btn-secondary btn-small" data-shot="${block.id}" style="margin-top:8px;">다시 찍기</button>
                     </div>`;
-                }).join('') + `<div class="review-block"><h4>이 거점 일지 글자</h4><div class="meter-grid">${meterFields}</div></div>`
-                    + (hints ? `<div class="review-guide">${hints}</div>` : '');
+                }).join('') + ['overview', 'issue'].filter((id) => photosOf(id).length).map((id) => {
+                    const type = photoTypes.find((p) => p.id === id);
+                    return `<div class="review-block"><h4>${type.label} · ${photosOf(id).length}장</h4><div class="review-thumbs">${thumbsOf(id)}</div></div>`;
+                }).join('');
                 go.classList.remove('hidden');
-                go.textContent = '이상 없음 · 완료';
+                go.textContent = '이 거점 글자 저장';
             }
             overlay.classList.remove('hidden');
         }

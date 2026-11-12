@@ -1,4 +1,4 @@
-// v4.20: full-frame close-up photos, daily log shared as text
+// v4.21: confirm MCCB and meter number from this zone's photos
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
