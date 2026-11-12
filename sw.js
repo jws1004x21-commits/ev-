@@ -1,4 +1,4 @@
-// v4.34: prefer 50A/75A MCCB ratings used on site
+// v4.35: beginner manual matching the current inspection and Excel flow
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
