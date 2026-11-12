@@ -1345,7 +1345,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.31';
+        const APP_VERSION = '4.32';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -2937,16 +2937,25 @@
             const sizes = [20, 30, 32, 40, 50, 60, 63, 75, 80, 100, 125, 150, 160, 175, 200, 225, 250];
             const found = [];
             const raw = readingText(text);
-            (raw.match(/\d{2,3}\s*A/g) || []).forEach((part) => {
-                const n = parseInt(part, 10);
+            const pushSize = (n) => {
                 if (sizes.indexOf(n) >= 0) found.push(n + 'A');
-            });
-            // Close-up OCR often reads trailing A as 8/B/R.
-            (raw.match(/\b\d{2,3}\s*[A8BR]\b/g) || []).forEach((part) => {
-                const m = part.match(/(\d{2,3})\s*[A8BR]/);
-                if (m && sizes.indexOf(parseInt(m[1], 10)) >= 0) found.push(parseInt(m[1], 10) + 'A');
-            });
+            };
+            // Overlapping scan so "175A" also yields "75A" when OCR glued a leading digit.
+            const ampRe = /(?=(\d{2,3}\s*[A8BR]))/g;
+            let m;
+            while ((m = ampRe.exec(raw)) !== null) {
+                const num = parseInt(m[1], 10);
+                pushSize(num);
+                ampRe.lastIndex = m.index + 1;
+            }
+            (raw.match(/\d{2,3}\s*A/g) || []).forEach((part) => pushSize(parseInt(part, 10)));
             let unique = [...new Set(found)];
+            if (unique.length > 1) {
+                const nums = unique.map((u) => parseInt(u, 10));
+                // Prefer 75A over 175A when both appear from the same OCR glue error.
+                const nested = nums.filter((n) => nums.some((big) => big !== n && String(big).endsWith(String(n))));
+                if (nested.length === 1) unique = [nested[0] + 'A'];
+            }
             if (unique.length === 1) return unique[0];
             if (!loose) return '';
             const looseFound = [];
@@ -2955,6 +2964,11 @@
                 if (sizes.indexOf(n) >= 0) looseFound.push(n + 'A');
             });
             unique = [...new Set(looseFound)];
+            if (unique.length > 1) {
+                const nums = unique.map((u) => parseInt(u, 10));
+                const nested = nums.filter((n) => nums.some((big) => big !== n && String(big).endsWith(String(n))));
+                if (nested.length === 1) unique = [nested[0] + 'A'];
+            }
             return unique.length === 1 ? unique[0] : '';
         }
 

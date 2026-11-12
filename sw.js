@@ -1,4 +1,4 @@
-// v4.31: stronger close-up OCR for MCCB rating and meter number
+// v4.32: fix 175A glue error on close-up MCCB photos
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
