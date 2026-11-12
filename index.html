@@ -1076,7 +1076,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.42</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.43</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
@@ -1174,7 +1174,7 @@
                             <div class="text">충전기 <strong id="chargerCount"></strong>대 | 제조사: <span id="makerInfo"></span></div>
                         </div>
                         <div style="font-weight:600;font-size:14px;margin-bottom:4px;">사진 촬영 — 장수 제한 없음</div>
-                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">필수 사진을 찍고, <b>6.MCCB용량</b>·<b>7.계량기번호</b>는 숫자만 화면 절반 이상 크게 찍으세요. 설명이 필요하면 홈의 사용설명서를 보세요.</div>
+                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">필수 사진을 찍고, <b>6.MCCB용량</b>·<b>7.계량기 제조번호</b>는 숫자만 화면 절반 이상 크게 찍으세요. 화질개선보다 또렷한 원본이 더 잘 맞습니다.</div>
                         <div id="editBanner" class="edit-banner hidden">완료된 거점입니다. 바꿀 사진·메모만 고치면 시트 같은 줄이 덮어씌워집니다.</div>
                         <div class="form-group" style="margin-bottom:10px;">
                             <label class="form-label">점검자 이름 (필수)</label>
@@ -1196,8 +1196,8 @@
                                     <input type="text" class="form-input" id="logMccb" placeholder="50A 또는 75A">
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">계량기번호</label>
-                                    <input type="text" class="form-input" id="logMeterNo" placeholder="이 거점 사진에 보이는 번호">
+                                    <label class="form-label">계량기 제조번호</label>
+                                    <input type="text" class="form-input" id="logMeterNo" placeholder="명판 제조번호 (예: 0261660)">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">충전기번호</label>
@@ -1578,7 +1578,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.42';
+        const APP_VERSION = '4.43';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -1609,7 +1609,7 @@
             { id: 'charger', label: '4. 충전기', required: true },
             { id: 'panel', label: '5. 배전반', required: true },
             { id: 'mccbClose', label: '6. MCCB용량', required: false },
-            { id: 'meterClose', label: '7. 계량기번호', required: false },
+            { id: 'meterClose', label: '7. 계량기 제조번호', required: false },
             { id: 'overview', label: '8. 충전소 전체샷', required: true },
             { id: 'issue', label: '9. 특이사항', required: false }
         ];
@@ -3582,19 +3582,16 @@
         }
 
         function agreedMeter(textA, textB) {
-            const left = pickMeterNo(textA);
-            const right = pickMeterNo(textB);
-            if (!left || !right) return '';
-            const na = left.replace(/^0+/, '');
-            const nb = right.replace(/^0+/, '');
-            if (!na || na !== nb) return '';
-            return left.length >= right.length ? left : right;
+            const left = pickClearMeter(textA);
+            const right = pickClearMeter(textB);
+            if (left && right && left === right) return left;
+            if (left && !right) return left;
+            if (right && !left) return right;
+            return '';
         }
 
         function pickMeterNo(text) {
-            const groups = readingText(text).match(/\d{6,14}/g) || [];
-            groups.sort((a, b) => b.length - a.length);
-            return groups[0] || '';
+            return pickClearMeter(text);
         }
 
         function pickSmallReading(text, max) {
@@ -3738,12 +3735,60 @@
             return collect(true);
         }
 
+        function isPlausibleMeterMfg(n) {
+            if (!/^\d{7,8}$/.test(n)) return false;
+            if (!/^0/.test(n)) return false;
+            if (/^0+$/.test(n) || /^(\d)\1+$/.test(n)) return false;
+            if (/^(15|16|18|19)/.test(n)) return false;
+            if (/^0220(220|380)/.test(n) || /^0380(220|380)/.test(n)) return false;
+            if (/^0(220|380)\d{3,4}$/.test(n) && !/^02\d{5}$/.test(n)) return false;
+            return true;
+        }
+
+        function extractMeterMfgCandidates(text) {
+            const raw = String(text || '');
+            const norm = readingText(raw);
+            const out = [];
+            const push = (value, weight) => {
+                let n = String(value || '').replace(/\D/g, '');
+                if (!n) return;
+                if (n.length > 8 && /^0/.test(n)) {
+                    [n.slice(0, 7), n.slice(0, 8)].forEach((part) => {
+                        if (isPlausibleMeterMfg(part)) out.push({ n: part, w: weight });
+                    });
+                    return;
+                }
+                if (isPlausibleMeterMfg(n)) out.push({ n, w: weight });
+            };
+            const labelRe = /(?:제조\s*번호|제조번호|NO\.?|N0\.?|S\s*\/\s*N|SERIAL)[^\d]{0,10}(\d[\d\-\s]{5,14}\d)/gi;
+            let match;
+            while ((match = labelRe.exec(norm))) push(match[1], 6);
+            labelRe.lastIndex = 0;
+            while ((match = labelRe.exec(raw))) push(match[1], 6);
+            (norm.match(/\b0(?:[\d\-\s]){5,12}\d\b/g) || []).forEach((part) => push(part, 2));
+            const compact = norm.replace(/[^0-9]/g, ' ');
+            (compact.match(/\d{7,8}/g) || []).forEach((part) => push(part, 1));
+            return out;
+        }
+
         function pickClearMeter(text) {
-            const compact = readingText(text).replace(/[^0-9A]/g, ' ');
-            const groups = compact.match(/\d{7,8}/g) || [];
-            const good = groups.filter((group) => /^0/.test(group) && !/^0+$/.test(group) && !/^(15|16|18|19)/.test(group));
-            const unique = [...new Set(good)];
-            return unique.length === 1 ? unique[0] : '';
+            const votes = new Map();
+            extractMeterMfgCandidates(text).forEach(({ n, w }) => {
+                votes.set(n, (votes.get(n) || 0) + w);
+            });
+            return pickMeterMfgWinner(votes);
+        }
+
+        function pickMeterMfgWinner(votes) {
+            const rows = [...votes.entries()].map(([n, score]) => ({
+                n,
+                score: score + (n.length === 7 ? 0.6 : 0) + (/^0[1-9]/.test(n) ? 0.2 : 0)
+            })).sort((a, b) => b.score - a.score || a.n.localeCompare(b.n));
+            if (!rows.length) return '';
+            if (rows.length === 1) return rows[0].score >= 2 ? rows[0].n : '';
+            if (rows[0].score >= rows[1].score + 1.5) return rows[0].n;
+            if (rows[0].score >= 5 && rows[0].n === rows[1].n) return rows[0].n;
+            return '';
         }
 
         function preprocessCloseCanvas(source, mode) {
@@ -3755,6 +3800,7 @@
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
             ctx.fillStyle = '#fff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.imageSmoothingEnabled = mode !== 'soft';
             ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
             const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const d = image.data;
@@ -3768,10 +3814,11 @@
                 if (g > max) max = g;
             }
             const span = Math.max(1, max - min);
+            const contrast = mode === 'soft' ? 1.25 : 1.85;
             let sum = 0;
             for (let p = 0; p < gray.length; p++) {
                 let v = ((gray[p] - min) / span) * 255;
-                v = Math.max(0, Math.min(255, (v - 128) * 1.85 + 128));
+                v = Math.max(0, Math.min(255, (v - 128) * contrast + 128));
                 gray[p] = v;
                 sum += v;
             }
@@ -3789,13 +3836,15 @@
 
         async function ocrCloseValue(dataUrl, kind) {
             // MCCB close-ups often include the toggle on the left; the rating on the white label is usually right/center.
+            // Meter manufacturing no. is often on the nameplate center; avoid inventing from first noisy pass.
             const sources = kind === 'mccb'
                 ? [
                     await cropRegion(dataUrl, 0.35, 0.05, 0.60, 0.90, 1),
                     await cropRegion(dataUrl, 0, 0, 1, 1, 1)
                 ]
                 : [
-                    await cropRegion(dataUrl, 0, 0.15, 1, 0.70, 1),
+                    await cropRegion(dataUrl, 0.08, 0.18, 0.84, 0.64, 1),
+                    await cropRegion(dataUrl, 0, 0.10, 1, 0.80, 1),
                     await cropRegion(dataUrl, 0, 0, 1, 1, 1)
                 ];
             const tries = kind === 'mccb'
@@ -3808,23 +3857,57 @@
                 : [
                     { psm: 7, wl: '0123456789- ' },
                     { psm: 6, wl: '0123456789- ' },
+                    { psm: 8, wl: '0123456789' },
                     { psm: 11, wl: '0123456789' },
-                    { psm: 7, wl: '' }
+                    { psm: 6, wl: '' }
                 ];
+            if (kind === 'mccb') {
+                for (let s = 0; s < sources.length; s++) {
+                    const canvases = [
+                        preprocessCloseCanvas(sources[s], 'contrast'),
+                        preprocessCloseCanvas(sources[s], 'binary')
+                    ];
+                    for (let c = 0; c < canvases.length; c++) {
+                        for (let t = 0; t < tries.length; t++) {
+                            const text = await ocrCanvas(canvases[c], tries[t].psm, tries[t].wl);
+                            const value = pickClearMccb(text, true);
+                            if (value) return value;
+                        }
+                    }
+                }
+                return '';
+            }
+            const votes = new Map();
             for (let s = 0; s < sources.length; s++) {
                 const canvases = [
+                    preprocessCloseCanvas(sources[s], 'soft'),
                     preprocessCloseCanvas(sources[s], 'contrast'),
                     preprocessCloseCanvas(sources[s], 'binary')
                 ];
                 for (let c = 0; c < canvases.length; c++) {
                     for (let t = 0; t < tries.length; t++) {
                         const text = await ocrCanvas(canvases[c], tries[t].psm, tries[t].wl);
-                        const value = kind === 'mccb' ? pickClearMccb(text, true) : pickClearMeter(text);
-                        if (value) return value;
+                        extractMeterMfgCandidates(text).forEach(({ n, w }) => {
+                            votes.set(n, (votes.get(n) || 0) + w);
+                        });
                     }
                 }
             }
-            return '';
+            return pickMeterMfgWinner(votes);
+        }
+
+        function clearPhotoFilledMeter() {
+            const el = document.getElementById('logMeterNo');
+            if (el && el.dataset.fromPhoto === '1') {
+                el.value = '';
+                delete el.dataset.fromPhoto;
+            }
+            document.querySelectorAll('#reviewBody [data-meter="logMeterNo"]').forEach((input) => {
+                if (input.dataset.fromPhoto === '1') {
+                    input.value = '';
+                    delete input.dataset.fromPhoto;
+                }
+            });
         }
 
         function setReadValue(id, value) {
@@ -3850,11 +3933,10 @@
             if (sub) sub.textContent = 'MCCB용량·계량기번호 확대 사진부터 읽는 중...';
             const mccbShots = photosOf('mccbClose').filter((item) => item.data).slice(-1)
                 .concat(photosOf('panel').filter((item) => item.data).slice(-1));
-            const meterShots = photosOf('meterClose').filter((item) => item.data).slice(-1)
-                .concat(photosOf('charger').filter((item) => item.data).slice(-1))
-                .concat(photosOf('panel').filter((item) => item.data).slice(-1));
+            // 제조번호는 7번 확대 사진만 사용. 다른 사진 번호가 섞이지 않게 함.
+            const meterShots = photosOf('meterClose').filter((item) => item.data).slice(-1);
             if (!mccbShots.length && !meterShots.length) {
-                if (sub) sub.textContent = 'MCCB용량·계량기번호는 숫자만 크게 확대해 찍으면 칸에 들어갑니다. 없으면 직접 적으세요.';
+                if (sub) sub.textContent = 'MCCB용량·계량기 제조번호는 숫자만 크게 확대해 찍으면 칸에 들어갑니다. 없으면 직접 적으세요.';
                 return;
             }
             try {
@@ -3866,18 +3948,21 @@
                 }
                 for (let i = 0; i < meterShots.length && !meter; i++) {
                     meter = await ocrCloseValue(meterShots[i].data, 'meter');
-                    if (!meter) meter = pickClearMeter(await ocrCanvas(await cropRegion(meterShots[i].data, 0.40, 0.05, 0.48, 0.42, 3), 6));
                 }
                 const notes = [];
                 if (setReadValue('logMccb', mccb)) notes.push('MCCB ' + mccb);
-                if (setReadValue('logMeterNo', meter)) notes.push('계량기 ' + meter);
+                if (meter) {
+                    if (setReadValue('logMeterNo', meter)) notes.push('제조번호 ' + meter);
+                } else if (meterShots.length) {
+                    clearPhotoFilledMeter();
+                }
                 persistWorking();
                 if (!sub) return;
                 sub.textContent = notes.length
-                    ? '사진에서 넣음: ' + notes.join(', ') + '. 맞으면 그대로 저장하고, 다르면 그 칸만 고치세요.'
-                    : '용량·번호가 한 개로 안 보이면 빈칸입니다. 6·7번으로 숫자만 크게 다시 찍으세요.';
+                    ? '사진에서 넣음: ' + notes.join(', ') + '. 사진과 다르면 그 칸만 고치세요.'
+                    : '용량·제조번호가 확실하지 않으면 빈칸입니다. 6·7번으로 숫자만 크게 다시 찍거나 직접 적으세요.';
             } catch (err) {
-                if (sub) sub.textContent = '판독에 실패했습니다. MCCB와 계량기번호만 직접 적으세요.';
+                if (sub) sub.textContent = '판독에 실패했습니다. MCCB와 계량기 제조번호만 직접 적으세요.';
             }
         }
 
@@ -3894,12 +3979,15 @@
                     }
                 } else if (photoId === 'meterClose') {
                     const meter = await ocrCloseValue(dataUrl, 'meter');
-                    if (setReadValue('logMeterNo', meter)) {
+                    if (meter && setReadValue('logMeterNo', meter)) {
                         persistWorking();
                         updateMeterHint();
-                        showCameraWarn('계량기 ' + meter + ' 넣었습니다.');
+                        showCameraWarn('제조번호 ' + meter + ' 넣었습니다. 사진과 다르면 칸에서 고치세요.');
                     } else {
-                        showCameraWarn('계량기 번호가 한 개로 안 보입니다. 번호만 크게 다시 찍으세요.');
+                        clearPhotoFilledMeter();
+                        persistWorking();
+                        updateMeterHint();
+                        showCameraWarn('제조번호가 확실하지 않아 비웠습니다. 번호만 더 크게 찍거나 직접 적으세요.');
                     }
                 }
             } catch (err) {
@@ -3950,9 +4038,8 @@
                         remember('logMccb', 'MCCB', found, setMeterAuto('logMccb', found));
                     }],
                     ['charger', (pass) => {
-                        const meter = agreedMeter(pass.contrast, pass.binary);
+                        // 충전기 사진에서는 제조번호를 넣지 않음. 명판 확대(7번)만 사용.
                         const mccb = agreedMccb(pass.contrast, pass.binary);
-                        remember('logMeterNo', '계량기', meter, setMeterAuto('logMeterNo', meter));
                         remember('logMccb', 'MCCB', mccb, setMeterAuto('logMccb', mccb));
                     }]
                 ];
@@ -4033,10 +4120,10 @@
                 if (chargerEl && !chargerEl.value) chargerEl.value = numbers;
                 const blocks = [
                     { id: 'mccbClose', guide: '거점 ' + (state.selectedZoneIdx + 1) + ' · 충전기 ' + count + '대. 용량은 거의 50A·75A입니다. 그 글자만 화면 절반 이상 크게 찍으세요.', fields: [['logMccb', '이 거점 MCCB용량', '50A 또는 75A']], also: 'panel' },
-                    { id: 'meterClose', guide: '계량기 전체보다 명판 번호만 화면 절반 이상 크게 찍으세요. 다르면 이 칸만 고치세요.', fields: [['logMeterNo', '이 거점 계량기번호', '사진에 보이는 번호'], ['meterGround', '접지저항', '없으면 비워 두세요']], also: 'charger' }
+                    { id: 'meterClose', guide: '계량기 전체보다 명판의 「제조번호」만 화면 절반 이상 크게 찍으세요. 화질개선·과도한 확대보다 또렷한 원본이 더 잘 읽힙니다. 다르면 이 칸만 고치세요.', fields: [['logMeterNo', '이 거점 제조번호', '명판 제조번호'], ['meterGround', '접지저항', '없으면 비워 두세요']], also: 'charger' }
                 ];
-                title.textContent = '이 거점 MCCB · 계량기';
-                sub.textContent = '국소명·거점·충전기 수·번호·장소는 자동입니다. MCCB·계량기번호는 숫자만 확대해 찍으세요.';
+                title.textContent = '이 거점 MCCB · 계량기 제조번호';
+                sub.textContent = '국소명·거점·충전기 수·번호·장소는 자동입니다. MCCB·제조번호는 숫자만 확대해 찍으세요.';
                 const autoCard = `<div class="review-block">
                     <h4>자동으로 시트에 들어갑니다</h4>
                     <div class="review-guide">국소명 · 거점 · 충전기 수 · 충전기 번호 · 장소. 사진에서 읽지 않습니다.</div>

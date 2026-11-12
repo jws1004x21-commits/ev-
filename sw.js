@@ -1,4 +1,4 @@
-// v4.42: nationwide / region picture map (Leaflet) on route tab
+// v4.43: meter manufacturing no. OCR consensus; no wrong fallback numbers
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
