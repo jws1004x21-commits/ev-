@@ -1,4 +1,4 @@
-// v4.53: clarify phone export vs zone-complete Drive/Sheet vs evening pack in manual
+// v4.54: Korea map labels + zoom/pan; clarify evening pack includes photos
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
