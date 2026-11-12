@@ -1,4 +1,4 @@
-// v4.37: stats place list, near-first routes, locks off, address/nav helpers
+// v4.38: show whole region near-first from current GPS
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
