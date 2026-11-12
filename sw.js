@@ -1,4 +1,4 @@
-// v4.24: read the large number in the middle of a close-up photo
+// v4.25: only confirmed readings are written into the daily log
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

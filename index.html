@@ -1354,7 +1354,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.24';
+        const APP_VERSION = '4.25';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -2925,7 +2925,13 @@
             };
             try {
                 if (!((document.getElementById('logChargerNo') || {}).value)) {
-                    remember('logChargerNo', '충전기번호', chargerNoDefault(), setMeterAuto('logChargerNo', chargerNoDefault()));
+                    const chargerNo = chargerNoDefault();
+                    const chargerEl = document.getElementById('logChargerNo');
+                    if (chargerEl && chargerNo) chargerEl.value = chargerNo;
+                    document.querySelectorAll('#reviewBody [data-meter="logChargerNo"]').forEach((input) => {
+                        if (!input.value && chargerNo) input.value = chargerNo;
+                    });
+                    if (chargerNo) notes.push('충전기번호 ' + chargerNo);
                 }
                 const jobs = [
                     ['voltage', (pass) => {
@@ -3011,7 +3017,8 @@
                 const numbers = (document.getElementById('logChargerNo') || {}).value || chargerNoDefault();
                 const fieldInput = (id, label, ph) => {
                     const val = String((document.getElementById(id) || {}).value || '').replace(/"/g, '&quot;');
-                    return `<label class="form-label">${label}</label><input class="form-input" data-meter="${id}" value="${val}" placeholder="${ph}">`;
+                    const confirm = id === 'logChargerNo' ? '' : `<button type="button" class="btn btn-secondary btn-small" data-confirm="${id}" style="margin-top:6px;">사진과 같음</button>`;
+                    return `<label class="form-label">${label}</label><input class="form-input" data-meter="${id}" data-label="${label}" value="${val}" placeholder="${ph}">${confirm}`;
                 };
                 const thumbsOf = (id) => {
                     const shots = photosOf(id);
@@ -3031,7 +3038,7 @@
                     { id: 'insulation', guide: '절연저항 사진을 보고 적으세요.', fields: [['meterInsul', '절연저항', '120']] }
                 ];
                 title.textContent = '이 거점 사진에서 읽는 중';
-                sub.textContent = '충전기 ' + count + '대 (' + numbers + '). 가운데 크게 찍힌 숫자만 읽습니다. 노란 칸을 확인하세요.';
+                sub.textContent = '충전기 ' + count + '대 (' + numbers + '). 노란 칸은 사진에서 읽은 초안입니다. 사진과 같음을 누른 글자만 일지에 들어갑니다.';
                 body.innerHTML = blocks.map((block) => {
                     const type = photoTypes.find((p) => p.id === block.id);
                     const shots = photosOf(block.id);
@@ -3047,7 +3054,7 @@
                     return `<div class="review-block"><h4>${type.label} · ${photosOf(id).length}장</h4><div class="review-thumbs">${thumbsOf(id)}</div></div>`;
                 }).join('');
                 go.classList.remove('hidden');
-                go.textContent = '이 거점 글자 저장';
+                go.textContent = '확인한 글자만 저장';
             }
             overlay.classList.remove('hidden');
             if (!(mode === 'missing' || missing.length)) readZonePhotosIntoFields();
@@ -3789,6 +3796,20 @@
             finishComplete();
         });
         document.getElementById('reviewBody').addEventListener('click', (e) => {
+            const confirmBtn = e.target.closest('[data-confirm]');
+            if (confirmBtn) {
+                const id = confirmBtn.getAttribute('data-confirm');
+                const input = document.querySelector('#reviewBody [data-meter="' + id + '"]');
+                const dest = document.getElementById(id);
+                if (input) delete input.dataset.auto;
+                if (dest) {
+                    if (input) dest.value = input.value;
+                    delete dest.dataset.auto;
+                }
+                confirmBtn.textContent = '확인함';
+                persistWorking();
+                return;
+            }
             const btn = e.target.closest('[data-shot]');
             if (!btn) return;
             closeReview();
@@ -3808,16 +3829,29 @@
         });
 
         function copyReviewMeters() {
+            const dropped = [];
             document.querySelectorAll('#reviewBody [data-meter]').forEach((el) => {
                 const dest = document.getElementById(el.getAttribute('data-meter'));
-                if (dest) dest.value = el.value;
+                if (!dest) return;
+                if (el.dataset.auto === '1') {
+                    dest.value = '';
+                    delete dest.dataset.auto;
+                    if (el.value) dropped.push(el.getAttribute('data-label') || el.getAttribute('data-meter'));
+                    return;
+                }
+                dest.value = el.value;
+                delete dest.dataset.auto;
             });
+            return dropped;
         }
 
         async function finishComplete() {
             if (completingLock || photosStillUploading()) return;
             if (!requireInspectorName()) return;
-            copyReviewMeters();
+            const droppedDrafts = copyReviewMeters();
+            if (droppedDrafts.length) {
+                document.getElementById('uploadStatus').textContent = '확인하지 않은 초안은 일지에서 뺐습니다: ' + droppedDrafts.join(', ');
+            }
             const zone = state.selectedZone;
             const meters = readMeterFields();
             const measured = meterLineForMemo();
@@ -3920,6 +3954,8 @@
                         ? (failed ? `시트 수정 · 드라이브 ${record.driveOk}장 · 부족 ${failed}장` : `시트 수정 저장 · 드라이브 ${record.driveOk}장 확인`)
                         : (failed ? `시트 전송 · 드라이브 ${record.driveOk}장 · 부족 ${failed}장` : `시트 저장 · 드라이브 ${record.driveOk}장 확인`);
                 }
+                if (droppedDrafts.length) record.upload += ' · 확인 안 한 초안 제외: ' + droppedDrafts.join(', ');
+                status.textContent = record.upload || '';
                 stopLockHeartbeat();
                 await releaseZoneLock();
             } catch (err) {
@@ -4445,18 +4481,18 @@
             box.dataset.open = '1';
             const date = logDateValue();
             const rows = rowsForDailyLog(date);
-            const cols = ['station', 'zoneIndex', 'chargers', 'chargerNo', 'mccb', 'ground', 'meterNo', 'v220', 'v380', 'place'];
-            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>접지저항</th><th>계량기번호</th><th>전압220</th><th>전압380</th><th>비고</th></tr>';
+            const cols = ['station', 'zoneIndex', 'chargers', 'chargerNo', 'mccb', 'ground', 'meterNo', 'place'];
+            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>접지저항</th><th>계량기번호</th><th>비고</th></tr>';
             const body = rows.map((r) => '<tr>' + cols.map((key) => '<td>' + String(r[key] || '').replace(/</g, '&lt;') + '</td>').join('') + '</tr>').join('');
             box.innerHTML = '<div style="font-size:13px;margin-bottom:6px;">점검일 ' + formDateLabel(date) + ' · ' + rows.length + '거점 · 글자로 시트와 카톡에 들어갑니다.</div>'
-                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="10">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
+                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="8">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
         }
 
         function dailyLogText(date, rows) {
             const lines = ['전기차 충전소 점검일지', '점검일: ' + formDateLabel(date), ''];
-            lines.push(['국소명', '거점', '충전기수', '충전기번호', 'MCCB용량', '접지저항', '계량기번호', '전압220', '전압380', '비고'].join('\t'));
+            lines.push(['국소명', '거점', '충전기수', '충전기번호', 'MCCB용량', '접지저항', '계량기번호', '비고'].join('\t'));
             rows.forEach((r) => {
-                lines.push([r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.v220, r.v380, r.place].join('\t'));
+                lines.push([r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.place].join('\t'));
             });
             if (!rows.length) lines.push('이 날짜에 기록이 없습니다.');
             return lines.join('\n');
