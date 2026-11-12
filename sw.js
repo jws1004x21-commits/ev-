@@ -1,4 +1,4 @@
-// v4.50: never cache app shell; always network for HTML/JS so phone gets latest
+// v4.51: native camera burst reopen; lightbox swipe between photos
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

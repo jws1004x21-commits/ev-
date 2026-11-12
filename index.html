@@ -410,6 +410,24 @@
             flex-shrink: 0;
         }
 
+        .lightbox-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 44px;
+            height: 64px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(30,30,40,0.72);
+            color: #fff;
+            font-size: 28px;
+            z-index: 2;
+            cursor: pointer;
+        }
+        .lightbox-nav.prev { left: 6px; }
+        .lightbox-nav.next { right: 6px; }
+        .lightbox-nav:disabled { opacity: 0.25; }
+
         .lightbox-stage {
             flex: 1;
             min-height: 0;
@@ -420,6 +438,7 @@
             justify-content: center;
             border-radius: 10px;
             background: #000;
+            position: relative;
         }
 
         .lightbox-stage img {
@@ -1083,7 +1102,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.50</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.51</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 지금 강제 새로고침 하세요. (안 바뀌면 이 버튼)
@@ -1098,7 +1117,7 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">버전이 안 바뀌면 이 버튼을 누르세요. 상단이 <b>v4.50</b>이어야 최신입니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">버전이 안 바뀌면 이 버튼을 누르세요. 상단이 <b>v4.51</b>이어야 최신입니다.</div>
                     <button type="button" class="btn btn-secondary btn-small" style="margin-top:10px;" onclick="openManual()">📖 앱 사용설명서</button>
                 </div>
             </div>
@@ -1426,7 +1445,7 @@
         </div>
     </div>
 
-    <input type="file" id="cameraInput" accept="image/*" capture="environment">
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" multiple>
     <input type="file" id="galleryInput" accept="image/*" multiple>
 
     <div id="liveCamera" class="live-camera hidden">
@@ -1578,9 +1597,11 @@
     </div>
 
     <div id="lightbox" class="lightbox hidden">
-        <div class="lightbox-hint" id="lightboxHint">확대해서 전압·저항·절연 숫자가 읽히는지 확인하세요 · 두 손가락 또는 ＋－</div>
+        <div class="lightbox-hint" id="lightboxHint">좌우로 밀어 다른 사진 확인 · 두 손가락으로 확대</div>
         <div class="lightbox-stage" id="lightboxStage">
+            <button type="button" class="lightbox-nav prev" id="lightboxPrev" aria-label="이전 사진">‹</button>
             <img id="lightboxImg" alt="미리보기">
+            <button type="button" class="lightbox-nav next" id="lightboxNext" aria-label="다음 사진">›</button>
         </div>
         <div class="lightbox-zoom-btns">
             <button type="button" id="zoomOut" aria-label="축소">－</button>
@@ -1596,7 +1617,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.50';
+        const APP_VERSION = '4.51';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -1831,6 +1852,10 @@
 
         let currentPhotoId = null;
         let lightboxTarget = null;
+        let nativeBurst = false;
+        let nativeBurstTimer = null;
+        let nativePickPending = false;
+        let lightboxSwipe = { x: 0, y: 0, active: false, moved: false };
         let idb = null;
         let persistTimer = null;
         let lastProgressFetch = 0;
@@ -3387,9 +3412,9 @@
 
         let cameraStream = null;
         let shutterBusy = false;
+        let cameraZoom = 1;
         let torchOn = false;
         let cameraSquare = false;
-        let cameraZoom = 1;
 
         function isFullShot(photoId) {
             return photoId === 'overview';
@@ -4465,14 +4490,40 @@
             updateLiveCameraHud();
         }
 
+        function stopNativeBurst() {
+            nativeBurst = false;
+            nativePickPending = false;
+            if (nativeBurstTimer) {
+                clearTimeout(nativeBurstTimer);
+                nativeBurstTimer = null;
+            }
+        }
+
         function openNativeCamera() {
-            stopLiveCamera();
+            if (cameraStream) {
+                shutterBusy = false;
+                torchOn = false;
+                const video = document.getElementById('liveCameraVideo');
+                cameraZoom = 1;
+                if (video) video.style.transform = '';
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach((t) => t.stop());
+                    cameraStream = null;
+                }
+                if (video) video.srcObject = null;
+                document.getElementById('liveCamera').classList.add('hidden');
+                document.getElementById('liveCameraShutter').disabled = false;
+            }
+            nativeBurst = true;
+            nativePickPending = true;
+            showCameraWarn('연속 촬영: 사용/확인 누르면 바로 다음 촬영이 열립니다. 그만하려면 카메라에서 뒤로/취소.');
             document.getElementById('cameraInput').click();
         }
 
         function stopLiveCamera() {
             shutterBusy = false;
             torchOn = false;
+            stopNativeBurst();
             const video = document.getElementById('liveCameraVideo');
             cameraZoom = 1;
             if (video) video.style.transform = '';
@@ -4480,7 +4531,7 @@
                 cameraStream.getTracks().forEach((t) => t.stop());
                 cameraStream = null;
             }
-            video.srcObject = null;
+            if (video) video.srcObject = null;
             document.getElementById('liveCamera').classList.add('hidden');
             document.getElementById('liveCameraShutter').disabled = false;
             const warn = document.getElementById('liveCameraWarn');
@@ -4533,6 +4584,7 @@
         }
 
         async function startLiveCamera(photoId) {
+            stopNativeBurst();
             currentPhotoId = photoId;
             cameraSquare = false;
             if (cameraStream && !document.getElementById('liveCamera').classList.contains('hidden')) {
@@ -4853,6 +4905,11 @@
         document.getElementById('cameraInput').addEventListener('change', async (e) => {
             const list = Array.from(e.target.files || []);
             e.target.value = '';
+            nativePickPending = false;
+            if (!list.length) {
+                stopNativeBurst();
+                return;
+            }
             const type = photoTypes.find((p) => p.id === currentPhotoId);
             if (type && list.length && !isIosPhone()) {
                 let n = nextShotIndex(type);
@@ -4863,6 +4920,26 @@
                 });
             }
             await addFiles(list, false);
+            // 폰카메라는 OS 확인 화면을 없앨 수 없어, 확인 후 바로 다시 열어 연속 촬영처럼 만듦.
+            if (nativeBurst) {
+                showCameraWarn('저장됨 · 다음 촬영 여는 중… (끝내려면 취소/뒤로)');
+                nativeBurstTimer = setTimeout(() => {
+                    if (!nativeBurst) return;
+                    nativePickPending = true;
+                    document.getElementById('cameraInput').click();
+                }, 280);
+            }
+        });
+
+        // 카메라에서 취소/뒤로로 돌아오면 연속 촬영 종료
+        window.addEventListener('focus', () => {
+            if (!nativeBurst || !nativePickPending) return;
+            setTimeout(() => {
+                if (nativeBurst && nativePickPending) {
+                    stopNativeBurst();
+                    showCameraWarn('연속 촬영을 끝났습니다. 사진은 목록에서 좌우로 넘겨 확인하세요.');
+                }
+            }, 700);
         });
 
         document.getElementById('galleryInput').addEventListener('change', async (e) => {
@@ -4932,13 +5009,64 @@
             return Math.hypot(dx, dy);
         }
 
+        function lightboxAlbum() {
+            return photoTypes.flatMap((type) =>
+                photosOf(type.id).map((item, index) => ({
+                    photoId: type.id,
+                    index,
+                    label: type.label,
+                    item
+                }))
+            );
+        }
+
+        function lightboxAlbumPos() {
+            if (!lightboxTarget) return -1;
+            const album = lightboxAlbum();
+            return album.findIndex((x) => x.photoId === lightboxTarget.photoId && x.index === lightboxTarget.index);
+        }
+
+        function updateLightboxChrome() {
+            const album = lightboxAlbum();
+            const pos = lightboxAlbumPos();
+            const hint = document.getElementById('lightboxHint');
+            const prev = document.getElementById('lightboxPrev');
+            const next = document.getElementById('lightboxNext');
+            if (pos < 0 || !album.length) {
+                if (hint) hint.textContent = '사진 없음';
+                if (prev) prev.disabled = true;
+                if (next) next.disabled = true;
+                return;
+            }
+            const cur = album[pos];
+            if (hint) {
+                hint.textContent = `${cur.label} · ${pos + 1}/${album.length}장 · 좌우로 밀어 넘기기 · 두 손가락 확대`;
+            }
+            if (prev) prev.disabled = pos <= 0;
+            if (next) next.disabled = pos >= album.length - 1;
+        }
+
+        function stepLightbox(dir) {
+            const album = lightboxAlbum();
+            const pos = lightboxAlbumPos() + dir;
+            if (pos < 0 || pos >= album.length) return;
+            openLightbox(album[pos].photoId, album[pos].index);
+        }
+
         function openLightbox(photoId, index) {
-            lightboxTarget = { photoId, index };
-            const item = photosOf(photoId)[index];
+            const shots = photosOf(photoId);
+            if (!shots.length) {
+                closeLightbox();
+                return;
+            }
+            const safeIndex = Math.max(0, Math.min(index, shots.length - 1));
+            lightboxTarget = { photoId, index: safeIndex };
+            const item = shots[safeIndex];
             document.getElementById('lightboxImg').src = (item && (item.data || item.thumb))
                 || (item && item.driveId ? ('https://drive.google.com/thumbnail?id=' + encodeURIComponent(item.driveId) + '&sz=w1600') : '');
             document.getElementById('lightbox').classList.remove('hidden');
             resetLightboxZoom();
+            updateLightboxChrome();
         }
 
         function closeLightbox() {
@@ -4946,12 +5074,30 @@
             document.getElementById('lightboxImg').src = '';
             lightboxTarget = null;
             zoomState.pointers.clear();
+            lightboxSwipe.active = false;
             resetLightboxZoom();
         }
 
         document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+        document.getElementById('lightboxPrev').addEventListener('click', (e) => {
+            e.stopPropagation();
+            stepLightbox(-1);
+        });
+        document.getElementById('lightboxNext').addEventListener('click', (e) => {
+            e.stopPropagation();
+            stepLightbox(1);
+        });
         document.getElementById('lightboxDelete').addEventListener('click', () => {
-            if (lightboxTarget) deletePhoto(lightboxTarget.photoId, lightboxTarget.index);
+            if (!lightboxTarget) return;
+            const album = lightboxAlbum();
+            const pos = lightboxAlbumPos();
+            const photoId = lightboxTarget.photoId;
+            const index = lightboxTarget.index;
+            deletePhoto(photoId, index);
+            const nextAlbum = lightboxAlbum();
+            if (!nextAlbum.length) return;
+            const nextPos = Math.min(pos, nextAlbum.length - 1);
+            openLightbox(nextAlbum[nextPos].photoId, nextAlbum[nextPos].index);
         });
         document.getElementById('lightboxRetake').addEventListener('click', () => {
             if (!lightboxTarget) return;
@@ -4965,16 +5111,23 @@
 
         const stage = document.getElementById('lightboxStage');
         stage.addEventListener('pointerdown', (e) => {
+            if (e.target.closest('.lightbox-nav')) return;
             stage.setPointerCapture(e.pointerId);
             zoomState.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            lightboxSwipe.x = e.clientX;
+            lightboxSwipe.y = e.clientY;
+            lightboxSwipe.active = zoomState.scale <= 1.05;
+            lightboxSwipe.moved = false;
             if (zoomState.pointers.size === 2) {
                 zoomState.startDist = pointerDistance();
                 zoomState.startScale = zoomState.scale;
                 zoomState.pan = false;
+                lightboxSwipe.active = false;
             } else if (zoomState.scale > 1) {
                 zoomState.pan = true;
                 zoomState.startX = e.clientX - zoomState.x;
                 zoomState.startY = e.clientY - zoomState.y;
+                lightboxSwipe.active = false;
             }
             const now = Date.now();
             if (now - zoomState.lastTap < 280) {
@@ -4988,16 +5141,29 @@
             zoomState.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
             if (zoomState.pointers.size === 2 && zoomState.startDist) {
                 setLightboxZoom(zoomState.startScale * (pointerDistance() / zoomState.startDist));
+                lightboxSwipe.active = false;
             } else if (zoomState.pan && zoomState.pointers.size === 1) {
                 zoomState.x = e.clientX - zoomState.startX;
                 zoomState.y = e.clientY - zoomState.startY;
                 applyLightboxZoom();
+            } else if (lightboxSwipe.active && zoomState.pointers.size === 1) {
+                const dx = e.clientX - lightboxSwipe.x;
+                if (Math.abs(dx) > 18) lightboxSwipe.moved = true;
             }
         });
         function endPointer(e) {
+            if (lightboxSwipe.active && lightboxSwipe.moved && zoomState.scale <= 1.05) {
+                const dx = e.clientX - lightboxSwipe.x;
+                if (dx <= -56) stepLightbox(1);
+                else if (dx >= 56) stepLightbox(-1);
+            }
             zoomState.pointers.delete(e.pointerId);
             if (zoomState.pointers.size < 2) zoomState.startDist = 0;
-            if (zoomState.pointers.size === 0) zoomState.pan = false;
+            if (zoomState.pointers.size === 0) {
+                zoomState.pan = false;
+                lightboxSwipe.active = false;
+                lightboxSwipe.moved = false;
+            }
         }
         stage.addEventListener('pointerup', endPointer);
         stage.addEventListener('pointercancel', endPointer);
