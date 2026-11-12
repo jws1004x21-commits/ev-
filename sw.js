@@ -1,4 +1,4 @@
-// v4.41: phone clear keeps sheet/drive; sync restores latest from sheet
+// v4.42: nationwide / region picture map (Leaflet) on route tab
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
