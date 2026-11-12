@@ -102,7 +102,7 @@ function doPost(e) {
     var action = data.action || 'complete';
 
     if (action === 'ping') {
-      return json_({ ok: true, version: 'v11' });
+      return json_({ ok: true, version: 'v12' });
     }
 
     if (action === 'photo') {
