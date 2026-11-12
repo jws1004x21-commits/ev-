@@ -1,4 +1,4 @@
-// v4.54: Korea map labels + zoom/pan; clarify evening pack includes photos
+// v4.55: Korea silhouette + side zoom + fullscreen map + city/station LOD
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

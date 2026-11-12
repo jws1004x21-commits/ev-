@@ -36,15 +36,69 @@
 
         .container { padding: 12px; max-width: 500px; margin: 0 auto; }
         #routeMapCard.hidden { display: none !important; }
+        .route-map-stage {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #2a3550;
+            background: #0b1220;
+        }
         #routeMapCanvas {
             width: 100%;
-            height: 420px;
+            height: 360px;
             display: block;
-            border-radius: 12px;
-            background: #0b1220;
-            border: 1px solid #2a3550;
             touch-action: none;
+            background: transparent;
         }
+        .route-map-side-btns {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 3;
+        }
+        .route-map-side-btns button {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            border: 1px solid #3a4a6a;
+            background: rgba(15, 23, 42, 0.88);
+            color: #f8fafc;
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1;
+            padding: 0;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+        }
+        .route-map-side-btns button.sm-label { font-size: 11px; }
+        #routeMapCard.route-map-fs {
+            position: fixed;
+            inset: 0;
+            z-index: 1200;
+            margin: 0;
+            border-radius: 0;
+            max-width: none;
+            background: #0b1220;
+            display: flex;
+            flex-direction: column;
+        }
+        #routeMapCard.route-map-fs .card-header {
+            border-radius: 0;
+            padding: 12px 14px;
+        }
+        #routeMapCard.route-map-fs .card-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            padding: 8px 10px 12px;
+        }
+        #routeMapCard.route-map-fs .route-map-stage { flex: 1; min-height: 0; border-radius: 10px; }
+        #routeMapCard.route-map-fs #routeMapCanvas { height: 100%; min-height: 60vh; }
+        body.route-map-fs-open { overflow: hidden; }
         #routeMapMeta {
             font-size: 12px;
             color: #aaa;
@@ -1099,7 +1153,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.54</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.55</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 지금 강제 새로고침 하세요. (안 바뀌면 이 버튼)
@@ -1114,7 +1168,7 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">버전이 안 바뀌면 이 버튼을 누르세요. 상단이 <b>v4.54</b>이어야 최신입니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">버전이 안 바뀌면 이 버튼을 누르세요. 상단이 <b>v4.55</b>이어야 최신입니다.</div>
                     <button type="button" class="btn btn-secondary btn-small" style="margin-top:10px;" onclick="openManual()">📖 앱 사용설명서</button>
                 </div>
             </div>
@@ -1338,15 +1392,21 @@
                 </div>
             </div>
             <div class="card hidden" id="routeMapCard">
-                <div class="card-header">우리나라 그림 지도 (앱 내장)</div>
+                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <span>우리나라 지도</span>
+                    <button type="button" class="btn btn-secondary btn-small" id="routeMapExpandBtn">크게 보기</button>
+                </div>
                 <div class="card-body" style="padding-top:8px;">
-                    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
-                        <button type="button" class="btn btn-secondary btn-small" id="routeMapZoomIn">확대 +</button>
-                        <button type="button" class="btn btn-secondary btn-small" id="routeMapZoomOut">축소 −</button>
-                        <button type="button" class="btn btn-secondary btn-small" id="routeMapReset">전체 보기</button>
+                    <div class="route-map-stage" id="routeMapStage">
+                        <canvas id="routeMapCanvas" width="640" height="420" aria-label="우리나라 그림 지도"></canvas>
+                        <div class="route-map-side-btns" aria-label="지도 확대축소">
+                            <button type="button" id="routeMapZoomIn" title="확대">+</button>
+                            <button type="button" id="routeMapZoomOut" title="축소">−</button>
+                            <button type="button" class="sm-label" id="routeMapReset" title="전체">전체</button>
+                            <button type="button" class="sm-label" id="routeMapFitBtn" title="선택지역">맞춤</button>
+                        </div>
                     </div>
-                    <canvas id="routeMapCanvas" width="640" height="420" aria-label="우리나라 그림 지도"></canvas>
-                    <div id="routeMapMeta">지역을 고르면 우리나라 지도에 시군명·충전소 점이 표시됩니다. 두 손가락으로 확대/이동.</div>
+                    <div id="routeMapMeta">멀리서는 시군, 확대하면 거점 이름. 옆 버튼·두 손가락·크게 보기 지원.</div>
                     <div id="routeMapPick" class="hidden"></div>
                 </div>
             </div>
@@ -1628,7 +1688,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.54';
+        const APP_VERSION = '4.55';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -2689,6 +2749,25 @@
         let routeMapPoints = [];
         let routeMapView = { scale: 1, ox: 0, oy: 0 };
         let routeMapGesture = { mode: '', x: 0, y: 0, ox: 0, oy: 0, dist: 0, scale: 1 };
+        let routeMapFs = false;
+        let routeMapCssH = 360;
+
+        // 남한 실루엣(대략 해안선). 외부 타일 없이 앱 내장.
+        const KOREA_LAND = [
+            [126.12, 37.77], [126.38, 37.82], [126.62, 37.95], [126.95, 37.98], [127.18, 38.12],
+            [127.42, 38.28], [127.72, 38.32], [128.05, 38.38], [128.35, 38.45], [128.62, 38.42],
+            [128.95, 38.18], [129.18, 37.82], [129.35, 37.55], [129.42, 37.18], [129.45, 36.85],
+            [129.38, 36.42], [129.42, 36.05], [129.35, 35.72], [129.28, 35.42], [129.18, 35.15],
+            [129.05, 34.95], [128.82, 34.88], [128.55, 34.78], [128.28, 34.85], [128.05, 34.78],
+            [127.78, 34.72], [127.48, 34.62], [127.18, 34.52], [126.92, 34.42], [126.72, 34.38],
+            [126.48, 34.42], [126.28, 34.58], [126.18, 34.82], [126.12, 35.08], [126.08, 35.35],
+            [126.05, 35.68], [126.08, 36.02], [126.12, 36.35], [126.18, 36.68], [126.22, 36.98],
+            [126.12, 37.22], [126.05, 37.45], [126.12, 37.77]
+        ];
+        const JEJU_LAND = [
+            [126.22, 33.28], [126.38, 33.48], [126.58, 33.55], [126.82, 33.52], [126.98, 33.42],
+            [126.95, 33.28], [126.78, 33.18], [126.52, 33.15], [126.32, 33.18], [126.22, 33.28]
+        ];
 
         // 시/군 대략 좌표(앱 내장). 외부 지도 API/타일 없이 그림 지도를 바로 그림.
         const CITY_GEO = {
@@ -2729,10 +2808,26 @@
         }
 
         function projectKoreaBase(lat, lng, w, h, pad) {
-            const minLat = 33.0; const maxLat = 38.75; const minLng = 124.9; const maxLng = 129.85;
-            const p = pad || 16;
-            const x = ((lng - minLng) / (maxLng - minLng)) * (w - p * 2) + p;
-            const y = (1 - (lat - minLat) / (maxLat - minLat)) * (h - p * 2) + p;
+            // 위도·경도 비율을 맞춰 한반도가 찌그러지지 않게
+            const minLat = 33.05; const maxLat = 38.65; const minLng = 125.55; const maxLng = 129.65;
+            const p = pad || 14;
+            const latSpan = maxLat - minLat;
+            const lngSpan = maxLng - minLng;
+            const usableW = w - p * 2;
+            const usableH = h - p * 2;
+            const midLat = (minLat + maxLat) / 2;
+            const lngScale = Math.cos(midLat * Math.PI / 180);
+            const aspect = (lngSpan * lngScale) / latSpan;
+            let drawW = usableW;
+            let drawH = usableW / aspect;
+            if (drawH > usableH) {
+                drawH = usableH;
+                drawW = usableH * aspect;
+            }
+            const ox = p + (usableW - drawW) / 2;
+            const oy = p + (usableH - drawH) / 2;
+            const x = ox + ((lng - minLng) / lngSpan) * drawW;
+            const y = oy + (1 - (lat - minLat) / latSpan) * drawH;
             return { x, y };
         }
 
@@ -2744,11 +2839,84 @@
             };
         }
 
+        function getRouteMapSize() {
+            const canvas = document.getElementById('routeMapCanvas');
+            const stage = document.getElementById('routeMapStage');
+            const cssW = (canvas && canvas.clientWidth) || (stage && stage.clientWidth) || 640;
+            let cssH = routeMapCssH;
+            if (routeMapFs && stage) {
+                cssH = Math.max(280, stage.clientHeight || window.innerHeight * 0.72);
+            } else if (canvas && canvas.clientHeight > 80) {
+                cssH = canvas.clientHeight;
+            }
+            return { w: cssW, h: cssH };
+        }
+
+        function fillPoly(ctx, ring, w, h) {
+            ctx.beginPath();
+            ring.forEach(([lng, lat], i) => {
+                const p = projectKorea(lat, lng, w, h, 12);
+                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function fitRouteMapToPoints(points, padScale) {
+            const list = (points || routeMapPoints || []).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+            const { w, h } = getRouteMapSize();
+            if (!list.length) {
+                routeMapReset();
+                return;
+            }
+            let minLat = 90; let maxLat = -90; let minLng = 180; let maxLng = -180;
+            list.forEach((p) => {
+                minLat = Math.min(minLat, p.lat);
+                maxLat = Math.max(maxLat, p.lat);
+                minLng = Math.min(minLng, p.lng);
+                maxLng = Math.max(maxLng, p.lng);
+            });
+            if (maxLat - minLat < 0.08) { minLat -= 0.08; maxLat += 0.08; }
+            if (maxLng - minLng < 0.1) { minLng -= 0.1; maxLng += 0.1; }
+            const cLat = (minLat + maxLat) / 2;
+            const cLng = (minLng + maxLng) / 2;
+            const a = projectKoreaBase(maxLat, minLng, w, h, 12);
+            const b = projectKoreaBase(minLat, maxLng, w, h, 12);
+            const boxW = Math.max(40, Math.abs(b.x - a.x));
+            const boxH = Math.max(40, Math.abs(b.y - a.y));
+            const margin = padScale || 0.72;
+            const scale = Math.max(1.1, Math.min(5.5, Math.min((w * margin) / boxW, (h * margin) / boxH)));
+            const center = projectKoreaBase(cLat, cLng, w, h, 12);
+            routeMapView.scale = scale;
+            routeMapView.ox = w / 2 - ((center.x - w / 2) * scale + w / 2);
+            routeMapView.oy = h / 2 - ((center.y - h / 2) * scale + h / 2);
+            drawRouteCanvas(routeMapPoints);
+        }
+
+        function zoomToCityCluster(cluster) {
+            if (!cluster) return;
+            const near = (routeMapPoints || []).filter((p) => shortCityName(p.city) === cluster.name || p.city === cluster.name);
+            fitRouteMapToPoints(near.length ? near : [{ lat: cluster.lat, lng: cluster.lng }], 0.55);
+        }
+
+        function setRouteMapFullscreen(on) {
+            const card = document.getElementById('routeMapCard');
+            const btn = document.getElementById('routeMapExpandBtn');
+            routeMapFs = !!on;
+            if (!card) return;
+            card.classList.toggle('route-map-fs', routeMapFs);
+            document.body.classList.toggle('route-map-fs-open', routeMapFs);
+            if (btn) btn.textContent = routeMapFs ? '닫기' : '크게 보기';
+            requestAnimationFrame(() => drawRouteCanvas(routeMapPoints));
+        }
+
         function clearRouteMap() {
             routeMapToken += 1;
             routeMapHits = [];
             routeMapPoints = [];
             routeMapView = { scale: 1, ox: 0, oy: 0 };
+            if (routeMapFs) setRouteMapFullscreen(false);
             const card = document.getElementById('routeMapCard');
             const pick = document.getElementById('routeMapPick');
             if (card) card.classList.add('hidden');
@@ -2804,89 +2972,104 @@
             routeMapPoints = points || routeMapPoints || [];
             points = routeMapPoints;
             const dpr = Math.min(2, window.devicePixelRatio || 1);
-            const cssW = canvas.clientWidth || 640;
-            const cssH = 420;
-            canvas.width = Math.round(cssW * dpr);
-            canvas.height = Math.round(cssH * dpr);
+            const size = getRouteMapSize();
+            const w = size.w;
+            const h = size.h;
+            canvas.style.height = h + 'px';
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
             const ctx = canvas.getContext('2d');
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            const w = cssW;
-            const h = cssH;
             ctx.clearRect(0, 0, w, h);
             const g = ctx.createLinearGradient(0, 0, w, h);
-            g.addColorStop(0, '#07101c');
-            g.addColorStop(1, '#12304a');
+            g.addColorStop(0, '#06101c');
+            g.addColorStop(1, '#0f2a44');
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, w, h);
 
-            // 우리나라(남한) 실루엣
-            ctx.fillStyle = '#245a45';
-            ctx.beginPath();
-            const land = [
-                [126.15, 37.75], [126.55, 37.95], [127.05, 38.25], [127.55, 38.35], [128.35, 38.45],
-                [128.95, 37.95], [129.35, 37.55], [129.45, 36.85], [129.35, 36.05], [129.25, 35.35],
-                [129.05, 34.95], [128.55, 34.75], [127.85, 34.65], [127.15, 34.45], [126.65, 34.35],
-                [126.25, 34.55], [126.05, 35.15], [126.05, 35.85], [126.15, 36.55], [126.05, 37.15],
-                [126.15, 37.75]
-            ];
-            land.forEach(([lng, lat], i) => {
-                const p = projectKorea(lat, lng, w, h, 12);
-                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
-            });
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#3d8f6d';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-            // 제주도
-            ctx.beginPath();
-            [[126.35, 33.45], [126.65, 33.55], [126.95, 33.45], [126.85, 33.25], [126.45, 33.2], [126.35, 33.45]].forEach(([lng, lat], i) => {
-                const p = projectKorea(lat, lng, w, h, 12);
-                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
-            });
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+            // 바다 톤
+            ctx.fillStyle = 'rgba(56, 120, 168, 0.18)';
+            ctx.fillRect(0, 0, w, h);
 
-            // 권역 안내 글자
-            ctx.font = 'bold 13px sans-serif';
-            ctx.fillStyle = 'rgba(255,255,255,0.55)';
-            [['충청', 36.55, 127.25], ['호남', 35.35, 126.85], ['제주', 33.4, 126.55]].forEach(([name, lat, lng]) => {
-                const p = projectKorea(lat, lng, w, h, 12);
-                ctx.fillText(name, p.x - 14, p.y);
-            });
+            ctx.fillStyle = '#2f6b4f';
+            ctx.strokeStyle = '#7dca9a';
+            ctx.lineWidth = 1.4;
+            fillPoly(ctx, KOREA_LAND, w, h);
+            fillPoly(ctx, JEJU_LAND, w, h);
 
-            // 시군 이름 (확대할수록 더 많이)
+            // 권역 안내 (멀리서만)
+            if (routeMapView.scale < 1.8) {
+                ctx.font = 'bold 13px sans-serif';
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                [['충청', 36.55, 127.25], ['호남', 35.35, 126.85], ['제주', 33.38, 126.55]].forEach(([name, lat, lng]) => {
+                    const p = projectKorea(lat, lng, w, h, 12);
+                    ctx.fillText(name, p.x - 14, p.y);
+                });
+            }
+
             const clusters = cityClusters(points);
-            const labelLimit = routeMapView.scale < 1.35 ? 14 : (routeMapView.scale < 2.2 ? 28 : 60);
-            clusters
-                .sort((a, b) => b.n - a.n)
-                .slice(0, labelLimit)
-                .forEach((c) => {
+            const showStations = routeMapView.scale >= 1.55 || points.length <= 18;
+            routeMapHits = [];
+
+            // 멀리: 시군 묶음 / 가까이: 거점 점 + 이름
+            if (!showStations) {
+                clusters.forEach((c) => {
+                    const p = projectKorea(c.lat, c.lng, w, h, 12);
+                    if (p.x < -50 || p.y < -40 || p.x > w + 50 || p.y > h + 40) return;
+                    const r = Math.max(10, Math.min(18, 8 + c.n));
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+                    ctx.fillStyle = c.left ? '#f97316' : '#22c55e';
+                    ctx.fill();
+                    ctx.strokeStyle = '#041018';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(String(c.n), p.x, p.y + 4);
+                    ctx.textAlign = 'left';
+                    const label = c.name;
+                    ctx.font = 'bold 12px sans-serif';
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+                    ctx.strokeText(label, p.x + r + 4, p.y + 4);
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.fillText(label, p.x + r + 4, p.y + 4);
+                    routeMapHits.push({ x: p.x, y: p.y, r: r + 14, kind: 'city', cluster: c });
+                });
+            } else {
+                // 시군 라벨은 약하게
+                clusters.slice(0, 40).forEach((c) => {
                     const p = projectKorea(c.lat, c.lng, w, h, 12);
                     if (p.x < -40 || p.y < -20 || p.x > w + 40 || p.y > h + 20) return;
-                    const label = c.name + (c.n > 1 ? '(' + c.n + ')' : '');
-                    ctx.font = (routeMapView.scale >= 1.8 ? 'bold 12px' : 'bold 11px') + ' sans-serif';
-                    ctx.lineWidth = 3;
-                    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-                    ctx.strokeText(label, p.x + 7, p.y - 7);
-                    ctx.fillStyle = '#f8fafc';
-                    ctx.fillText(label, p.x + 7, p.y - 7);
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.fillStyle = 'rgba(226,232,240,0.7)';
+                    ctx.fillText(c.name, p.x + 8, p.y - 10);
                 });
-
-            routeMapHits = [];
-            points.forEach((it) => {
-                const p = projectKorea(it.lat, it.lng, w, h, 12);
-                const r = Math.max(4, (it.doneAll ? 5 : 6) * Math.min(1.6, routeMapView.scale));
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-                ctx.fillStyle = it.doneAll ? '#22c55e' : '#f97316';
-                ctx.fill();
-                ctx.strokeStyle = '#041018';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                routeMapHits.push({ x: p.x, y: p.y, r: r + 10, item: it });
-            });
+                points.forEach((it) => {
+                    const p = projectKorea(it.lat, it.lng, w, h, 12);
+                    if (p.x < -30 || p.y < -30 || p.x > w + 30 || p.y > h + 30) return;
+                    const r = Math.max(5, Math.min(10, 4.5 * Math.min(2.2, routeMapView.scale)));
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+                    ctx.fillStyle = it.doneAll ? '#22c55e' : '#f97316';
+                    ctx.fill();
+                    ctx.strokeStyle = '#041018';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    if (routeMapView.scale >= 2.1) {
+                        const nm = String(it.name || '').slice(0, 10);
+                        ctx.font = 'bold 11px sans-serif';
+                        ctx.lineWidth = 3;
+                        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+                        ctx.strokeText(nm, p.x + 8, p.y + 4);
+                        ctx.fillStyle = '#fff7ed';
+                        ctx.fillText(nm, p.x + 8, p.y + 4);
+                    }
+                    routeMapHits.push({ x: p.x, y: p.y, r: r + 12, kind: 'station', item: it });
+                });
+            }
 
             const here = typeof gpsLatLng === 'function' ? gpsLatLng() : null;
             if (here && Number.isFinite(here.lat)) {
@@ -2906,18 +3089,18 @@
             const left = points.filter((p) => !p.doneAll).length;
             const done = points.length - left;
             if (meta) {
-                meta.textContent = `우리나라 지도 · ${points.length}곳 · 🟠남음 ${left} · 🟢완료 ${done} · 시군명 표시 · 확대/이동 가능 · 점 누르면 상세`;
+                meta.textContent = showStations
+                    ? `거점 표시 · ${points.length}곳 · 🟠${left} 🟢${done} · 점 터치 · 옆 +/- 또는 핀치`
+                    : `시군 묶음 · ${clusters.length}개 · 시군 누르면 확대 · 크게 보기 추천`;
             }
         }
 
         function routeMapZoom(factor, cx, cy) {
-            const canvas = document.getElementById('routeMapCanvas');
-            const w = (canvas && canvas.clientWidth) || 640;
-            const h = 420;
-            const x = cx == null ? w / 2 : cx;
-            const y = cy == null ? h / 2 : cy;
+            const size = getRouteMapSize();
+            const x = cx == null ? size.w / 2 : cx;
+            const y = cy == null ? size.h / 2 : cy;
             const prev = routeMapView.scale;
-            const next = Math.max(0.8, Math.min(6, prev * factor));
+            const next = Math.max(0.85, Math.min(7, prev * factor));
             routeMapView.ox = x - (x - routeMapView.ox) * (next / prev);
             routeMapView.oy = y - (y - routeMapView.oy) * (next / prev);
             routeMapView.scale = next;
@@ -2961,7 +3144,9 @@
                         bestD = d;
                     }
                 });
-                if (best) showMapPick(best.item);
+                if (!best) return;
+                if (best.kind === 'city') zoomToCityCluster(best.cluster);
+                else if (best.item) showMapPick(best.item);
             };
             canvas.addEventListener('pointerdown', (e) => {
                 canvas.setPointerCapture(e.pointerId);
@@ -2997,7 +3182,7 @@
                     const cx = (pts[0].x + pts[1].x) / 2 - rect.left;
                     const cy = (pts[0].y + pts[1].y) / 2 - rect.top;
                     const factor = dist / (routeMapGesture.dist || dist);
-                    const next = Math.max(0.8, Math.min(6, routeMapGesture.scale * factor));
+                    const next = Math.max(0.85, Math.min(7, routeMapGesture.scale * factor));
                     const prev = routeMapView.scale;
                     routeMapView.ox = cx - (cx - routeMapView.ox) * (next / prev);
                     routeMapView.oy = cy - (cy - routeMapView.oy) * (next / prev);
@@ -3026,15 +3211,28 @@
             const zin = document.getElementById('routeMapZoomIn');
             const zout = document.getElementById('routeMapZoomOut');
             const zreset = document.getElementById('routeMapReset');
+            const zfit = document.getElementById('routeMapFitBtn');
+            const zexp = document.getElementById('routeMapExpandBtn');
             if (zin) zin.onclick = () => routeMapZoom(1.35);
             if (zout) zout.onclick = () => routeMapZoom(1 / 1.35);
             if (zreset) zreset.onclick = () => routeMapReset();
+            if (zfit) zfit.onclick = () => fitRouteMapToPoints(routeMapPoints, 0.7);
+            if (zexp) zexp.onclick = () => setRouteMapFullscreen(!routeMapFs);
+            window.addEventListener('resize', () => {
+                if (!document.getElementById('routeMapCard')?.classList.contains('hidden')) {
+                    drawRouteCanvas(routeMapPoints);
+                }
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && routeMapFs) setRouteMapFullscreen(false);
+            });
         }
 
         async function showRouteMap(items) {
             const mode = (document.getElementById('routeViewMode') || {}).value || 'map';
             const card = document.getElementById('routeMapCard');
             if (!card || mode === 'list') {
+                setRouteMapFullscreen(false);
                 clearRouteMap();
                 return;
             }
@@ -3044,8 +3242,13 @@
             let points = prepareMapPoints(items || []);
             routeMapView = { scale: 1, ox: 0, oy: 0 };
             drawRouteCanvas(points);
+            if (points.length && points.length <= 80) {
+                // 선택 지역만 보이면 바로 맞춤
+                const cities = new Set(points.map((p) => shortCityName(p.city)));
+                if (cities.size <= 12) fitRouteMapToPoints(points, 0.75);
+            }
             const hint = document.getElementById('routeGpsHint');
-            if (hint) hint.textContent = '우리나라 지도에 시군명·점이 표시됩니다. 확대/이동 후 점을 누르세요. 도로는 카카오·네이버로.';
+            if (hint) hint.textContent = '멀리서는 시군, 확대하면 거점. 크게 보기 + 옆 +/- 추천. 도로는 카카오·네이버.';
             try {
                 await ensureStationGeo(items || [], {
                     maxRounds: 8,
