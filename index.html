@@ -1354,7 +1354,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.23';
+        const APP_VERSION = '4.24';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -2724,7 +2724,7 @@
                     });
                     await worker.setParameters({
                         tessedit_char_whitelist: '0123456789.A',
-                        tessedit_pageseg_mode: '11'
+                        tessedit_pageseg_mode: '6'
                     });
                     return worker;
                 })().catch((err) => {
@@ -2740,11 +2740,13 @@
                 const img = new Image();
                 img.onload = () => {
                     const scale = Math.max(1, Math.min(2, 1400 / img.width));
+                    const cropW = img.width * 0.78;
+                    const cropH = img.height * 0.72;
                     const canvas = document.createElement('canvas');
-                    canvas.width = Math.round(img.width * scale);
-                    canvas.height = Math.round(img.height * scale);
+                    canvas.width = Math.max(1, Math.round(cropW * scale));
+                    canvas.height = Math.max(1, Math.round(cropH * scale));
                     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, (img.width - cropW) / 2, (img.height - cropH) / 2, cropW, cropH, 0, 0, canvas.width, canvas.height);
                     const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const d = image.data;
                     const gray = new Float32Array(d.length / 4);
@@ -2868,20 +2870,46 @@
             return true;
         }
 
-        function trustedText(result) {
+        function dominantText(result) {
             const data = (result && result.data) || {};
-            const words = data.words || [];
-            const good = words.filter((word) => Number(word.confidence) >= 62 && String(word.text || '').trim());
-            if (good.length) return good.map((word) => readingText(word.text)).join(' ');
-            if (Number(data.confidence) >= 75) return readingText(data.text);
-            return '';
+            const words = (data.words || []).filter((word) => Number(word.confidence) >= 55 && String(word.text || '').trim());
+            if (!words.length) {
+                if (Number(data.confidence) >= 78) return readingText(data.text);
+                return '';
+            }
+            const boxes = words.map((word) => {
+                const box = word.bbox || {};
+                return {
+                    text: readingText(word.text),
+                    h: Math.max(1, (box.y1 || 0) - (box.y0 || 0)),
+                    cx: ((box.x0 || 0) + (box.x1 || 0)) / 2,
+                    cy: ((box.y0 || 0) + (box.y1 || 0)) / 2,
+                    x1: box.x1 || 0,
+                    y1: box.y1 || 0
+                };
+            });
+            let maxX = 1;
+            let maxY = 1;
+            let maxH = 1;
+            boxes.forEach((box) => {
+                maxX = Math.max(maxX, box.x1);
+                maxY = Math.max(maxY, box.y1);
+                maxH = Math.max(maxH, box.h);
+            });
+            const main = boxes.filter((box) => {
+                const nearX = Math.abs(box.cx - maxX / 2) / maxX < 0.36;
+                const nearY = Math.abs(box.cy - maxY / 2) / maxY < 0.4;
+                return box.h >= maxH * 0.55 && nearX && nearY;
+            });
+            const use = main.length ? main : boxes.filter((box) => box.h >= maxH * 0.75);
+            return use.map((box) => box.text).join(' ');
         }
 
         async function ocrPhotoPasses(dataUrl) {
             const worker = await getOcrWorker();
             const contrast = await worker.recognize(await preprocessReading(dataUrl, 'contrast'));
             const binary = await worker.recognize(await preprocessReading(dataUrl, 'binary'));
-            return { contrast: trustedText(contrast), binary: trustedText(binary) };
+            return { contrast: dominantText(contrast), binary: dominantText(binary) };
         }
 
         async function readZonePhotosIntoFields() {
@@ -3003,7 +3031,7 @@
                     { id: 'insulation', guide: '절연저항 사진을 보고 적으세요.', fields: [['meterInsul', '절연저항', '120']] }
                 ];
                 title.textContent = '이 거점 사진에서 읽는 중';
-                sub.textContent = '충전기 ' + count + '대 (' + numbers + '). 두 번 읽어서 같은 숫자만 넣습니다. 노란 칸을 확인하세요.';
+                sub.textContent = '충전기 ' + count + '대 (' + numbers + '). 가운데 크게 찍힌 숫자만 읽습니다. 노란 칸을 확인하세요.';
                 body.innerHTML = blocks.map((block) => {
                     const type = photoTypes.find((p) => p.id === block.id);
                     const shots = photosOf(block.id);

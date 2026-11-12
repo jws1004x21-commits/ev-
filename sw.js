@@ -1,4 +1,4 @@
-// v4.23: keep a photo number only when two reads agree
+// v4.24: read the large number in the middle of a close-up photo
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
