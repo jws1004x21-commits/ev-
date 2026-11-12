@@ -1,4 +1,4 @@
-// v4.17: confirm each Drive photo, pull Drive-only photos into the daily folder
+// v4.18: 1:1 crop choice, camera types stay off the view
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

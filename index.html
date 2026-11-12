@@ -438,39 +438,26 @@
             z-index: 1;
             touch-action: none;
         }
-        .live-camera.is-full .live-camera-frame { display: none; }
+        .live-camera-frame {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            display: none;
+        }
+        .live-camera.show-square .live-camera-frame { display: block; }
         .live-camera-square {
             position: absolute;
             left: 50%;
             top: 50%;
             transform: translate(-50%, -50%);
             box-sizing: border-box;
-            border: 2px solid #fff;
-            box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);
-            border-radius: 4px;
+            border: 2px solid rgba(255,255,255,0.9);
+            border-radius: 2px;
+            box-shadow: none;
         }
         .live-camera-square::before,
-        .live-camera-square::after {
-            content: '';
-            position: absolute;
-            pointer-events: none;
-        }
-        .live-camera-square::before {
-            left: 0;
-            right: 0;
-            top: 33.33%;
-            height: 33.33%;
-            border-top: 1px solid rgba(255,255,255,0.35);
-            border-bottom: 1px solid rgba(255,255,255,0.35);
-        }
-        .live-camera-square::after {
-            top: 0;
-            bottom: 0;
-            left: 33.33%;
-            width: 33.33%;
-            border-left: 1px solid rgba(255,255,255,0.35);
-            border-right: 1px solid rgba(255,255,255,0.35);
-        }
+        .live-camera-square::after { content: none; }
         .live-camera-top {
             position: absolute;
             top: 0;
@@ -486,6 +473,46 @@
             z-index: 2;
             gap: 8px;
         }
+        .cam-title-btn {
+            width: 100%;
+            border: none;
+            background: transparent;
+            color: inherit;
+            padding: 0;
+        }
+        .cam-edge {
+            position: absolute;
+            top: 46%;
+            z-index: 2;
+            width: 34px;
+            height: 64px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(0,0,0,0.28);
+            color: #fff;
+            font-size: 30px;
+            line-height: 64px;
+        }
+        .cam-edge.prev { left: 4px; }
+        .cam-edge.next { right: 4px; }
+        .live-camera-sheet {
+            position: absolute;
+            left: 10px;
+            right: 10px;
+            bottom: 108px;
+            z-index: 3;
+            background: rgba(10,10,10,0.88);
+            border-radius: 16px;
+            padding: 8px;
+        }
+        .live-camera-sheet.hidden { display: none; }
+        .live-camera-sheet .live-camera-types,
+        .live-camera-sheet .live-camera-film {
+            position: static;
+            bottom: auto;
+            padding: 4px;
+        }
+        .live-camera-sheet .live-camera-types { flex-wrap: wrap; justify-content: center; }
         .live-camera-top .cam-title { font-weight: 700; font-size: 16px; text-align: center; }
         .live-camera-top .cam-count { font-size: 12px; color: #86efac; text-align: center; }
         .cam-icon, .cam-ratio {
@@ -614,9 +641,7 @@
             flex-shrink: 0;
             background: #222;
         }
-        .live-camera-types { bottom: 210px; }
-        .live-camera-hint { bottom: 258px; }
-        .live-camera-frame { display: none; }
+        .live-camera-types { position: static; }
         .live-camera-thumb-wrap {
             width: 64px;
             height: 64px;
@@ -635,12 +660,12 @@
         }
         .live-camera-hint {
             position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 258px;
+            left: 48px;
+            right: 48px;
+            bottom: calc(92px + env(safe-area-inset-bottom, 0px));
             text-align: center;
             color: #ddd;
-            font-size: 13px;
+            font-size: 12px;
             z-index: 2;
             text-shadow: 0 1px 4px #000;
             pointer-events: none;
@@ -1271,21 +1296,26 @@
         </div>
         <div class="live-camera-flash" id="liveCameraFlash"></div>
         <div class="live-camera-top">
-            <div style="width:100%;text-align:center;">
+            <button type="button" class="cam-title-btn" id="liveCameraTitleBtn">
                 <div class="cam-title" id="liveCameraTitle">촬영</div>
-                <div class="cam-count" id="liveCameraCount">0장</div>
-            </div>
+                <div class="cam-count" id="liveCameraCount">0장 · 눌러서 항목</div>
+            </button>
         </div>
+        <button type="button" class="cam-edge prev" id="liveCameraPrev" aria-label="이전 항목">‹</button>
+        <button type="button" class="cam-edge next" id="liveCameraNext" aria-label="다음 항목">›</button>
         <div class="live-camera-tools">
+            <button type="button" id="liveCameraRatio">1:1</button>
             <button type="button" id="liveCameraZoomOut">줌-</button>
             <button type="button" id="liveCameraZoomIn">줌+</button>
             <button type="button" id="liveCameraTorch">라이트</button>
             <button type="button" id="liveCameraNative">폰카메라</button>
         </div>
         <div class="live-camera-warn hidden" id="liveCameraWarn"></div>
-        <div class="live-camera-hint" id="liveCameraHint">네모 안에 맞추고 빨간 버튼을 누르세요</div>
-        <div class="live-camera-types" id="liveCameraTypes"></div>
-        <div class="live-camera-film" id="liveCameraFilm"></div>
+        <div class="live-camera-hint" id="liveCameraHint">좌우로 넘기면 다음 항목</div>
+        <div id="liveCameraSheet" class="live-camera-sheet hidden">
+            <div class="live-camera-types" id="liveCameraTypes"></div>
+            <div class="live-camera-film" id="liveCameraFilm"></div>
+        </div>
         <div class="live-camera-bottom">
             <button type="button" class="cam-side" id="liveCameraClose">닫기</button>
             <button type="button" class="cam-shutter" id="liveCameraShutter" aria-label="촬영"></button>
@@ -1324,7 +1354,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.17';
+        const APP_VERSION = '4.18';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -2550,12 +2580,12 @@
         }
 
         function cameraHintFor(photoId) {
-            const zoom = '두 손가락 또는 위아래로 드래그하면 줌';
-            if (photoId === 'voltage') return '380V·220V 숫자가 또렷하게 · ' + zoom;
-            if (photoId === 'resistance') return '접지저항 숫자가 또렷하게 · ' + zoom;
-            if (photoId === 'insulation') return '절연저항 숫자가 또렷하게 · ' + zoom;
-            if (photoId === 'overview') return '충전소 전체가 나오게 · ' + zoom;
-            return '화면 전체가 저장됩니다 · ' + zoom;
+            const crop = cameraSquare ? '네모 안만 저장' : '화면 전체 저장';
+            if (photoId === 'voltage') return '380V·220V · ' + crop;
+            if (photoId === 'resistance') return '접지저항 · ' + crop;
+            if (photoId === 'insulation') return '절연저항 · ' + crop;
+            if (photoId === 'overview') return '충전소 전체 · ' + crop;
+            return crop + ' · 좌우로 넘기면 항목';
         }
 
         function showCameraWarn(msg) {
@@ -2718,20 +2748,34 @@
         }
 
         function layoutSquareGuide() {
-            const frame = document.getElementById('liveCameraFrame');
+            const cam = document.getElementById('liveCamera');
             const sq = document.getElementById('liveCameraSquare');
-            if (!frame || !sq) return;
-            const s = Math.max(96, Math.min(frame.clientWidth, frame.clientHeight));
-            sq.style.width = s + 'px';
-            sq.style.height = s + 'px';
+            const video = document.getElementById('liveCameraVideo');
+            if (!cam || !sq || !video) return;
+            cam.classList.toggle('show-square', cameraSquare);
+            if (!cameraSquare) return;
+            const box = video.getBoundingClientRect();
+            const vw = video.videoWidth || 4;
+            const vh = video.videoHeight || 3;
+            const fit = Math.min(box.width / vw, box.height / vh);
+            const side = Math.max(80, Math.min(vw * fit, vh * fit, box.width, box.height));
+            sq.style.width = side + 'px';
+            sq.style.height = side + 'px';
         }
 
         function updateLiveCameraHud() {
             const type = photoTypes.find((p) => p.id === currentPhotoId);
-            document.getElementById('liveCameraTitle').textContent = type ? type.label : '촬영';
-            document.getElementById('liveCameraCount').textContent = (type ? photosOf(type.id).length : 0) + '장';
+            const short = type ? String(type.label).replace(/^\d+\.\s*/, '') : '촬영';
+            const idx = Math.max(0, photoTypes.findIndex((p) => p.id === currentPhotoId));
+            document.getElementById('liveCameraTitle').textContent = short;
+            document.getElementById('liveCameraCount').textContent =
+                (type ? photosOf(type.id).length : 0) + '장 · ' + (idx + 1) + '/' + photoTypes.length + ' 눌러서 항목';
             document.getElementById('liveCameraHint').textContent = cameraHintFor(currentPhotoId);
-            document.getElementById('liveCamera').classList.add('is-full');
+            const ratio = document.getElementById('liveCameraRatio');
+            if (ratio) {
+                ratio.textContent = cameraSquare ? '1:1' : '전체';
+                ratio.classList.toggle('on', cameraSquare);
+            }
             const box = document.getElementById('liveCameraTypes');
             box.innerHTML = photoTypes.map((p) => {
                 const n = photosOf(p.id).length;
@@ -2742,6 +2786,18 @@
             refreshTorchButton();
             refreshZoomButtons();
             renderLiveCameraFilm();
+            layoutSquareGuide();
+        }
+
+        function stepCameraType(dir) {
+            const i = photoTypes.findIndex((p) => p.id === currentPhotoId);
+            const next = photoTypes[i + dir];
+            if (!next) return;
+            currentPhotoId = next.id;
+            cameraSquare = !isFullShot(next.id);
+            const sheet = document.getElementById('liveCameraSheet');
+            if (sheet) sheet.classList.add('hidden');
+            updateLiveCameraHud();
         }
 
         function renderLiveCameraFilm() {
@@ -2882,10 +2938,17 @@
             const ctx = canvas.getContext('2d');
             const range = cameraZoomRange();
             const scale = range.hardware ? 1 : Math.max(1, cameraZoom);
-            const sw = video.videoWidth / scale;
-            const sh = video.videoHeight / scale;
-            const sx = (video.videoWidth - sw) / 2;
-            const sy = (video.videoHeight - sh) / 2;
+            let sw = video.videoWidth / scale;
+            let sh = video.videoHeight / scale;
+            let sx = (video.videoWidth - sw) / 2;
+            let sy = (video.videoHeight - sh) / 2;
+            if (cameraSquare) {
+                const side = Math.min(sw, sh);
+                sx += (sw - side) / 2;
+                sy += (sh - side) / 2;
+                sw = side;
+                sh = side;
+            }
             canvas.width = Math.max(1, Math.round(sw));
             canvas.height = Math.max(1, Math.round(sh));
             ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
@@ -2924,7 +2987,7 @@
 
         async function startLiveCamera(photoId) {
             currentPhotoId = photoId;
-            cameraSquare = false;
+            cameraSquare = !isFullShot(photoId);
             if (cameraStream && !document.getElementById('liveCamera').classList.contains('hidden')) {
                 updateLiveCameraHud();
                 return;
@@ -2958,6 +3021,7 @@
             video.setAttribute('playsinline', 'true');
             video.muted = true;
             video.srcObject = stream;
+            video.onresize = () => layoutSquareGuide();
             try { await video.play(); } catch (err) {}
             cameraZoom = cameraZoomRange().min;
             applyViewScale();
@@ -3125,7 +3189,13 @@
         document.getElementById('liveCameraZoomIn').addEventListener('click', () => bumpCameraZoom(1));
         document.getElementById('liveCameraZoomOut').addEventListener('click', () => bumpCameraZoom(-1));
         document.getElementById('liveCameraNative').addEventListener('click', openNativeCamera);
-        const camGesture = { pointers: new Map(), mode: '', startDist: 0, startZoom: 1, startY: 0, moved: false };
+        document.getElementById('liveCameraRatio').addEventListener('click', toggleCameraSquare);
+        document.getElementById('liveCameraPrev').addEventListener('click', () => stepCameraType(-1));
+        document.getElementById('liveCameraNext').addEventListener('click', () => stepCameraType(1));
+        document.getElementById('liveCameraTitleBtn').addEventListener('click', () => {
+            document.getElementById('liveCameraSheet').classList.toggle('hidden');
+        });
+        const camGesture = { pointers: new Map(), mode: '', startDist: 0, startZoom: 1, startX: 0, startY: 0, moved: false };
         let camIgnoreClick = false;
 
         function camPointerDist() {
@@ -3146,6 +3216,7 @@
                 camGesture.moved = true;
             } else {
                 camGesture.mode = 'drag';
+                camGesture.startX = e.clientX;
                 camGesture.startY = e.clientY;
                 camGesture.startZoom = cameraZoom;
                 camGesture.moved = false;
@@ -3156,8 +3227,16 @@
             camGesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
             if (camGesture.mode === 'pinch' && camGesture.pointers.size >= 2 && camGesture.startDist > 8) {
                 applyCameraZoom(camGesture.startZoom * (camPointerDist() / camGesture.startDist));
+            } else if (camGesture.mode === 'swipe') {
+                camGesture.moved = true;
             } else if (camGesture.mode === 'drag' && camGesture.pointers.size === 1) {
+                const dx = e.clientX - camGesture.startX;
                 const dy = camGesture.startY - e.clientY;
+                if (Math.abs(dx) > 22 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+                    camGesture.mode = 'swipe';
+                    camGesture.moved = true;
+                    return;
+                }
                 if (Math.abs(dy) < 14) return;
                 camGesture.moved = true;
                 const range = cameraZoomRange();
@@ -3166,6 +3245,11 @@
             }
         });
         function endCamPointer(e) {
+            if (camGesture.mode === 'swipe' && camGesture.pointers.size === 1) {
+                const dx = e.clientX - camGesture.startX;
+                if (dx > 64) stepCameraType(-1);
+                else if (dx < -64) stepCameraType(1);
+            }
             camGesture.pointers.delete(e.pointerId);
             if (camGesture.moved) camIgnoreClick = true;
             if (camGesture.pointers.size < 2) camGesture.startDist = 0;
@@ -3203,7 +3287,8 @@
             const btn = e.target.closest('button[data-id]');
             if (!btn) return;
             currentPhotoId = btn.getAttribute('data-id');
-            cameraSquare = false;
+            cameraSquare = !isFullShot(currentPhotoId);
+            document.getElementById('liveCameraSheet').classList.add('hidden');
             updateLiveCameraHud();
         });
         window.addEventListener('resize', () => {
