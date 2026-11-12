@@ -1,5 +1,5 @@
-// v4.56: hard cache bust — always network, kill old caches
-const SW_VER = '4.56';
+// v4.57: emergency mode panel + hard cache bust
+const SW_VER = '4.57';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
@@ -20,7 +20,6 @@ self.addEventListener('fetch', (event) => {
     const req = event.request;
     if (req.method !== 'GET') return;
     const url = new URL(req.url);
-    // HTML/버전은 무조건 최신 네트워크
     const bust = url.pathname.endsWith('/') || url.pathname.endsWith('.html') || url.pathname.endsWith('version.json') || url.pathname.endsWith('sw.js');
     const freshReq = bust
         ? new Request(req.url, { cache: 'reload', credentials: req.credentials, mode: req.mode, headers: req.headers })

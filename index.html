@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.56">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.57">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1156,7 +1156,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.56</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.57</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전 있음 · 상단이 v4.56이어야 최신
@@ -1171,9 +1171,12 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.56">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.56</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
-                    <button type="button" class="btn btn-secondary btn-small" style="margin-top:10px;" onclick="openManual()">📖 앱 사용설명서</button>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.57">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.57</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
+                    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
+                        <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
+                    </div>
                 </div>
             </div>
             <div class="stats-grid">
@@ -1312,6 +1315,7 @@
                 <div style="font-size:12px;color:#aaa;margin:6px 0 10px;">내보내기 = 폰에 zip만 저장. 구글에는 안 올라갑니다. 구글(시트+드라이브)은 아래 <b>거점 완료</b> 때 올라갑니다.</div>
                 <button class="btn btn-primary" id="completeZoneBtn" disabled>이 거점 점검 완료</button>
                 <button class="btn btn-secondary" id="backBtn">뒤로</button>
+                <button type="button" class="btn btn-secondary btn-small" style="margin-top:8px;border-color:#b45309;color:#fdba74;" onclick="openEmergencyMode()">🆘 비상모드</button>
             </div>
 
             <div id="completedSection" class="hidden">
@@ -1455,6 +1459,7 @@
                         <div class="text">초보자용입니다. 최신 앱 기준으로 점검 → 사진 → 저장 → 엑셀 보고 순서만 적어 두었습니다.</div>
                     </div>
                     <button type="button" class="btn btn-primary" onclick="openManual()">사용설명서 보기</button>
+                    <button type="button" class="btn btn-secondary" style="margin-top:8px;border-color:#b45309;color:#fdba74;" onclick="openEmergencyMode()">🆘 비상모드 (앱 장애 시)</button>
                     <button type="button" class="btn btn-secondary" style="margin-top:8px;" onclick="forceAppReload()">🔄 강제 새로고침 (버전 안 바뀔 때)</button>
                 </div>
             </div>
@@ -1577,6 +1582,49 @@
         </div>
     </div>
 
+    <div id="emergencyOverlay" class="manual-overlay hidden">
+        <div class="manual-sheet">
+            <h2>🆘 비상모드</h2>
+            <div class="manual-ver" id="emergencyVersion">앱 장애 시 현장 진행</div>
+            <div class="manual-sec">
+                <h3>지금 장소</h3>
+                <div id="emergencyContext" style="font-size:13px;line-height:1.55;color:#ddd;"></div>
+            </div>
+            <div class="manual-sec">
+                <h3>현장 순서 (앱 대신)</h3>
+                <ol>
+                    <li>폰 <b>기본 카메라</b>로 필수 사진 촬영</li>
+                    <li>파일명/앨범 메모: <b>시군_충전소_거점_항목</b></li>
+                    <li>아래 <b>점검 메모</b> 복사 → 메모장·카톡에 붙여 넣기</li>
+                    <li>거점마다 메모 1장 + 사진 세트 완성</li>
+                    <li>저녁에 앱 살아나면 사진 넣고 거점 저장 / 안 되면 폴더로 전달</li>
+                </ol>
+                <div class="tip">필수 사진: 전압·저항·절연·충전기·배전반·MCCB·계량기·전체샷·(특이사항)</div>
+            </div>
+            <div class="manual-sec">
+                <h3>빠른 실행</h3>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <button type="button" class="btn btn-primary" onclick="copyEmergencyMemo()">📋 점검 메모 복사</button>
+                    <button type="button" class="btn btn-secondary" onclick="shareEmergencyMemo()">📤 메모 공유(카톡 등)</button>
+                    <button type="button" class="btn btn-secondary" onclick="copyEmergencyFolder()">📁 폴더명 복사</button>
+                    <button type="button" class="btn btn-secondary" onclick="copyEmergencyChecklist()">✅ 촬영 체크리스트 복사</button>
+                </div>
+                <pre id="emergencyPreview" style="margin-top:10px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px;color:#e2e8f0;max-height:180px;overflow:auto;"></pre>
+            </div>
+            <div class="manual-sec">
+                <h3>저녁 비상 보고</h3>
+                <ul>
+                    <li>앱 OK → 사진 다시 넣고 <b>거점 저장</b> → 내역에서 오늘 폴더</li>
+                    <li>앱 계속 불가 → <b>시군/충전소/거점</b> 폴더 + 메모/엑셀을 드라이브·카톡으로 전달</li>
+                </ul>
+            </div>
+            <div class="manual-actions">
+                <button type="button" class="btn btn-secondary" onclick="forceAppReload()">강제 새로고침</button>
+                <button type="button" class="btn btn-primary" onclick="closeEmergencyMode()">닫기</button>
+            </div>
+        </div>
+    </div>
+
     <div id="manualOverlay" class="manual-overlay hidden">
         <div class="manual-sheet">
             <h2>앱 사용설명서</h2>
@@ -1662,6 +1710,7 @@
                     <li>칸이 비면 → 6·7번 다시 찍거나 직접 적기</li>
                     <li>드라이브에 사진이 없으면 → 거점 저장을 했는지 확인</li>
                     <li>저녁 폴더가 비면 → 오늘 이 폰에서 거점 완료한 것이 있는지 확인</li>
+                    <li>앱이 아예 안 되면 → 홈 <b>비상모드</b> (카메라+메모로 진행)</li>
                 </ul>
             </div>
 
@@ -1690,9 +1739,9 @@
         </div>
     </div>
 
-    <script src="station_data.js?v=4.56"></script>
+    <script src="station_data.js?v=4.57"></script>
     <script>
-        const APP_VERSION = '4.56';
+        const APP_VERSION = '4.57';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
@@ -3997,6 +4046,140 @@
 
         function closeManual() {
             document.getElementById('manualOverlay').classList.add('hidden');
+        }
+
+        function emergencyPlace() {
+            const zone = state.selectedZone;
+            const zoneName = zone && (zone.name || zone.id)
+                ? String(zone.name || zone.id)
+                : (state.selectedZoneIdx != null ? ('거점' + ((state.selectedZoneIdx || 0) + 1)) : '');
+            return {
+                inspector: currentInspectorName() || '(이름)',
+                region: state.region || '(지역)',
+                city: state.city || '(시군)',
+                station: state.station || '(충전소)',
+                zone: zoneName || '(거점)',
+                zoneIdx: (state.selectedZoneIdx || 0) + 1,
+                date: new Date().toISOString().slice(0, 10),
+                time: new Date().toTimeString().slice(0, 5)
+            };
+        }
+
+        function buildEmergencyMemo() {
+            const p = emergencyPlace();
+            return [
+                '[비상점검 메모]',
+                '날짜: ' + p.date + ' ' + p.time,
+                '점검자: ' + p.inspector,
+                '지역: ' + p.region,
+                '시군: ' + p.city,
+                '충전소: ' + p.station,
+                '거점: ' + p.zone + ' (#' + p.zoneIdx + ')',
+                '충전기수: ',
+                '충전기번호: ',
+                'MCCB용량: ',
+                '접지저항: ',
+                '계량기번호: ',
+                '특이사항: 없음',
+                '사진: 전압/저항/절연/충전기/배전반/MCCB/계량기/전체샷',
+                '비고: 앱 장애로 카메라·메모 대체'
+            ].join('\n');
+        }
+
+        function buildEmergencyFolder() {
+            const p = emergencyPlace();
+            const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '_').trim();
+            return safe(p.date) + '/' + safe(p.city) + '/' + safe(p.station) + '/' + safe('거점' + p.zoneIdx + '_' + p.zone);
+        }
+
+        function buildEmergencyChecklist() {
+            const p = emergencyPlace();
+            return [
+                '[촬영 체크리스트] ' + p.city + ' / ' + p.station + ' / ' + p.zone,
+                '□ 1 전압',
+                '□ 2 저항',
+                '□ 3 절연',
+                '□ 4 충전기',
+                '□ 5 배전반',
+                '□ 6 MCCB용량(숫자 크게)',
+                '□ 7 계량기 제조번호(숫자 크게)',
+                '□ 8 충전소 전체샷',
+                '□ 9 특이사항(있을 때만)',
+                '파일명 예: ' + p.city + '_' + p.station + '_거점' + p.zoneIdx + '_전압'
+            ].join('\n');
+        }
+
+        function refreshEmergencyPanel() {
+            const p = emergencyPlace();
+            const ctx = document.getElementById('emergencyContext');
+            const prev = document.getElementById('emergencyPreview');
+            const ver = document.getElementById('emergencyVersion');
+            if (ver) ver.textContent = '비상 진행 · v' + APP_VERSION;
+            if (ctx) {
+                ctx.innerHTML = '<b>' + p.inspector + '</b><br>'
+                    + p.region + ' · ' + p.city + '<br>'
+                    + p.station + ' · ' + p.zone
+                    + '<div class="tip" style="margin-top:6px;">장소가 비면 홈에서 충전소·거점을 고른 뒤 다시 여세요.</div>';
+            }
+            if (prev) prev.textContent = buildEmergencyMemo();
+        }
+
+        async function copyEmergencyRaw(text, okMsg) {
+            const v = String(text || '').trim();
+            if (!v) return;
+            try {
+                await navigator.clipboard.writeText(v);
+                alert(okMsg || '복사했습니다.');
+            } catch (err) {
+                prompt('아래 내용을 복사하세요', v);
+            }
+        }
+
+        function copyEmergencyMemo() {
+            const memo = buildEmergencyMemo();
+            const prev = document.getElementById('emergencyPreview');
+            if (prev) prev.textContent = memo;
+            return copyEmergencyRaw(memo, '점검 메모를 복사했습니다. 메모장·카톡에 붙여넣으세요.');
+        }
+
+        function copyEmergencyFolder() {
+            const folder = buildEmergencyFolder();
+            const prev = document.getElementById('emergencyPreview');
+            if (prev) prev.textContent = folder;
+            return copyEmergencyRaw(folder, '폴더명 경로를 복사했습니다.\n예: 시군/충전소/거점');
+        }
+
+        function copyEmergencyChecklist() {
+            const list = buildEmergencyChecklist();
+            const prev = document.getElementById('emergencyPreview');
+            if (prev) prev.textContent = list;
+            return copyEmergencyRaw(list, '촬영 체크리스트를 복사했습니다.');
+        }
+
+        async function shareEmergencyMemo() {
+            const memo = buildEmergencyMemo();
+            const prev = document.getElementById('emergencyPreview');
+            if (prev) prev.textContent = memo;
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title: '비상점검 메모', text: memo });
+                    return;
+                } catch (err) {
+                    if (err && err.name === 'AbortError') return;
+                }
+            }
+            return copyEmergencyRaw(memo, '공유가 안 되어 메모를 복사했습니다.');
+        }
+
+        function openEmergencyMode() {
+            refreshEmergencyPanel();
+            const el = document.getElementById('emergencyOverlay');
+            if (el) el.classList.remove('hidden');
+        }
+
+        function closeEmergencyMode() {
+            const el = document.getElementById('emergencyOverlay');
+            if (el) el.classList.add('hidden');
         }
 
         let ocrWorkerPromise = null;
