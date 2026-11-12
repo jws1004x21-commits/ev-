@@ -1198,7 +1198,7 @@
                         <input type="date" class="form-input" id="logDate">
                     </div>
                     <div id="dailyLog" class="daily-log"></div>
-                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">동기화는 대표 구글 시트를 다시 받아 최신으로 바꿉니다. 폰마다 구글 로그인은 필요 없습니다. 거점마다 사진을 확인한 뒤 적은 전압·MCCB·접지·계량기번호가 글자로 시트에 들어가고, 카톡에도 그 글자가 나갑니다. 같은 거점은 한 줄입니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">보고는 두 가지입니다. 일지 글자는 위 표이고, 사진은 거점 폴더로 정리됩니다. 같은 거점은 한 줄입니다.</div>
                     <button class="btn btn-secondary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📁 오늘 폴더로 저장</button>
                     <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📋 전체 기록만 엑셀</button>
                     <div style="font-size:12px;color:#aaa;margin-bottom:12px;">카톡에는 그날 zip 하나를 보냅니다. 받는 사람이 압축을 풀면 시/군 · 충전소 · 거점 폴더로 사진이 정리되고, 점검목록.html 에서 사진이 보입니다. 컴퓨터는 아래 폴더 저장을 누르면 압축 없이 폴더가 만들어집니다.</div>
@@ -1344,7 +1344,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.27';
+        const APP_VERSION = '4.28';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -3028,7 +3028,7 @@
                 if (chargerEl && !chargerEl.value) chargerEl.value = numbers;
                 const blocks = [
                     { id: 'panel', guide: '거점 ' + (state.selectedZoneIdx + 1) + ' · 충전기 ' + count + '대 (' + numbers + ') 배전반 사진에 있는 MCCB만 적으세요.', fields: [['logMccb', '이 거점 MCCB용량', '예: 75A']] },
-                    { id: 'charger', guide: '이 거점 계량기 사진의 번호만 적으세요. 다른 거점 번호를 넣지 마세요.', fields: [['logMeterNo', '이 거점 계량기번호', '사진에 보이는 번호']] }
+                    { id: 'charger', guide: '이 거점 계량기 사진의 번호만 적으세요. 다른 거점 번호를 넣지 마세요.', fields: [['logMeterNo', '이 거점 계량기번호', '사진에 보이는 번호'], ['meterGround', '접지저항', '없으면 비워 두세요']] }
                 ];
                 title.textContent = '이 거점 MCCB · 계량기';
                 sub.textContent = '국소명·거점·충전기 수·번호·장소는 자동입니다. 전압·저항·절연 숫자는 일지에 넣지 않습니다.';
@@ -4424,8 +4424,9 @@
                 { key: 'zoneIndex', title: '거점', w: 72 },
                 { key: 'chargers', title: '충전기수', w: 96 },
                 { key: 'chargerNo', title: '충전기번호', w: 130 },
-                { key: 'mccb', title: 'MCCB용량', w: 140 },
-                { key: 'meterNo', title: '계량기번호', w: 200 },
+                { key: 'mccb', title: 'MCCB용량', w: 120 },
+                { key: 'ground', title: '접지저항', w: 110 },
+                { key: 'meterNo', title: '계량기번호', w: 180 },
                 { key: 'place', title: '비고', w: 320 }
             ];
             const rowH = 58;
@@ -4491,18 +4492,18 @@
             box.dataset.open = '1';
             const date = logDateValue();
             const rows = rowsForDailyLog(date);
-            const cols = ['station', 'zoneIndex', 'chargers', 'chargerNo', 'mccb', 'meterNo', 'place'];
-            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>계량기번호</th><th>비고</th></tr>';
+            const cols = ['station', 'zoneIndex', 'chargers', 'chargerNo', 'mccb', 'ground', 'meterNo', 'place'];
+            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>접지저항</th><th>계량기번호</th><th>비고</th></tr>';
             const body = rows.map((r) => '<tr>' + cols.map((key) => '<td>' + String(r[key] || '').replace(/</g, '&lt;') + '</td>').join('') + '</tr>').join('');
             box.innerHTML = '<div style="font-size:13px;margin-bottom:6px;">점검일 ' + formDateLabel(date) + ' · ' + rows.length + '거점 · 글자로 시트와 카톡에 들어갑니다.</div>'
-                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="7">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
+                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="8">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
         }
 
         function dailyLogText(date, rows) {
             const lines = ['전기차 충전소 점검일지', '점검일: ' + formDateLabel(date), ''];
-            lines.push(['국소명', '거점', '충전기수', '충전기번호', 'MCCB용량', '계량기번호', '비고'].join('\t'));
+            lines.push(['국소명', '거점', '충전기수', '충전기번호', 'MCCB용량', '접지저항', '계량기번호', '비고'].join('\t'));
             rows.forEach((r) => {
-                lines.push([r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.meterNo, r.place].join('\t'));
+                lines.push([r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.place].join('\t'));
             });
             if (!rows.length) lines.push('이 날짜에 기록이 없습니다.');
             return lines.join('\n');

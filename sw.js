@@ -1,4 +1,4 @@
-// v4.27: log keeps MCCB and meter number for each zone only
+// v4.28: report is the paper log plus photos in each zone folder
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
