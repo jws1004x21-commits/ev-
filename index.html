@@ -11,7 +11,7 @@
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -39,13 +39,20 @@
         #routeMap {
             width: 100%;
             height: 420px;
+            min-height: 420px;
             border-radius: 14px;
             margin-bottom: 12px;
             border: 1px solid #333;
             z-index: 1;
             background: #1a1a2e;
+            position: relative;
         }
-        #routeMap.hidden { display: none; }
+        #routeMap.hidden { display: none !important; }
+        #routeMap .map-loading {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            color: #ccc; font-size: 14px; padding: 16px; text-align: center; z-index: 2;
+            background: #1a1a2e;
+        }
         .leaflet-container { font: inherit; }
         .leaflet-popup-content { margin: 10px 12px; color: #111; font-size: 13px; line-height: 1.45; }
         .leaflet-popup-content .map-pop-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -1076,7 +1083,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.46</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.47</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
@@ -1578,7 +1585,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.46';
+        const APP_VERSION = '4.47';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -2562,7 +2569,7 @@
 
         async function ensureStationGeo(items, opts) {
             const cache = geoCacheGet();
-            const maxRounds = (opts && opts.maxRounds) || 5;
+            const maxRounds = (opts && opts.maxRounds != null) ? opts.maxRounds : 5;
             const onProgress = opts && opts.onProgress;
             const applyCache = () => {
                 items.forEach((it) => {
@@ -2621,14 +2628,23 @@
         function loadLeaflet() {
             if (window.L) return Promise.resolve(window.L);
             if (leafletLoadPromise) return leafletLoadPromise;
+            const urls = [
+                'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
+                'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+            ];
             leafletLoadPromise = new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-                s.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
-                s.crossOrigin = '';
-                s.onload = () => resolve(window.L);
-                s.onerror = () => reject(new Error('지도 라이브러리 로드 실패'));
-                document.head.appendChild(s);
+                let i = 0;
+                const tryNext = () => {
+                    if (window.L) return resolve(window.L);
+                    if (i >= urls.length) return reject(new Error('지도 라이브러리 로드 실패'));
+                    const s = document.createElement('script');
+                    s.src = urls[i++];
+                    s.crossOrigin = '';
+                    s.onload = () => (window.L ? resolve(window.L) : tryNext());
+                    s.onerror = () => tryNext();
+                    document.head.appendChild(s);
+                };
+                tryNext();
             });
             return leafletLoadPromise;
         }
@@ -2695,29 +2711,47 @@
             }
             const token = ++routeMapToken;
             mapEl.classList.remove('hidden');
-            mapEl.innerHTML = '';
-            try {
-                await loadLeaflet();
-            } catch (err) {
-                mapEl.innerHTML = '<div class="info-box"><div class="text">지도를 불러오지 못했습니다. 인터넷을 확인한 뒤 다시 열어 주세요.</div></div>';
-                return;
-            }
-            if (token !== routeMapToken) return;
             if (routeLeafletMap) {
                 try { routeLeafletMap.remove(); } catch (err) {}
                 routeLeafletMap = null;
             }
+            mapEl.innerHTML = '<div class="map-loading">지도 불러오는 중…</div>';
+            try {
+                await loadLeaflet();
+            } catch (err) {
+                mapEl.innerHTML = '<div class="map-loading">지도를 불러오지 못했습니다.<br>인터넷 확인 후 지역을 다시 선택해 주세요.</div>';
+                return;
+            }
+            if (token !== routeMapToken) return;
+            mapEl.innerHTML = '';
             routeLeafletMap = L.map(mapEl, { zoomControl: true }).setView([36.35, 127.7], 7);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            // Carto 타일(국내 모바일에서 OSM 타일이 안 뜨는 경우 대비)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
                 maxZoom: 18,
-                attribution: '&copy; OpenStreetMap'
+                subdomains: 'abcd',
+                attribution: '&copy; OpenStreetMap &copy; CARTO'
             }).addTo(routeLeafletMap);
+            setTimeout(() => { if (routeLeafletMap && token === routeMapToken) routeLeafletMap.invalidateSize(); }, 100);
+            setTimeout(() => { if (routeLeafletMap && token === routeMapToken) routeLeafletMap.invalidateSize(); }, 500);
             const hint = document.getElementById('routeGpsHint');
             const setHint = (have, total, missing) => {
                 if (!hint) return;
                 if (missing > 0) hint.textContent = `지도 좌표 맞추는 중… ${have}/${total}곳 (남은 ${missing})`;
+                else if (!have) hint.textContent = '지도는 떴습니다. 좌표를 못 받아 점은 아직 없습니다. 인터넷·스크립트 배포를 확인하세요.';
                 else hint.textContent = `지도에 ${have}곳 표시 · 🟠남음 🟢완료 🔵현재위치 · 손가락으로 확대/축소`;
             };
+            const repaint = () => {
+                if (token !== routeMapToken || !routeLeafletMap) return;
+                routeLeafletMap.eachLayer((layer) => {
+                    if (layer instanceof L.CircleMarker) routeLeafletMap.removeLayer(layer);
+                });
+                const bounds = paintRouteMarkers(routeLeafletMap, items);
+                if (bounds.length) routeLeafletMap.fitBounds(bounds, { padding: [28, 28], maxZoom: items.length > 80 ? 9 : 12 });
+            };
+            // 캐시된 좌표로 바로 표시
+            await ensureStationGeo(items, { maxRounds: 0 });
+            setHint(items.filter((it) => Number.isFinite(it.lat)).length, items.length, items.filter((it) => !Number.isFinite(it.lat)).length);
+            repaint();
             let lastPaintAt = 0;
             await ensureStationGeo(items, {
                 maxRounds: 40,
@@ -2727,22 +2761,13 @@
                     const now = Date.now();
                     if (missing > 0 && now - lastPaintAt < 900) return;
                     lastPaintAt = now;
-                    routeLeafletMap.eachLayer((layer) => {
-                        if (layer instanceof L.CircleMarker) routeLeafletMap.removeLayer(layer);
-                    });
-                    const bounds = paintRouteMarkers(routeLeafletMap, items);
-                    if (bounds.length) routeLeafletMap.fitBounds(bounds, { padding: [28, 28], maxZoom: 12 });
+                    repaint();
                 }
             });
             if (token !== routeMapToken || !routeLeafletMap) return;
             const have = items.filter((it) => Number.isFinite(it.lat)).length;
             setHint(have, items.length, items.length - have);
-            routeLeafletMap.eachLayer((layer) => {
-                if (layer instanceof L.CircleMarker) routeLeafletMap.removeLayer(layer);
-            });
-            const bounds = paintRouteMarkers(routeLeafletMap, items);
-            if (bounds.length) routeLeafletMap.fitBounds(bounds, { padding: [28, 28], maxZoom: items.length > 80 ? 9 : 12 });
-            else routeLeafletMap.setView([36.35, 127.7], 7);
+            repaint();
             setTimeout(() => { if (routeLeafletMap) routeLeafletMap.invalidateSize(); }, 250);
         }
 
@@ -3403,7 +3428,15 @@
 
         function fillMeterFields(m) {
             m = m || {};
-            const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+            const set = (id, v) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.value = v || '';
+                if (!v) {
+                    delete el.dataset.fromPhoto;
+                    delete el.dataset.auto;
+                }
+            };
             set('meterV220', m.v220);
             set('meterV380', m.v380);
             set('meterGround', m.ground);
@@ -3922,6 +3955,15 @@
                 delete input.dataset.fromPhoto;
                 delete input.dataset.auto;
             });
+            // 확인 화면이 열려 있으면 표시 값도 즉시 맞춤
+            const overlay = document.getElementById('reviewOverlay');
+            if (overlay && !overlay.classList.contains('hidden')) {
+                document.querySelectorAll('#reviewBody [data-meter="' + id + '"]').forEach((input) => {
+                    input.value = '';
+                    delete input.dataset.fromPhoto;
+                    delete input.dataset.auto;
+                });
+            }
         }
 
         function clearPhotoFilledMeter() {
@@ -3954,13 +3996,13 @@
             if (photoId === 'mccbClose') {
                 const shots = photosOf('mccbClose').filter((item) => item.data);
                 clearPhotoFilledMccb();
-                if (!shots.length) {
-                    updateMeterHint();
-                    persistWorking();
-                    return;
-                }
+                updateMeterHint();
+                persistWorking();
+                if (!shots.length) return;
                 const mccb = await ocrCloseValue(shots[shots.length - 1].data, 'mccb');
+                if (!photosOf('mccbClose').some((item) => item.data)) return;
                 if (mccb) setReadValue('logMccb', mccb, true);
+                else clearPhotoFilledMccb();
                 updateMeterHint();
                 persistWorking();
                 return;
@@ -3968,13 +4010,13 @@
             if (photoId === 'meterClose') {
                 const shots = photosOf('meterClose').filter((item) => item.data);
                 clearPhotoFilledMeter();
-                if (!shots.length) {
-                    updateMeterHint();
-                    persistWorking();
-                    return;
-                }
+                updateMeterHint();
+                persistWorking();
+                if (!shots.length) return;
                 const meter = await ocrCloseValue(shots[shots.length - 1].data, 'meter');
+                if (!photosOf('meterClose').some((item) => item.data)) return;
                 if (meter) setReadValue('logMeterNo', meter, true);
+                else clearPhotoFilledMeter();
                 updateMeterHint();
                 persistWorking();
             }
@@ -4775,8 +4817,12 @@
             if (!item) return;
             item.cancelled = true;
             photosOf(photoId).splice(index, 1);
+            // 사진부터 지운 뒤, 6·7번이면 칸 값을 즉시 비움 (저장보다 먼저).
+            if (photoId === 'mccbClose') clearPhotoFilledMccb();
+            if (photoId === 'meterClose') clearPhotoFilledMeter();
             closeLightbox();
             renderChecklist();
+            updateMeterHint();
             persistWorking();
             if (cameraStream && !document.getElementById('liveCamera').classList.contains('hidden')) {
                 updateLiveCameraHud();
@@ -4789,7 +4835,7 @@
                     filename: item.filename
                 }).catch(() => {});
             }
-            // 6·7번 확대 사진을 지우면 용량·제조번호 칸도 같이 비우거나 남은 사진으로 다시 읽음.
+            // 남은 6·7번 사진이 있으면 그걸로만 다시 읽고, 없으면 빈칸 유지.
             if (photoId === 'mccbClose' || photoId === 'meterClose') {
                 refreshClosePhotoFields(photoId);
             }
@@ -5929,16 +5975,11 @@
                 const targetCity = c.rawCity || c.city;
                 return `<button type="button" class="btn btn-secondary btn-small" style="margin:0 6px 6px 0;" onclick='openRouteCity(${JSON.stringify(targetRegion)}, ${JSON.stringify(targetCity)})'>${c.city} · 남음 ${c.leftZ}</button>`;
             }).join('');
-            const mode = (document.getElementById('routeViewMode') || {}).value || 'map';
-            const listEl = document.getElementById('routeList');
-            listEl.style.display = mode === 'map' ? 'none' : '';
-            listEl.innerHTML =
+            const loadingHtml =
                 `<div class="card"><div class="card-header">시/군만 좁혀 보기</div><div class="card-body">${cityChips || '없음'}</div></div>`
-                + '<div class="info-box" style="margin-bottom:10px;"><div class="text">지도 좌표·가까운 순 맞추는 중이면 잠시만 기다리세요. GPS·인터넷이 필요합니다.</div></div>';
-            if (mode !== 'list') {
-                document.getElementById('routeMap').classList.remove('hidden');
-                document.getElementById('routeGpsHint').textContent = '지도 좌표 맞추는 중…';
-            }
+                + '<div class="info-box" style="margin-bottom:10px;"><div class="text">지도는 바로 띄우고, 좌표·가까운 순은 이어서 맞춥니다.</div></div>';
+            // 정렬 기다리지 말고 지도부터 표시
+            await applyRouteView(filtered, loadingHtml);
             const items = await sortRouteItems(filtered);
             routePlan = { region, city: '', teams: [items], allItems };
             const listHtml =

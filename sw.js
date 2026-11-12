@@ -1,4 +1,4 @@
-// v4.46: meter MFG OCR accepts any digits; no leading-zero preference
+// v4.47: clear fields immediately on photo delete; fix map load/tiles
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
