@@ -1080,7 +1080,7 @@
                         <div id="zonePhotoTotal" class="drive-count">이 거점 사진 0장 · 드라이브 전송 0장</div>
                         <div id="checklist"></div>
                         <div class="form-group" style="margin-top:16px;">
-                            <label class="form-label">측정값 (선택 · 사진 숫자 확인용)</label>
+                            <label class="form-label">이 거점 일지 글자 · 사진 보고 입력하면 시트에 저장</label>
                             <div class="meter-grid">
                                 <div class="form-group">
                                     <label class="form-label">전압 220 (V)</label>
@@ -1201,13 +1201,13 @@
                 <div class="card-header">📋 점검 내역</div>
                 <div class="card-body">
                     <button class="btn btn-primary btn-small" onclick="syncAndShowDailyLog()" style="margin-bottom:8px;">🔄 동기화 후 오늘 점검일지</button>
-                    <button class="btn btn-secondary btn-small" onclick="shareDailyLog()" style="margin-bottom:8px;">📤 일지 양식 사진으로 첨부</button>
+                    <button class="btn btn-secondary btn-small" onclick="shareDailyLog()" style="margin-bottom:8px;">📤 일지 글자로 보내기</button>
                     <div class="form-group" style="margin-bottom:8px;">
                         <label class="form-label">점검일</label>
                         <input type="date" class="form-input" id="logDate">
                     </div>
                     <div id="dailyLog" class="daily-log"></div>
-                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">동기화는 대표 구글 시트를 다시 받아 최신으로 바꿉니다. 폰마다 구글 로그인은 필요 없습니다. 일지 첨부는 손으로 쓰던 표와 같은 칸의 사진입니다. 카톡에서 그 사진을 같이 보내면 됩니다. 같은 거점은 한 줄입니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">동기화는 대표 구글 시트를 다시 받아 최신으로 바꿉니다. 폰마다 구글 로그인은 필요 없습니다. 거점마다 사진을 확인한 뒤 적은 전압·MCCB·접지·계량기번호가 글자로 시트에 들어가고, 카톡에도 그 글자가 나갑니다. 같은 거점은 한 줄입니다.</div>
                     <button class="btn btn-secondary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📁 오늘 폴더로 저장</button>
                     <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📋 전체 기록만 엑셀</button>
                     <div style="font-size:12px;color:#aaa;margin-bottom:12px;">카톡에는 그날 zip 하나를 보냅니다. 받는 사람이 압축을 풀면 시/군 · 충전소 · 거점 폴더로 사진이 정리되고, 점검목록.html 에서 사진이 보입니다. 컴퓨터는 아래 폴더 저장을 누르면 압축 없이 폴더가 만들어집니다.</div>
@@ -1304,7 +1304,6 @@
         <button type="button" class="cam-edge prev" id="liveCameraPrev" aria-label="이전 항목">‹</button>
         <button type="button" class="cam-edge next" id="liveCameraNext" aria-label="다음 항목">›</button>
         <div class="live-camera-tools">
-            <button type="button" id="liveCameraRatio">1:1</button>
             <button type="button" id="liveCameraZoomOut">줌-</button>
             <button type="button" id="liveCameraZoomIn">줌+</button>
             <button type="button" id="liveCameraTorch">라이트</button>
@@ -1354,7 +1353,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.19';
+        const APP_VERSION = '4.20';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -1955,6 +1954,9 @@
                     v380: h.v380,
                     ground: h.ground,
                     insul: h.insul,
+                    mccb: h.mccb,
+                    meterNo: h.meterNo,
+                    chargerNo: h.chargerNo,
                     upload: h.upload
                 })),
                 todayInspected: state.todayInspected,
@@ -2580,12 +2582,11 @@
         }
 
         function cameraHintFor(photoId) {
-            const crop = cameraSquare ? '네모 안만 저장' : '화면 전체 저장';
-            if (photoId === 'voltage') return '380V·220V · ' + crop;
-            if (photoId === 'resistance') return '접지저항 · ' + crop;
-            if (photoId === 'insulation') return '절연저항 · ' + crop;
-            if (photoId === 'overview') return '충전소 전체 · ' + crop;
-            return crop + ' · 좌우로 넘기면 항목';
+            if (photoId === 'voltage') return '가까이 대고 전압 숫자가 크게 보이게. 보이는 그대로 저장';
+            if (photoId === 'resistance') return '가까이 대고 저항 숫자가 크게 보이게';
+            if (photoId === 'insulation') return '가까이 대고 절연 숫자가 크게 보이게';
+            if (photoId === 'overview') return '충전소 전체가 나오게';
+            return '보이는 화면 전체가 저장됩니다';
         }
 
         function showCameraWarn(msg) {
@@ -2721,9 +2722,20 @@
                     resistance: '접지저항 숫자가 읽히나요? 값이 너무 높으면 다시 측정·촬영하세요.',
                     insulation: '절연저항 숫자가 읽히나요? 값이 너무 낮으면 다시 확인하세요.'
                 };
-                title.textContent = '전압·저항·절연 사진 확인';
-                sub.textContent = '사진을 눌러 확대하세요. 숫자가 흐리거나 이상하면 다시 찍기.';
+                title.textContent = '이 거점 사진 확인';
+                sub.textContent = '숫자를 보고 아래 칸에 적으면 이 거점 시트에 글자로 들어갑니다.';
                 const hints = updateMeterHint && (document.getElementById('meterHint') || {}).textContent;
+                const meterFields = [
+                    ['meterV220', '전압 220', '221'],
+                    ['meterV380', '전압 380', '380'],
+                    ['meterGround', '접지저항', '2'],
+                    ['logMccb', 'MCCB용량', '75A'],
+                    ['logMeterNo', '계량기번호', '계량기 번호'],
+                    ['logChargerNo', '충전기번호', '1~4']
+                ].map(([id, label, ph]) => {
+                    const val = String((document.getElementById(id) || {}).value || '').replace(/"/g, '&quot;');
+                    return `<label class="form-label">${label}</label><input class="form-input" data-meter="${id}" value="${val}" placeholder="${ph}">`;
+                }).join('');
                 body.innerHTML = ['voltage', 'resistance', 'insulation'].map((id) => {
                     const type = photoTypes.find((p) => p.id === id);
                     const shots = photosOf(id);
@@ -2740,7 +2752,8 @@
                         <div class="review-thumbs">${thumbs}</div>
                         <button type="button" class="btn btn-secondary btn-small" data-shot="${id}" style="margin-top:8px;">다시 찍기</button>
                     </div>`;
-                }).join('') + (hints ? `<div class="review-guide">${hints}</div>` : '');
+                }).join('') + `<div class="review-block"><h4>이 거점 일지 글자</h4><div class="meter-grid">${meterFields}</div></div>`
+                    + (hints ? `<div class="review-guide">${hints}</div>` : '');
                 go.classList.remove('hidden');
                 go.textContent = '이상 없음 · 완료';
             }
@@ -2749,18 +2762,7 @@
 
         function layoutSquareGuide() {
             const cam = document.getElementById('liveCamera');
-            const sq = document.getElementById('liveCameraSquare');
-            const video = document.getElementById('liveCameraVideo');
-            if (!cam || !sq || !video) return;
-            cam.classList.toggle('show-square', cameraSquare);
-            if (!cameraSquare) return;
-            const box = video.getBoundingClientRect();
-            const vw = video.videoWidth || 4;
-            const vh = video.videoHeight || 3;
-            const fit = Math.min(box.width / vw, box.height / vh);
-            const side = Math.max(80, Math.min(vw * fit, vh * fit, box.width, box.height));
-            sq.style.width = side + 'px';
-            sq.style.height = side + 'px';
+            if (cam) cam.classList.remove('show-square');
         }
 
         function updateLiveCameraHud() {
@@ -2771,11 +2773,6 @@
             document.getElementById('liveCameraCount').textContent =
                 (type ? photosOf(type.id).length : 0) + '장 · ' + (idx + 1) + '/' + photoTypes.length + ' 눌러서 항목';
             document.getElementById('liveCameraHint').textContent = cameraHintFor(currentPhotoId);
-            const ratio = document.getElementById('liveCameraRatio');
-            if (ratio) {
-                ratio.textContent = cameraSquare ? '1:1' : '전체';
-                ratio.classList.toggle('on', cameraSquare);
-            }
             const box = document.getElementById('liveCameraTypes');
             box.innerHTML = photoTypes.map((p) => {
                 const n = photosOf(p.id).length;
@@ -2794,7 +2791,7 @@
             const next = photoTypes[i + dir];
             if (!next) return;
             currentPhotoId = next.id;
-            cameraSquare = !isFullShot(next.id);
+            cameraSquare = false;
             const sheet = document.getElementById('liveCameraSheet');
             if (sheet) sheet.classList.add('hidden');
             updateLiveCameraHud();
@@ -2938,17 +2935,10 @@
             const ctx = canvas.getContext('2d');
             const range = cameraZoomRange();
             const scale = range.hardware ? 1 : Math.max(1, cameraZoom);
-            let sw = video.videoWidth / scale;
-            let sh = video.videoHeight / scale;
-            let sx = (video.videoWidth - sw) / 2;
-            let sy = (video.videoHeight - sh) / 2;
-            if (cameraSquare) {
-                const side = Math.min(sw, sh);
-                sx += (sw - side) / 2;
-                sy += (sh - side) / 2;
-                sw = side;
-                sh = side;
-            }
+            const sw = video.videoWidth / scale;
+            const sh = video.videoHeight / scale;
+            const sx = (video.videoWidth - sw) / 2;
+            const sy = (video.videoHeight - sh) / 2;
             canvas.width = Math.max(1, Math.round(sw));
             canvas.height = Math.max(1, Math.round(sh));
             ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
@@ -2987,7 +2977,7 @@
 
         async function startLiveCamera(photoId) {
             currentPhotoId = photoId;
-            cameraSquare = !isFullShot(photoId);
+            cameraSquare = false;
             if (cameraStream && !document.getElementById('liveCamera').classList.contains('hidden')) {
                 updateLiveCameraHud();
                 return;
@@ -3189,7 +3179,6 @@
         document.getElementById('liveCameraZoomIn').addEventListener('click', () => bumpCameraZoom(1));
         document.getElementById('liveCameraZoomOut').addEventListener('click', () => bumpCameraZoom(-1));
         document.getElementById('liveCameraNative').addEventListener('click', openNativeCamera);
-        document.getElementById('liveCameraRatio').addEventListener('click', toggleCameraSquare);
         document.getElementById('liveCameraPrev').addEventListener('click', () => stepCameraType(-1));
         document.getElementById('liveCameraNext').addEventListener('click', () => stepCameraType(1));
         document.getElementById('liveCameraTitleBtn').addEventListener('click', () => {
@@ -3287,7 +3276,7 @@
             const btn = e.target.closest('button[data-id]');
             if (!btn) return;
             currentPhotoId = btn.getAttribute('data-id');
-            cameraSquare = !isFullShot(currentPhotoId);
+            cameraSquare = false;
             document.getElementById('liveCameraSheet').classList.add('hidden');
             updateLiveCameraHud();
         });
@@ -3512,10 +3501,26 @@
             closeReview();
             takePhoto(btn.getAttribute('data-shot'), 'camera');
         });
+        document.getElementById('reviewBody').addEventListener('input', (e) => {
+            const id = e.target.getAttribute('data-meter');
+            if (!id) return;
+            const dest = document.getElementById(id);
+            if (dest) dest.value = e.target.value;
+            updateMeterHint();
+            persistWorking();
+        });
+
+        function copyReviewMeters() {
+            document.querySelectorAll('#reviewBody [data-meter]').forEach((el) => {
+                const dest = document.getElementById(el.getAttribute('data-meter'));
+                if (dest) dest.value = el.value;
+            });
+        }
 
         async function finishComplete() {
             if (completingLock || photosStillUploading()) return;
             if (!requireInspectorName()) return;
+            copyReviewMeters();
             const zone = state.selectedZone;
             const meters = readMeterFields();
             const measured = meterLineForMemo();
@@ -3965,12 +3970,18 @@
 
         function rowsForDailyLog(date) {
             const rows = [];
-            const seen = new Set();
+            const byKey = new Map();
             const add = (row) => {
                 const key = (row.station || '') + '|' + String(row.zoneIndex || row.zone || '');
-                if (seen.has(key)) return;
-                seen.add(key);
-                rows.push(row);
+                const prev = byKey.get(key);
+                if (!prev) {
+                    byKey.set(key, row);
+                    rows.push(row);
+                    return;
+                }
+                ['chargers', 'chargerNo', 'mccb', 'ground', 'meterNo', 'v220', 'v380', 'place', 'note', 'inspector', 'city'].forEach((k) => {
+                    if (!prev[k] && row[k]) prev[k] = row[k];
+                });
             };
             (state.teamProgress || []).forEach((row) => {
                 if (String(row.date || '').substring(0, 10) !== date) return;
@@ -3983,6 +3994,8 @@
                     mccb: row.mccb || '',
                     ground: row.ground || '',
                     meterNo: row.meterNo || '',
+                    v220: row.v220 || '',
+                    v380: row.v380 || '',
                     place: parsed.zoneName || '',
                     note: [parsed.zoneName, row.memo].filter(Boolean).join(' · '),
                     inspector: row.inspector || '',
@@ -3999,6 +4012,8 @@
                     mccb: h.mccb || '',
                     ground: h.ground || '',
                     meterNo: h.meterNo || '',
+                    v220: h.v220 || '',
+                    v380: h.v380 || '',
                     place: h.zoneName || '',
                     note: [h.zoneName, h.memo].filter(Boolean).join(' · '),
                     inspector: h.inspector || '',
@@ -4133,23 +4148,21 @@
             box.dataset.open = '1';
             const date = logDateValue();
             const rows = rowsForDailyLog(date);
-            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>접지저항</th><th>계량기번호</th><th>비고</th></tr>';
-            const body = rows.map((r) => '<tr>' + [r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.place]
-                .map((cell) => '<td>' + String(cell || '').replace(/</g, '&lt;') + '</td>').join('') + '</tr>').join('');
-            box.innerHTML = '<div style="font-size:13px;margin-bottom:6px;">점검일 ' + formDateLabel(date) + ' · ' + rows.length + '거점 · 아래 사진을 카톡에 첨부합니다.</div>'
-                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="8">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
-            const token = String(Date.now());
-            box.dataset.formToken = token;
-            dailyLogFormBlob(date, rows).then((blob) => {
-                if (!blob || box.dataset.formToken !== token) return;
-                if (box._formUrl) URL.revokeObjectURL(box._formUrl);
-                box._formUrl = URL.createObjectURL(blob);
-                const img = document.createElement('img');
-                img.src = box._formUrl;
-                img.alt = '점검일지 양식';
-                img.style.cssText = 'width:100%;margin-top:10px;background:#fff;border-radius:8px;';
-                box.appendChild(img);
+            const cols = ['station', 'zoneIndex', 'chargers', 'chargerNo', 'mccb', 'ground', 'meterNo', 'v220', 'v380', 'place'];
+            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>접지저항</th><th>계량기번호</th><th>전압220</th><th>전압380</th><th>비고</th></tr>';
+            const body = rows.map((r) => '<tr>' + cols.map((key) => '<td>' + String(r[key] || '').replace(/</g, '&lt;') + '</td>').join('') + '</tr>').join('');
+            box.innerHTML = '<div style="font-size:13px;margin-bottom:6px;">점검일 ' + formDateLabel(date) + ' · ' + rows.length + '거점 · 글자로 시트와 카톡에 들어갑니다.</div>'
+                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="10">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
+        }
+
+        function dailyLogText(date, rows) {
+            const lines = ['전기차 충전소 점검일지', '점검일: ' + formDateLabel(date), ''];
+            lines.push(['국소명', '거점', '충전기수', '충전기번호', 'MCCB용량', '접지저항', '계량기번호', '전압220', '전압380', '비고'].join('\t'));
+            rows.forEach((r) => {
+                lines.push([r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.v220, r.v380, r.place].join('\t'));
             });
+            if (!rows.length) lines.push('이 날짜에 기록이 없습니다.');
+            return lines.join('\n');
         }
 
         async function syncAndShowDailyLog() {
@@ -4162,18 +4175,17 @@
         async function shareDailyLog() {
             const date = logDateValue();
             const rows = rowsForDailyLog(date);
-            if (!rows.length) {
-                alert('이 날짜에 첨부할 거점이 없습니다. 동기화 후 다시 눌러 주세요.');
-                return;
+            const text = dailyLogText(date, rows);
+            try {
+                if (navigator.share) {
+                    await navigator.share({ title: '점검일지 ' + date, text });
+                    return;
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') return;
             }
-            const blob = await dailyLogFormBlob(date, rows);
-            if (!blob) {
-                alert('일지 사진을 만들지 못했습니다.');
-                return;
-            }
-            const file = new File([blob], '점검일지_' + date + '.jpg', { type: 'image/jpeg' });
-            const shared = await shareOrSaveFile(file, '전기차 충전소 점검일지 ' + formDateLabel(date));
-            if (!shared) alert('점검일지 사진을 저장했습니다. 카톡 대화에서 그 사진을 첨부하세요.');
+            const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
+            downloadFileToPhone(new File([blob], '점검일지_' + date + '.txt', { type: 'text/plain' }));
         }
 
         function suggestedTeamCount(n) {

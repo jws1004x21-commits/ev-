@@ -1,4 +1,4 @@
-// v4.19: daily log is attached as the paper form photo
+// v4.20: full-frame close-up photos, daily log shared as text
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
