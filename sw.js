@@ -1,5 +1,5 @@
-// v4.57: emergency mode panel + hard cache bust
-const SW_VER = '4.57';
+// v4.58: team report steps in manual (leader excel + member kakao zips)
+const SW_VER = '4.58';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

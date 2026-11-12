@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.57">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.58">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1156,10 +1156,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.57</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.58</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전 있음 · 상단이 v4.57이어야 최신
+        새 버전 있음 · 상단이 v4.58이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1171,8 +1171,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.57">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.57</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.58">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.58</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
                         <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
@@ -1426,11 +1426,12 @@
                 <div class="card-header">📋 점검 내역</div>
                 <div class="card-body">
                     <div class="info-box" style="margin-bottom:10px;">
-                        <div class="title">저녁 보고 안내</div>
+                        <div class="title">보고 안내 (저녁 아니어도 됨)</div>
                         <div class="text">
-                            ① 낮에 <b>거점 저장</b>한 것만 시트·드라이브에 있습니다.<br>
-                            ② 여기서 <b>일지 엑셀</b> + <b>오늘 폴더</b>를 만들면 양식과 <b>사진</b>이 시군/충전소/거점 폴더로 같이 묶입니다.<br>
-                            ③ 「사진을 폰으로 내보내기」는 거점 작업 중 백업용이고, 저녁 전체 보고와는 다릅니다.
+                            ① 조원: <b>거점 저장</b> → 시트·드라이브에 쌓임<br>
+                            ② 조원: 보고할 때 <b>카톡보내기</b> 한 번 (내 사진 묶음)<br>
+                            ③ 팀장: <b>일지 엑셀</b> 한 번(시트 최신) + 조원 zip 사진만 합치면 오늘 전체 보고<br>
+                            ④ 「폰으로 내보내기」는 중간 백업용입니다.
                         </div>
                     </div>
                     <button class="btn btn-primary btn-small" onclick="syncAndShowDailyLog()" style="margin-bottom:8px;">🔄 동기화 후 오늘 점검일지</button>
@@ -1675,41 +1676,56 @@
             </div>
 
             <div class="manual-sec">
-                <h3>5. 저녁에 오늘 전체 보고</h3>
+                <h3>5. 보고할 때 (저녁 아니어도 됨)</h3>
                 <ol>
                     <li>아래 메뉴 <b>내역</b>으로 갑니다.</li>
-                    <li><b>동기화 후 오늘 점검일지</b> (팀 시트 최신 맞춤)</li>
-                    <li><b>일지 엑셀 내려받기</b> → 양식 열: 국소명, 거점, 충전기수, 충전기번호, MCCB용량, 접지저항, 계량기번호, 비고</li>
-                    <li><b>오늘 폴더로 저장</b> → <b>일지 엑셀/양식 + 사진 원본</b>이 시군 / 충전소 / 거점 폴더로 같이 묶입니다.</li>
-                    <li>카톡으로 보낼 때 → <b>오늘 점검 카톡으로 보내기</b> zip (풀면 일지+사진 폴더 그대로)</li>
+                    <li><b>동기화 후 오늘 점검일지</b> → 구글 시트 최신으로 맞춤</li>
+                    <li><b>일지 엑셀 내려받기</b> → MCCB·계량기번호 들어간 양식 (시트 최신 기준)</li>
+                    <li><b>오늘 폴더로 저장</b> 또는 <b>카톡으로 보내기</b> → 일지 + <b>사진/시군/충전소/거점</b> 폴더</li>
                 </ol>
-                <div class="tip">저녁 묶음에는 사진도 포함됩니다. 단, 거점 완료를 안 한 것은 안 들어갑니다.</div>
+                <div class="tip">거점 완료한 것만 들어갑니다. 드라이브=보관소, 오늘 폴더/카톡 zip=보고용 묶음.</div>
             </div>
 
             <div class="manual-sec">
-                <h3>6. 「사진을 폰으로 내보내기」는?</h3>
+                <h3>6. 팀 보고는 이렇게 (제일 중요)</h3>
+                <ol>
+                    <li><b>조원</b>: 맡은 거점마다 <b>거점 완료(저장)</b>만 확실히 합니다.</li>
+                    <li><b>조원</b>: 보고 시각에 <b>내역 → 오늘 점검 카톡으로 보내기</b>를 <b>한 번</b> 눌러 팀장에게 보냅니다. (내 폰에서 완료한 사진 묶음)</li>
+                    <li><b>팀장</b>: <b>내역 → 일지 엑셀 내려받기</b>를 <b>한 번</b>만 합니다. (구글 시트에 전원 기록이 이미 모여 있어서 엑셀은 여러 개 합칠 필요 없음)</li>
+                    <li><b>팀장</b>: 조원들이 보낸 <b>사진 zip</b>만 풀어서 시군/충전소/거점끼리 합칩니다. (또는 구글 드라이브 거점 폴더를 그대로 써도 됩니다)</li>
+                </ol>
+                <div class="tip">한 줄 요약: 엑셀은 팀장 1번(시트 최신) · 사진 zip은 조원마다 1번 · 합치면 오늘 전체 보고.</div>
                 <ul>
-                    <li><b>지금 보고 있는 거점</b> 사진만 zip으로 폰에 받는 백업입니다.</li>
-                    <li>구글 드라이브 업로드와는 <b>다릅니다.</b> 내보내기만 했다고 시트/드라이브에 안 들어갑니다.</li>
-                    <li>드라이브에 올리려면 반드시 <b>거점 저장</b>을 하세요.</li>
+                    <li><b>팀 동기화</b> = “누가 어디까지 했나” 장부(시트)를 내 화면에 맞추기. <b>사진은 안 내려옵니다.</b></li>
+                    <li>사진은 거점 완료 때 <b>구글 드라이브</b>에 올라가 있고, 카톡 zip은 보고용 사본입니다.</li>
                 </ul>
             </div>
 
             <div class="manual-sec">
-                <h3>7. 팀 동기화 / 동선</h3>
+                <h3>7. 「사진을 폰으로 내보내기」는?</h3>
+                <ul>
+                    <li><b>지금 보고 있는 거점</b> 사진만 zip으로 폰에 받는 백업입니다.</li>
+                    <li>구글 드라이브 업로드와는 <b>다릅니다.</b> 내보내기만 했다고 시트/드라이브에 안 들어갑니다.</li>
+                    <li>공식 보고용은 <b>거점 저장</b> + (나중에) <b>카톡보내기/오늘 폴더</b>입니다.</li>
+                </ul>
+            </div>
+
+            <div class="manual-sec">
+                <h3>8. 팀 동기화 / 동선</h3>
                 <ul>
                     <li>기록의 기준은 <b>구글 시트 하나</b>. 홈 <b>팀 동기화</b>로 맞춥니다.</li>
+                    <li>다른 폰에서 동기화해도 같은 시트 최신을 각자 자기 폰에 읽어 옵니다.</li>
                     <li>동선에서 지역·그림 지도·가까운 순·카카오/네이버 길안내를 씁니다.</li>
                 </ul>
             </div>
 
             <div class="manual-sec">
-                <h3>8. 자주 막히는 것</h3>
+                <h3>9. 자주 막히는 것</h3>
                 <ul>
                     <li>버전이 안 바뀌면 → 홈 <b>강제 새로고침</b> (상단 v번호 확인)</li>
                     <li>칸이 비면 → 6·7번 다시 찍거나 직접 적기</li>
                     <li>드라이브에 사진이 없으면 → 거점 저장을 했는지 확인</li>
-                    <li>저녁 폴더가 비면 → 오늘 이 폰에서 거점 완료한 것이 있는지 확인</li>
+                    <li>카톡 zip에 사진이 적으면 → 오늘 이 폰에서 거점 완료한 것만 들어감</li>
                     <li>앱이 아예 안 되면 → 홈 <b>비상모드</b> (카메라+메모로 진행)</li>
                 </ul>
             </div>
@@ -1739,9 +1755,9 @@
         </div>
     </div>
 
-    <script src="station_data.js?v=4.57"></script>
+    <script src="station_data.js?v=4.58"></script>
     <script>
-        const APP_VERSION = '4.57';
+        const APP_VERSION = '4.58';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
