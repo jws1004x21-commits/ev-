@@ -1052,7 +1052,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.38</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.39</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
@@ -1082,12 +1082,16 @@
                     <div class="stat-value" id="totalCount">0</div>
                     <div class="stat-label">누적 · 눌러서 보기</div>
                 </button>
-                <div class="stat-card">
+                <button type="button" class="stat-card stat-tap" onclick="openStatsPlaces('progress')">
                     <div class="stat-value" id="progressPercent">0%</div>
-                    <div class="stat-label">진행률</div>
-                </div>
+                    <div class="stat-label">진행률 · 지역별</div>
+                </button>
             </div>
-            <div style="font-size:11px;color:#888;margin:-6px 0 12px;">숫자는 팀 전체(구글 시트) 기준 · 오늘/이번주/누적을 누르면 어디 했는지 나옵니다</div>
+            <div style="display:flex;gap:8px;align-items:center;margin:-6px 0 12px;flex-wrap:wrap;">
+                <div style="font-size:11px;color:#888;flex:1;">팀 전체(구글 시트) 기준 · 숫자를 누르면 상세 · 동기화하면 다른 사람 완료도 이 폰에 반영</div>
+                <button type="button" class="btn btn-secondary btn-small" id="homeSyncBtn" onclick="syncTeamNow()">🔄 팀 동기화</button>
+            </div>
+            <div id="homeSyncStatus" style="font-size:12px;color:#aaa;margin:-4px 0 12px;"></div>
 
             <div id="selectScreen">
                 <div class="card">
@@ -1495,6 +1499,8 @@
                 <h3>7. 오늘·이번주 확인 / 동선</h3>
                 <ul>
                     <li>홈의 <b>오늘·이번주·누적</b>을 누르면 어디를 했는지 목록이 나옵니다.</li>
+                    <li><b>진행률</b>을 누르면 지역별로 얼마나 됐는지 보입니다.</li>
+                    <li>홈의 <b>팀 동기화</b>를 누르면 구글 시트 최신이 이 폰에 반영됩니다. 다른 사람도 각자 동기화하면 같은 최신을 봅니다.</li>
                     <li>동선에서 <b>지역만</b> 고르면 그 지역 전체가 나오고, 정렬이 <b>가까운 순(GPS)</b>이면 지금 위치에서 가까운 곳부터 보입니다.</li>
                     <li>시/군 버튼으로 좁힐 수도 있습니다.</li>
                     <li>각 충전소에 <b>주소 복사 · 카카오맵 · 네이버맵</b>이 있습니다. 복사한 주소를 내비에 붙여넣어도 됩니다.</li>
@@ -1538,7 +1544,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.38';
+        const APP_VERSION = '4.39';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -2310,7 +2316,90 @@
             return rows;
         }
 
-        function openStatsPlaces(mode) {
+        function regionTargetTotals() {
+            const out = {};
+            Object.keys(STATION_DATA || {}).forEach((region) => {
+                let chargers = 0;
+                let zones = 0;
+                let stations = 0;
+                Object.keys(STATION_DATA[region] || {}).forEach((city) => {
+                    Object.keys(STATION_DATA[region][city] || {}).forEach((station) => {
+                        stations += 1;
+                        (STATION_DATA[region][city][station].zones || []).forEach((z) => {
+                            zones += 1;
+                            chargers += Number(z.chargers) || 0;
+                        });
+                    });
+                });
+                out[region] = { chargers, zones, stations };
+            });
+            return out;
+        }
+
+        function regionProgressRows() {
+            const targets = regionTargetTotals();
+            const done = {};
+            Object.keys(targets).forEach((region) => {
+                done[region] = { chargers: 0, zones: 0 };
+            });
+            uniqueTeamCompletions().forEach((row) => {
+                const region = row.region || findStationRegion(row.city, row.station);
+                if (!region || !done[region]) return;
+                done[region].chargers += chargersForRow(row);
+                done[region].zones += 1;
+            });
+            return Object.keys(targets).sort((a, b) => a.localeCompare(b, 'ko')).map((region) => {
+                const t = targets[region];
+                const d = done[region] || { chargers: 0, zones: 0 };
+                const pct = t.chargers ? (d.chargers / t.chargers) * 100 : 0;
+                return {
+                    region,
+                    doneChargers: d.chargers,
+                    totalChargers: t.chargers,
+                    doneZones: d.zones,
+                    totalZones: t.zones,
+                    stations: t.stations,
+                    pct
+                };
+            });
+        }
+
+        async function syncTeamNow() {
+            const el = document.getElementById('homeSyncStatus');
+            const btn = document.getElementById('homeSyncBtn');
+            if (el) el.textContent = '구글 시트에서 팀 완료 불러오는 중...';
+            if (btn) btn.disabled = true;
+            await fetchTeamProgress(true);
+            if (btn) btn.disabled = false;
+            const n = (state.teamProgress || []).length;
+            const when = new Date().toLocaleTimeString();
+            if (el) el.textContent = n
+                ? `동기화됨 · 팀 완료 ${n}건 · ${when} · 다른 사람도 이 버튼을 누르면 같은 최신을 봅니다.`
+                : `동기화 시도함 · ${when} · 시트에 완료가 없거나 인터넷을 확인하세요.`;
+            updateStats();
+        }
+
+        async function openStatsPlaces(mode) {
+            openSimpleSheet('불러오는 중', '팀 최신 기록 동기화...', '<div class="stats-place">잠시만 기다리세요.</div>');
+            await fetchTeamProgress(true);
+            if (mode === 'progress') {
+                const rows = regionProgressRows();
+                const totalDone = rows.reduce((s, r) => s + r.doneChargers, 0);
+                const totalAll = rows.reduce((s, r) => s + r.totalChargers, 0) || 4571;
+                const body = rows.map((row) => {
+                    const bar = Math.max(0, Math.min(100, row.pct));
+                    return `<div class="stats-place">
+                        <div><b>${row.region}</b> · ${row.pct.toFixed(1)}%</div>
+                        <div class="progress-bar" style="margin:8px 0;"><span style="width:${bar}%"></span></div>
+                        <div class="meta">충전기 ${row.doneChargers}/${row.totalChargers}대 · 거점 ${row.doneZones}/${row.totalZones} · 충전소 ${row.stations}곳</div>
+                        <div class="route-btns" style="margin-top:6px;">
+                            <button type="button" class="btn btn-secondary btn-small" onclick='jumpToRegionProgress(${JSON.stringify(row.region)})'>이 지역 동선 보기</button>
+                        </div>
+                    </div>`;
+                }).join('') || '<div class="stats-place">지역 데이터가 없습니다.</div>';
+                openSimpleSheet('지역별 진행률', `전체 ${((totalDone / totalAll) * 100).toFixed(1)}% · 팀 동기화 반영`, body);
+                return;
+            }
             const titles = { today: '오늘 점검', week: '이번주 점검', total: '누적 점검' };
             const rows = statsPlaceRows(mode);
             const body = rows.length
@@ -2320,7 +2409,7 @@
                     const addr = stationAddressOf(region, row.city, row.station);
                     return `<div class="stats-place">
                         <div><b>${row.station || ''}</b> · ${row.zone || ''}</div>
-                        <div class="meta">${row.city || ''} · ${parseSheetDate(row.date) || ''} · ${n}대${row.inspector ? ' · ' + row.inspector : ''}</div>
+                        <div class="meta">${region ? region + ' · ' : ''}${row.city || ''} · ${parseSheetDate(row.date) || ''} · ${n}대${row.inspector ? ' · ' + row.inspector : ''}</div>
                         ${addr ? `<div class="meta">${addr}</div>
                         <div class="route-btns" style="margin-top:6px;">
                             <button type="button" class="btn btn-secondary btn-small" onclick='copyText(${JSON.stringify(addr)})'>주소 복사</button>
@@ -2329,8 +2418,18 @@
                         </div>` : ''}
                     </div>`;
                 }).join('')
-                : '<div class="stats-place">이 기간에 기록이 없습니다. 동기화 후 다시 눌러 보세요.</div>';
-            openSimpleSheet(titles[mode] || '점검 목록', rows.length + '곳', body);
+                : '<div class="stats-place">이 기간에 기록이 없습니다. 팀 동기화 후 다시 눌러 보세요.</div>';
+            openSimpleSheet(titles[mode] || '점검 목록', rows.length + '곳 · 팀 동기화 반영', body);
+        }
+
+        function jumpToRegionProgress(region) {
+            closeSimpleSheet();
+            showTab('route', document.querySelector('.nav-item[data-tab="route"]'));
+            const regionSel = document.getElementById('routeRegion');
+            if (regionSel) {
+                regionSel.value = region;
+                regionSel.dispatchEvent(new Event('change'));
+            }
         }
 
         function openSimpleSheet(title, sub, bodyHtml) {
@@ -4991,14 +5090,18 @@
         async function fetchTeamProgress(force) {
             if (!force && lastProgressFetch && Date.now() - lastProgressFetch < 60000) return;
             updateRouteSyncStatus(null, '팀 진행 불러오는 중...');
+            const homeSync = document.getElementById('homeSyncStatus');
+            if (homeSync && force) homeSync.textContent = '구글 시트에서 팀 완료 불러오는 중...';
             const probe = await googleJsonp('action=progress', 15000);
             if (!probe.ok || !probe.data) {
                 updateRouteSyncStatus(null, '불러오기 실패. 인터넷을 확인하세요.');
+                if (homeSync) homeSync.textContent = '동기화 실패. 인터넷을 확인하세요.';
                 updateStats();
                 return;
             }
             if (!Array.isArray(probe.data.progress)) {
-                updateRouteSyncStatus(null, '구글 스크립트를 v8로 다시 배포해야 팀 진행·수정이 됩니다.');
+                updateRouteSyncStatus(null, '구글 스크립트를 최신으로 다시 배포해야 팀 진행이 됩니다.');
+                if (homeSync) homeSync.textContent = '구글 스크립트를 최신으로 배포해야 팀 동기화가 됩니다.';
                 updateStats();
                 return;
             }
@@ -5011,6 +5114,9 @@
                 locks: state.zoneLocks
             }));
             updateRouteSyncStatus(lastProgressFetch);
+            if (homeSync) {
+                homeSync.textContent = `동기화됨 · 팀 완료 ${state.teamProgress.length}건 · ${new Date(lastProgressFetch).toLocaleTimeString()}`;
+            }
             updateStats();
             renderRoutePlan();
             if (state.station && STATION_DATA[state.region] && STATION_DATA[state.region][state.city] && STATION_DATA[state.region][state.city][state.station]) {

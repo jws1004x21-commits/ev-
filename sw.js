@@ -1,4 +1,4 @@
-// v4.38: show whole region near-first from current GPS
+// v4.39: region progress breakdown and home team sync
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
