@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.62">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.63">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1156,10 +1156,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.62</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.63</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전 있음 · 상단이 v4.62이어야 최신
+        새 버전 있음 · 상단이 v4.63이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1171,8 +1171,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.62">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.62</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.63">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.63</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
                         <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
@@ -1759,9 +1759,9 @@
         </div>
     </div>
 
-    <script src="station_data.js?v=4.62"></script>
+    <script src="station_data.js?v=4.63"></script>
     <script>
-        const APP_VERSION = '4.62';
+        const APP_VERSION = '4.63';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
@@ -7321,18 +7321,37 @@
                         state.selectedZone = prevZone;
                         state.selectedZoneIdx = prevIdx;
 
+                        paint('시트에 더미 기록 확인 중…');
+                        let recordFound = false;
+                        let recordHint = '';
+                        for (let r = 0; r < 5; r++) {
+                            const rec = await googleJsonp(
+                                'action=record'
+                                + '&station=' + encodeURIComponent(loc.station)
+                                + '&zone=' + encodeURIComponent(loc.zoneLabel)
+                                + '&zoneFolder=' + encodeURIComponent(loc.zoneFolder)
+                                + '&region=' + encodeURIComponent(loc.region)
+                                + '&city=' + encodeURIComponent(loc.city),
+                                12000
+                            );
+                            if (rec.ok && rec.data && rec.data.record && rec.data.record.found) {
+                                recordFound = true;
+                                recordHint = (rec.data.record.mccb || '') + ' / ' + (rec.data.record.meterNo || '');
+                                break;
+                            }
+                            await waitMs(1500);
+                        }
+                        add(recordFound, recordFound
+                            ? ('시트 더미 행 확인됨 (자동테스트) · ' + (recordHint || '기록 OK'))
+                            : '시트 더미 행 확인 실패 · 잠시 후 설정에서 구글 연결 테스트 재시도');
+
                         paint('팀 동기화(최신) 중…');
                         try {
                             await syncTeamNow(true);
                             const rows = state.teamProgress || [];
-                            const found = rows.some((row) =>
-                                String(row.station || '') === '자동테스트'
-                                && String(row.date || '').substring(0, 10) === date
-                            );
-                            add(Array.isArray(rows), '팀 동기화 완료 · 전체 ' + rows.length + '건');
-                            add(found, found
-                                ? '동기화 목록에서 오늘 더미(자동테스트) 확인됨'
-                                : '동기화는 됐지만 오늘 자동테스트 행이 아직 안 보임(잠시 후 다시 동기화)');
+                            add(Array.isArray(rows), '팀 동기화 완료 · 실무 완료 ' + rows.length + '건');
+                            // progress API는 '테스트' 지역/자동테스트 충전소를 의도적으로 제외함
+                            note('참고: 팀 동기화 목록에는 테스트 행이 안 나옵니다(실무 목록만). 더미는 위에서 시트로 따로 확인합니다.');
                         } catch (err) {
                             add(false, '팀 동기화 실패');
                         }

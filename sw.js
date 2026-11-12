@@ -1,5 +1,5 @@
-// v4.62: show numbered failed auto-check items in banner/alert/voice
-const SW_VER = '4.62';
+// v4.63: auto-check verifies dummy via record API (progress hides tests)
+const SW_VER = '4.63';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
