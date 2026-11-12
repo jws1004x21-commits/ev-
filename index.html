@@ -1083,7 +1083,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.48</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.49</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
@@ -1253,9 +1253,9 @@
                 <div class="card-header">🗺️ 지역 동선</div>
                 <div class="card-body">
                     <div class="info-box">
-                        <div class="text"><b>전국</b> 또는 지역을 고르면 그림 지도·목록으로 볼 수 있습니다. GPS를 켜 두면 가까운 순·현재 위치 표시가 됩니다.</div>
+                        <div class="text"><b>전국</b> 또는 지역을 고르면 그림 지도·목록으로 볼 수 있습니다. 앱 안 지도는 <b>구글맵 API가 아닙니다</b>(무료 지도 타일). 길안내는 <b>카카오·네이버</b>를 씁니다.</div>
                     </div>
-                    <div class="legend">🟠 남음 &nbsp; 🟢 완료 &nbsp; 🔵 현재 위치 · 지도에서 축소·확대</div>
+                    <div class="legend">🟠 남음 &nbsp; 🟢 완료 &nbsp; 🔵 현재 위치 · 구글맵 API 키 없음</div>
                     <div class="form-group">
                         <label class="form-label">표시</label>
                         <select class="form-select" id="routeViewMode">
@@ -1594,7 +1594,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.48';
+        const APP_VERSION = '4.49';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -2724,11 +2724,11 @@
                 try { routeLeafletMap.remove(); } catch (err) {}
                 routeLeafletMap = null;
             }
-            mapEl.innerHTML = '<div class="map-loading">지도 불러오는 중…</div>';
+            mapEl.innerHTML = '<div class="map-loading">그림 지도 불러오는 중…<br><span style="font-size:12px;color:#888">구글맵 API 아님 · 카카오/네이버로 길안내</span></div>';
             try {
                 await loadLeaflet();
             } catch (err) {
-                mapEl.innerHTML = '<div class="map-loading">지도를 불러오지 못했습니다.<br>인터넷 확인 후 지역을 다시 선택해 주세요.</div>';
+                mapEl.innerHTML = '<div class="map-loading">그림 지도를 불러오지 못했습니다.<br>아래 목록에서 카카오·네이버맵으로 확인하세요.</div>';
                 return;
             }
             if (token !== routeMapToken) return;
@@ -6117,34 +6117,23 @@
             await applyRouteView(viewItems, renderStationRouteList(items));
         }
 
-        function googleDirUrl(addresses) {
-            const list = addresses.filter(Boolean).slice(0, 10);
-            if (!list.length) return '';
-            const dest = encodeURIComponent(list[list.length - 1]);
-            const wps = list.slice(0, -1).map(encodeURIComponent).join('|');
-            let url = 'https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=' + dest + '&travelmode=driving';
-            if (wps) url += '&waypoints=' + wps;
-            return url;
-        }
-
         function driveRouteButtons(teamItems) {
             const remaining = teamItems.filter((it) => it.done < it.total);
             const targets = remaining.length ? remaining : teamItems;
             const addrs = targets.map((it) => it.address || it.name);
             if (!addrs.length) return '';
-            const chunks = [];
-            for (let i = 0; i < addrs.length; i += 10) chunks.push(addrs.slice(i, i + 10));
-            const nextKakao = `https://map.kakao.com/link/search/${encodeURIComponent(addrs[0])}`;
-            const links = chunks.map((chunk, i) => {
-                const url = googleDirUrl(chunk);
-                const label = chunks.length === 1 ? '이 조 운전 경로' : `운전 경로 ${i + 1} (${i * 10 + 1}~${i * 10 + chunk.length})`;
-                return `<a class="btn btn-secondary" href="${url}" target="_blank" rel="noopener">${label}</a>`;
-            }).join('');
+            // 국내에서는 구글맵 API/길안내 화면이 이상하거나 제한되는 경우가 많아 카카오·네이버만 사용.
+            const first = addrs[0];
+            const second = addrs[1] || addrs[0];
+            const kakaoFirst = kakaoMapUrl(first);
+            const naverFirst = naverMapUrl(first);
+            const kakaoNext = kakaoMapUrl(second);
             return `<div class="route-btns" style="margin-bottom:12px;flex-wrap:wrap;">
-                ${links}
-                <a class="btn btn-secondary" href="${nextKakao}" target="_blank" rel="noopener">다음 곳 카카오맵</a>
+                <a class="btn btn-primary" href="${kakaoFirst}" target="_blank" rel="noopener">다음 곳 카카오맵</a>
+                <a class="btn btn-secondary" href="${naverFirst}" target="_blank" rel="noopener">다음 곳 네이버맵</a>
+                ${addrs.length > 1 ? `<a class="btn btn-secondary" href="${kakaoNext}" target="_blank" rel="noopener">그다음 카카오</a>` : ''}
             </div>
-            <div class="route-meta" style="margin-bottom:10px;">운전 경로는 구글맵이 실제 도로로 안내합니다. 한 번에 최대 10곳입니다.</div>`;
+            <div class="route-meta" style="margin-bottom:10px;">길안내는 카카오·네이버로 엽니다. 구글맵 API 키는 쓰지 않습니다(국내에서 이상하게 뜨는 문제 방지).</div>`;
         }
 
         function routeText() {

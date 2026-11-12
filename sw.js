@@ -1,4 +1,4 @@
-// v4.48: faster meter OCR feedback; home self-check with sample Excel; map tile fallback
+// v4.49: drop Google Maps dir (no API); Kakao/Naver navigation only
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
