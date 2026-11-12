@@ -1076,7 +1076,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.43</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.44</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
@@ -1180,7 +1180,7 @@
                             <label class="form-label">점검자 이름 (필수)</label>
                             <input type="text" class="form-input" id="inspectInspector" placeholder="이름 없으면 완료 안 됩니다" autocomplete="name">
                         </div>
-                        <div id="zonePhotoTotal" class="drive-count">이 거점 사진 0장 · 드라이브 전송 0장</div>
+                        <div id="zonePhotoTotal" class="drive-count">사진 0장 · 찍으면 폰에 저장 · 완료 시 드라이브</div>
                         <div id="checklist"></div>
                         <div class="form-group" style="margin-top:16px;">
                             <label class="form-label">이 거점 MCCB·계량기번호 · 다른 거점 값을 넣지 마세요</label>
@@ -1507,12 +1507,12 @@
             </div>
 
             <div class="manual-sec">
-                <h3>5. 거점 저장</h3>
+                <h3>5. 사진 · 거점 저장</h3>
                 <ol>
-                    <li><b>이 거점 점검 완료</b>를 누릅니다.</li>
-                    <li>확인 화면에서 MCCB·계량기번호가 맞는지 봅니다.</li>
-                    <li>비어 있거나 틀리면 그 칸만 고치거나, <b>숫자만 크게 찍기</b>로 다시 찍습니다.</li>
-                    <li><b>이 거점 저장</b>을 누르면 구글 시트·드라이브에 들어갑니다.</li>
+                    <li>찍은 사진은 <b>바로 이 폰(앱)</b>에만 저장됩니다. 구글 드라이브에는 아직 안 올라갑니다.</li>
+                    <li>잘못 찍으면 × 또는 <b>다시 찍기</b>로 지우면 됩니다. 드라이브에 잘못된 장이 쌓이지 않습니다.</li>
+                    <li><b>이 거점 점검 완료</b> → 확인 화면에서 MCCB·제조번호를 봅니다.</li>
+                    <li><b>이 거점 저장</b>을 누르면 그때 사진이 드라이브로 올라가고, 시트에도 기록됩니다.</li>
                 </ol>
                 <div class="tip">같은 거점을 다시 저장하면 시트 같은 줄이 덮어씌워집니다. 거점을 바꾸면 MCCB·계량기 칸은 비워집니다.</div>
             </div>
@@ -1578,7 +1578,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.43';
+        const APP_VERSION = '4.44';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -1707,10 +1707,11 @@
         function drivePhotoStats() {
             const all = allPhotos();
             const total = all.length;
-            const sent = all.filter((p) => p.uploaded && !p.failed).length;
-            const fail = all.filter((p) => p.failed || (p.data && !p.uploaded && !p.uploading)).length;
-            const pending = all.filter((p) => p.uploading || (p.data && !p.uploaded && !p.failed)).length;
-            return { total, sent, fail, pending };
+            const sent = all.filter((p) => (p.uploaded || p.remote) && !p.failed).length;
+            const fail = all.filter((p) => p.failed).length;
+            const uploading = all.filter((p) => p.uploading).length;
+            const local = all.filter((p) => p.data && !p.uploaded && !p.uploading && !p.failed && !p.remote).length;
+            return { total, sent, fail, pending: uploading, local, uploading };
         }
 
         function driveCountLine(stats) {
@@ -1719,9 +1720,11 @@
                 if (s.folder < s.total) return `사진 ${s.total}장 · 드라이브 폴더 ${s.folder}장 확인 · 부족 ${s.total - s.folder}장`;
                 return `사진 ${s.total}장 · 드라이브 폴더 ${s.folder}장 확인됨`;
             }
-            if (s.pending) return `사진 ${s.total}장 · 드라이브 전송 ${s.sent}장 · 올리는 중 ${s.pending}장`;
-            if (s.fail) return `사진 ${s.total}장 · 드라이브 전송 ${s.sent}장 · 실패 ${s.fail}장`;
-            return `사진 ${s.total}장 · 드라이브 전송 ${s.sent}장`;
+            if (s.uploading) return `사진 ${s.total}장 · 드라이브 올리는 중 ${s.uploading}장`;
+            if (s.fail) return `사진 ${s.total}장 · 드라이브 ${s.sent}장 · 실패 ${s.fail}장`;
+            if (s.local) return `사진 ${s.total}장 · 폰에 ${s.local}장 대기 · 거점 완료 시 드라이브`;
+            if (s.sent) return `사진 ${s.total}장 · 드라이브 ${s.sent}장`;
+            return `사진 ${s.total}장 · 찍으면 폰에 저장 · 완료 시 드라이브`;
         }
 
         function waitMs(ms) {
@@ -3268,11 +3271,12 @@
         }
 
         function thumbStatus(item) {
-            if (item.uploading) return '<div class="thumb-status">올리는 중</div>';
+            if (item.uploading) return '<div class="thumb-status">드라이브 올리는 중</div>';
             if (item.blurry) return '<div class="thumb-status blur">흐림·다시</div>';
             if (item.failed) return '<div class="thumb-status fail">실패·재시도</div>';
             if (item.remote) return '<div class="thumb-status">드라이브</div>';
-            if (item.uploaded) return '<div class="thumb-status">업로드됨</div>';
+            if (item.uploaded) return '<div class="thumb-status">드라이브</div>';
+            if (item.data) return '<div class="thumb-status">폰 저장</div>';
             return '';
         }
 
@@ -4548,7 +4552,7 @@
                 const item = {
                     thumb,
                     data: full,
-                    uploading: true,
+                    uploading: false,
                     uploaded: false,
                     failed: false,
                     blurry,
@@ -4559,8 +4563,9 @@
                 photosOf(photoId).push(item);
                 added += 1;
                 renderChecklist();
-                enqueueUpload(item);
+                // 드라이브는 거점 완료 시에만 올림. 잘못 찍은 장은 지우면 폰에서만 사라짐.
                 if (blurry) showCameraWarn('숫자가 흐릴 수 있습니다. 다시 찍어 주세요.');
+                else showCameraWarn('폰에 저장됨 · 거점 완료 시 드라이브로 올라갑니다.');
                 if (photoId === 'mccbClose' || photoId === 'meterClose') readCloseShotNow(photoId, full);
             }
             if (navigator.vibrate) navigator.vibrate(50);
@@ -4721,7 +4726,8 @@
             if (cameraStream && !document.getElementById('liveCamera').classList.contains('hidden')) {
                 updateLiveCameraHud();
             }
-            if (item.filename) {
+            // 아직 드라이브에 안 올린 장은 폰에서만 삭제. 이미 올린 장만 드라이브에서도 지움.
+            if (item.filename && (item.uploaded || item.remote)) {
                 postGoogle({
                     action: 'deletePhoto',
                     ...driveFolderFields(item.location || currentLocationFields()),
@@ -4837,20 +4843,20 @@
         }, { passive: false });
 
         function photosStillUploading() {
-            return allPhotos().some((p) => p.uploading || (p.data && !p.uploaded && !p.failed));
+            return allPhotos().some((p) => p.uploading);
         }
 
         function checkCanComplete() {
             const missing = missingRequired();
-            const pending = photosStillUploading();
+            const uploading = photosStillUploading();
             const named = !!currentInspectorName();
             const btn = document.getElementById('completeZoneBtn');
             if (!btn) return;
-            btn.disabled = pending || completingLock || !named;
+            btn.disabled = uploading || completingLock || !named;
             btn.textContent = !named
                 ? '점검자 이름 필요'
-                : pending
-                    ? '사진 올리는 중...'
+                : uploading
+                    ? '드라이브 올리는 중...'
                     : missing.length
                         ? `빠진 사진 ${missing.length}개`
                         : (state.editing ? '수정 저장' : '이 거점 점검 완료');
@@ -4861,9 +4867,9 @@
             } else if (missing.length) {
                 warn.classList.remove('hidden');
                 warn.textContent = '⚠️ 아직 없음: ' + missing.map((p) => p.label).join(', ');
-            } else if (pending) {
+            } else if (uploading) {
                 warn.classList.remove('hidden');
-                warn.textContent = '⚠️ 사진이 드라이브에 다 올라간 뒤에 완료할 수 있습니다';
+                warn.textContent = '⚠️ 드라이브로 사진 올리는 중입니다. 잠시만 기다리세요.';
             } else {
                 warn.classList.add('hidden');
             }
@@ -5006,11 +5012,11 @@
             let failed = 0;
 
             try {
-                status.textContent = '남은 사진 올리는 중...';
+                status.textContent = '거점 저장: 드라이브로 사진 올리는 중...';
                 await uploadQueue;
-                const pending = allPhotos().filter(p => !p.uploaded && p.data);
+                const pending = allPhotos().filter(p => !p.uploaded && p.data && !p.remote);
                 for (let i = 0; i < pending.length; i++) {
-                    status.textContent = `사진 재시도 ${i + 1}/${pending.length}`;
+                    status.textContent = `드라이브 업로드 ${i + 1}/${pending.length}`;
                     await uploadPhotoNow(pending[i]);
                 }
                 const drive = drivePhotoStats();
