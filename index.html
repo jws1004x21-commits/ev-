@@ -1052,7 +1052,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.39</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.40</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
@@ -1088,10 +1088,10 @@
                 </button>
             </div>
             <div style="display:flex;gap:8px;align-items:center;margin:-6px 0 12px;flex-wrap:wrap;">
-                <div style="font-size:11px;color:#888;flex:1;">팀 전체(구글 시트) 기준 · 숫자를 누르면 상세 · 동기화하면 다른 사람 완료도 이 폰에 반영</div>
+                <div style="font-size:11px;color:#888;flex:1;">기록은 구글 시트 하나 · 각자 <b>팀 동기화</b>하면 모든 폰이 같은 최신을 봅니다</div>
                 <button type="button" class="btn btn-secondary btn-small" id="homeSyncBtn" onclick="syncTeamNow()">🔄 팀 동기화</button>
             </div>
-            <div id="homeSyncStatus" style="font-size:12px;color:#aaa;margin:-4px 0 12px;"></div>
+            <div id="homeSyncStatus" style="font-size:12px;color:#aaa;margin:-4px 0 12px;">앱을 열거나 홈으로 오면 자동으로 맞춥니다. 숫자가 다르면 동기화를 누르세요.</div>
 
             <div id="selectScreen">
                 <div class="card">
@@ -1500,7 +1500,8 @@
                 <ul>
                     <li>홈의 <b>오늘·이번주·누적</b>을 누르면 어디를 했는지 목록이 나옵니다.</li>
                     <li><b>진행률</b>을 누르면 지역별로 얼마나 됐는지 보입니다.</li>
-                    <li>홈의 <b>팀 동기화</b>를 누르면 구글 시트 최신이 이 폰에 반영됩니다. 다른 사람도 각자 동기화하면 같은 최신을 봅니다.</li>
+                    <li>기록은 <b>구글 시트 하나</b>입니다. 홈의 <b>팀 동기화</b>를 누르면 그 시트 최신이 이 폰에 맞춰집니다.</li>
+                    <li>다른 사람도 각자 동기화(또는 앱을 다시 열기)하면 <b>모두가 같은 숫자</b>를 봅니다. 한 사람만 눌러서는 남의 폰이 자동으로 바뀌진 않습니다.</li>
                     <li>동선에서 <b>지역만</b> 고르면 그 지역 전체가 나오고, 정렬이 <b>가까운 순(GPS)</b>이면 지금 위치에서 가까운 곳부터 보입니다.</li>
                     <li>시/군 버튼으로 좁힐 수도 있습니다.</li>
                     <li>각 충전소에 <b>주소 복사 · 카카오맵 · 네이버맵</b>이 있습니다. 복사한 주소를 내비에 붙여넣어도 됩니다.</li>
@@ -1544,7 +1545,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.39';
+        const APP_VERSION = '4.40';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -2115,11 +2116,17 @@
             }
             syncInspectorFields(state.inspector || '');
             updateLocalBackupStatus();
-            fetchTeamProgress(false).catch(() => {});
+            syncTeamNow(true).catch(() => fetchTeamProgress(false));
             checkAppVersion();
             setInterval(checkAppVersion, 60000);
+            setInterval(() => {
+                if (document.visibilityState === 'visible') fetchTeamProgress(false).catch(() => {});
+            }, 3 * 60 * 1000);
             document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') checkAppVersion();
+                if (document.visibilityState === 'visible') {
+                    checkAppVersion();
+                    fetchTeamProgress(false).catch(() => {});
+                }
             });
             const reloadBtn = document.getElementById('updateReloadBtn');
             if (reloadBtn) reloadBtn.addEventListener('click', () => forceAppReload());
@@ -2364,18 +2371,20 @@
             });
         }
 
-        async function syncTeamNow() {
+        async function syncTeamNow(quiet) {
             const el = document.getElementById('homeSyncStatus');
             const btn = document.getElementById('homeSyncBtn');
-            if (el) el.textContent = '구글 시트에서 팀 완료 불러오는 중...';
+            if (el && !quiet) el.textContent = '구글 시트 공통 기록 맞추는 중...';
             if (btn) btn.disabled = true;
             await fetchTeamProgress(true);
             if (btn) btn.disabled = false;
             const n = (state.teamProgress || []).length;
             const when = new Date().toLocaleTimeString();
-            if (el) el.textContent = n
-                ? `동기화됨 · 팀 완료 ${n}건 · ${when} · 다른 사람도 이 버튼을 누르면 같은 최신을 봅니다.`
-                : `동기화 시도함 · ${when} · 시트에 완료가 없거나 인터넷을 확인하세요.`;
+            if (el) {
+                el.textContent = n
+                    ? `동기화됨 · 팀 완료 ${n}건 · ${when} · 다른 사람도 동기화하면 같은 숫자로 맞춰집니다.`
+                    : `동기화 시도함 · ${when} · 시트에 완료가 없거나 인터넷을 확인하세요.`;
+            }
             updateStats();
         }
 
@@ -5787,10 +5796,16 @@
             document.querySelectorAll('.nav-item').forEach(node => node.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.add('active');
             (el || document.querySelector(`.nav-item[data-tab="${tab}"]`)).classList.add('active');
+            if (tab === 'home') {
+                fetchTeamProgress(false).catch(() => {});
+            }
             if (tab === 'route') {
                 loadCachedProgress();
                 renderRoutePlan();
                 fetchTeamProgress(false);
+            }
+            if (tab === 'history') {
+                fetchTeamProgress(false).catch(() => {});
             }
         }
 
