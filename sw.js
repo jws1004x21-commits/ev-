@@ -1,4 +1,4 @@
-// v4.35: beginner manual matching the current inspection and Excel flow
+// v4.36: force reload so phones pick up the new app version
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

@@ -1038,11 +1038,11 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.36</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전이 있습니다. 앱을 새로고침 하세요.
-        <button type="button" id="updateReloadBtn">지금 새로고침</button>
+        새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
+        <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
     <div class="container">
@@ -1276,6 +1276,7 @@
                         <div class="text">초보자용입니다. 최신 앱 기준으로 점검 → 사진 → 저장 → 엑셀 보고 순서만 적어 두었습니다.</div>
                     </div>
                     <button type="button" class="btn btn-primary" onclick="openManual()">사용설명서 보기</button>
+                    <button type="button" class="btn btn-secondary" style="margin-top:8px;" onclick="forceAppReload()">🔄 강제 새로고침 (버전 안 바뀔 때)</button>
                 </div>
             </div>
 
@@ -1502,7 +1503,26 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.35';
+        const APP_VERSION = '4.36';
+
+        async function forceAppReload() {
+            try {
+                if ('caches' in window) {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map((k) => caches.delete(k)));
+                }
+            } catch (err) {}
+            try {
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(regs.map((r) => r.unregister()));
+                }
+            } catch (err) {}
+            const url = new URL(location.href);
+            url.searchParams.set('v', APP_VERSION);
+            url.searchParams.set('r', String(Date.now()));
+            location.replace(url.toString());
+        }
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -2056,9 +2076,7 @@
                 if (document.visibilityState === 'visible') checkAppVersion();
             });
             const reloadBtn = document.getElementById('updateReloadBtn');
-            if (reloadBtn) {
-                reloadBtn.addEventListener('click', () => location.reload());
-            }
+            if (reloadBtn) reloadBtn.addEventListener('click', () => forceAppReload());
         }
 
         function loadState() {
