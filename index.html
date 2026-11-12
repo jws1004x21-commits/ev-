@@ -1083,10 +1083,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.49</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.50</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
+        새 버전이 있습니다. 지금 강제 새로고침 하세요. (안 바뀌면 이 버튼)
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1097,6 +1097,8 @@
                 <div class="card-body">
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
+                    <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">버전이 안 바뀌면 이 버튼을 누르세요. 상단이 <b>v4.50</b>이어야 최신입니다.</div>
                     <button type="button" class="btn btn-secondary btn-small" style="margin-top:10px;" onclick="openManual()">📖 앱 사용설명서</button>
                 </div>
             </div>
@@ -1594,11 +1596,19 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.49';
+        const APP_VERSION = '4.50';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
         async function forceAppReload() {
+            let remote = '';
+            try {
+                const res = await fetch(versionCheckUrl(), { cache: 'no-store' });
+                if (res.ok) {
+                    const data = await res.json();
+                    remote = String(data.version || '').trim();
+                }
+            } catch (err) {}
             try {
                 if ('caches' in window) {
                     const keys = await caches.keys();
@@ -1611,10 +1621,10 @@
                     await Promise.all(regs.map((r) => r.unregister()));
                 }
             } catch (err) {}
-            const url = new URL(location.href);
-            url.searchParams.set('v', APP_VERSION);
-            url.searchParams.set('r', String(Date.now()));
-            location.replace(url.toString());
+            // 홈 화면 아이콘/캐시가 옛 HTML을 붙잡는 경우 → index.html 로 직접 진입
+            const base = location.origin + location.pathname.replace(/\/[^/]*$/, '/');
+            const ver = remote || APP_VERSION || String(Date.now());
+            location.replace(base + 'index.html?v=' + encodeURIComponent(ver) + '&r=' + Date.now());
         }
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
@@ -1715,8 +1725,16 @@
                 const remote = String(data.version || '').trim();
                 const banner = document.getElementById('updateBanner');
                 if (!banner) return;
-                if (remote && remote !== APP_VERSION) banner.classList.add('show');
-                else banner.classList.remove('show');
+                if (remote && remote !== APP_VERSION) {
+                    banner.classList.add('show');
+                    const key = 'didAutoReload_' + remote;
+                    if (!sessionStorage.getItem(key)) {
+                        sessionStorage.setItem(key, '1');
+                        forceAppReload();
+                    }
+                } else {
+                    banner.classList.remove('show');
+                }
             } catch (err) {}
         }
 
