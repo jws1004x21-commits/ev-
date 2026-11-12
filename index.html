@@ -1083,7 +1083,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.47</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.48</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
@@ -1123,6 +1123,14 @@
                 <button type="button" class="btn btn-secondary btn-small" id="homeSyncBtn" onclick="syncTeamNow()">🔄 팀 동기화</button>
             </div>
             <div id="homeSyncStatus" style="font-size:12px;color:#aaa;margin:-4px 0 12px;">앱을 열거나 홈으로 오면 자동으로 맞춥니다. 숫자가 다르면 동기화를 누르세요.</div>
+            <div class="card" style="margin-bottom:12px;">
+                <div class="card-header">홈 점검 테스트</div>
+                <div class="card-body">
+                    <div class="text" style="font-size:12px;color:#aaa;margin-bottom:8px;">임의 샘플로 일지 양식·엑셀·지도 라이브러리를 확인합니다. 시트/드라이브에는 올리지 않습니다.</div>
+                    <button type="button" class="btn btn-primary" onclick="runHomeSelfCheck()">🧪 홈 테스트 실행 (엑셀 포함)</button>
+                    <div id="homeSelfCheckResult" style="font-size:12px;color:#ccc;margin-top:10px;line-height:1.55;"></div>
+                </div>
+            </div>
 
             <div id="selectScreen">
                 <div class="card">
@@ -1382,6 +1390,7 @@
                     <button class="btn btn-secondary" onclick="testGoogleLink()">구글 연결 테스트</button>
                     <button class="btn btn-secondary" onclick="retryPendingUploads()">대기 중인 구글 업로드 재시도</button>
                     <button class="btn btn-primary" onclick="runAutoTest()">🧪 아무 사진으로 자동 테스트</button>
+                    <button class="btn btn-secondary" style="margin-top:8px;" onclick="runHomeSelfCheck()">🧪 홈 테스트 (엑셀·지도·양식)</button>
                     <div class="upload-status" id="googleTestStatus"></div>
                     <div id="autoTestResults" style="margin-top:12px;font-size:13px;"></div>
                 </div>
@@ -1585,7 +1594,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.47';
+        const APP_VERSION = '4.48';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -2725,12 +2734,23 @@
             if (token !== routeMapToken) return;
             mapEl.innerHTML = '';
             routeLeafletMap = L.map(mapEl, { zoomControl: true }).setView([36.35, 127.7], 7);
-            // Carto 타일(국내 모바일에서 OSM 타일이 안 뜨는 경우 대비)
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                maxZoom: 18,
-                subdomains: 'abcd',
-                attribution: '&copy; OpenStreetMap &copy; CARTO'
-            }).addTo(routeLeafletMap);
+            // 국내 모바일에서 타일 차단될 수 있어 여러 소스 시도
+            const tileLayers = [
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 18, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO'
+                }),
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 18, attribution: '&copy; OpenStreetMap'
+                })
+            ];
+            let tileIdx = 0;
+            tileLayers[0].addTo(routeLeafletMap);
+            tileLayers[0].on('tileerror', () => {
+                if (tileIdx >= tileLayers.length - 1 || !routeLeafletMap) return;
+                routeLeafletMap.removeLayer(tileLayers[tileIdx]);
+                tileIdx += 1;
+                tileLayers[tileIdx].addTo(routeLeafletMap);
+            });
             setTimeout(() => { if (routeLeafletMap && token === routeMapToken) routeLeafletMap.invalidateSize(); }, 100);
             setTimeout(() => { if (routeLeafletMap && token === routeMapToken) routeLeafletMap.invalidateSize(); }, 500);
             const hint = document.getElementById('routeGpsHint');
@@ -3924,19 +3944,37 @@
                 }
                 return '';
             }
+            // 빠르게: soft→contrast 먼저, 분명하면 바로 반환. binary·전체는 필요할 때만.
             const votes = new Map();
-            for (let s = 0; s < sources.length; s++) {
+            const bump = (text, wMul) => {
+                extractMeterMfgCandidates(text).forEach(({ n, w }) => {
+                    votes.set(n, (votes.get(n) || 0) + w * (wMul || 1));
+                });
+            };
+            const meterSources = sources.slice(0, 2);
+            const quickTries = tries.slice(0, 3);
+            for (let s = 0; s < meterSources.length; s++) {
                 const canvases = [
-                    preprocessCloseCanvas(sources[s], 'soft'),
-                    preprocessCloseCanvas(sources[s], 'contrast'),
-                    preprocessCloseCanvas(sources[s], 'binary')
+                    preprocessCloseCanvas(meterSources[s], 'soft'),
+                    preprocessCloseCanvas(meterSources[s], 'contrast')
                 ];
                 for (let c = 0; c < canvases.length; c++) {
+                    for (let t = 0; t < quickTries.length; t++) {
+                        bump(await ocrCanvas(canvases[c], quickTries[t].psm, quickTries[t].wl));
+                        const early = pickMeterMfgWinner(votes);
+                        if (early && (votes.get(early) || 0) >= 6) return early;
+                    }
+                }
+            }
+            let winner = pickMeterMfgWinner(votes);
+            if (winner) return winner;
+            for (let s = 0; s < sources.length; s++) {
+                const canvases = [preprocessCloseCanvas(sources[s], 'binary')];
+                for (let c = 0; c < canvases.length; c++) {
                     for (let t = 0; t < tries.length; t++) {
-                        const text = await ocrCanvas(canvases[c], tries[t].psm, tries[t].wl);
-                        extractMeterMfgCandidates(text).forEach(({ n, w }) => {
-                            votes.set(n, (votes.get(n) || 0) + w);
-                        });
+                        bump(await ocrCanvas(canvases[c], tries[t].psm, tries[t].wl), 1);
+                        winner = pickMeterMfgWinner(votes);
+                        if (winner && (votes.get(winner) || 0) >= 5) return winner;
                     }
                 }
             }
@@ -4068,6 +4106,7 @@
             try {
                 if (photoId === 'mccbClose') {
                     clearPhotoFilledMccb();
+                    showCameraWarn('MCCB 용량 읽는 중…');
                     const mccb = await ocrCloseValue(dataUrl, 'mccb');
                     if (mccb && setReadValue('logMccb', mccb, true)) {
                         persistWorking();
@@ -4080,6 +4119,7 @@
                     }
                 } else if (photoId === 'meterClose') {
                     clearPhotoFilledMeter();
+                    showCameraWarn('제조번호 읽는 중… 잠시만요.');
                     const meter = await ocrCloseValue(dataUrl, 'meter');
                     if (meter && setReadValue('logMeterNo', meter, true)) {
                         persistWorking();
@@ -4662,6 +4702,7 @@
                 renderChecklist();
                 // 드라이브는 거점 완료 시에만 올림. 잘못 찍은 장은 지우면 폰에서만 사라짐.
                 if (blurry) showCameraWarn('숫자가 흐릴 수 있습니다. 다시 찍어 주세요.');
+                else if (photoId === 'mccbClose' || photoId === 'meterClose') showCameraWarn('폰에 저장 · 숫자 읽는 중…');
                 else showCameraWarn('폰에 저장됨 · 거점 완료 시 드라이브로 올라갑니다.');
                 if (photoId === 'mccbClose' || photoId === 'meterClose') readCloseShotNow(photoId, full);
             }
@@ -6229,6 +6270,7 @@
                 loadCachedProgress();
                 renderRoutePlan();
                 fetchTeamProgress(false);
+                setTimeout(() => { if (routeLeafletMap) routeLeafletMap.invalidateSize(); }, 300);
             }
             if (tab === 'history') {
                 fetchTeamProgress(false).catch(() => {});
@@ -6243,6 +6285,63 @@
             }
             saveState();
             alert('설정이 저장되었습니다.');
+        }
+
+        async function runHomeSelfCheck() {
+            const box = document.getElementById('homeSelfCheckResult');
+            const lines = [];
+            const add = (ok, text) => lines.push((ok ? '✅ ' : '❌ ') + text);
+            const note = (text) => lines.push('· ' + text);
+            if (box) box.innerHTML = '홈 테스트 진행 중…';
+            try {
+                add(!!APP_VERSION, '앱 버전 v' + APP_VERSION);
+                add(typeof clearFieldValue === 'function', '사진 삭제 시 용량·제조번호 초기화 로직');
+                add(typeof showRouteMap === 'function' && typeof loadLeaflet === 'function', '그림 지도 함수');
+
+                const m1 = pickClearMeter('제조번호 0252508 기타');
+                const m2 = pickClearMeter('NO. 1250033');
+                const m3 = pickClearMeter('제조번호 0261660');
+                add(m1 === '0252508', '제조번호 샘플 0252508 → ' + (m1 || '빈값'));
+                add(m2 === '1250033', '제조번호 샘플 1250033 → ' + (m2 || '빈값'));
+                add(m3 === '0261660', '제조번호 샘플 0261660 → ' + (m3 || '빈값'));
+                add(pickClearMccb('정격 75A', true) === '75A', 'MCCB 샘플 75A');
+                add(pickClearMccb('50A', true) === '50A', 'MCCB 샘플 50A');
+
+                const date = todayStamp();
+                const sampleRows = [
+                    { station: '테스트충전소A', zoneIndex: 1, chargers: 4, chargerNo: '1~4', mccb: '75A', ground: '', meterNo: '0252508', place: '지하주차장', city: '대전', inspector: '홈테스트' },
+                    { station: '테스트충전소A', zoneIndex: 2, chargers: 4, chargerNo: '5~8', mccb: '50A', ground: '', meterNo: '1250033', place: '지상', city: '대전', inspector: '홈테스트' },
+                    { station: '테스트충전소B', zoneIndex: 1, chargers: 2, chargerNo: '1~2', mccb: '75A', ground: '', meterNo: '0261660', place: '입구', city: '전주', inspector: '홈테스트' }
+                ];
+                const bytes = dailyLogXlsxBytes(date, sampleRows);
+                const isZip = bytes && bytes.length > 400 && bytes[0] === 0x50 && bytes[1] === 0x4b;
+                add(!!isZip, '일지 엑셀 생성 (' + (bytes ? bytes.length : 0) + ' bytes, 양식 열: 국소명·거점·충전기수·충전기번호·MCCB·접지·계량기·비고)');
+
+                try {
+                    await loadLeaflet();
+                    add(!!window.L, '지도 라이브러리(Leaflet) 로드');
+                } catch (err) {
+                    add(false, '지도 라이브러리 로드 실패 · ' + (err && err.message ? err.message : err));
+                }
+
+                try {
+                    const tileRes = await fetch('https://a.basemaps.cartocdn.com/light_all/6/55/25.png', { cache: 'no-store' });
+                    add(tileRes.ok, '지도 타일 응답 ' + tileRes.status + (tileRes.ok ? '' : ' · 동선 탭에서 한번 더 확인'));
+                } catch (err) {
+                    note('지도 타일 직접 확인 불가(네트워크). 동선 → 전국/지역 → 그림 지도로 확인하세요.');
+                }
+
+                const file = new File([bytes], '홈테스트_점검일지_' + date + '.xlsx', {
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                });
+                const shared = await shareOrSaveFile(file, '홈테스트 점검일지 ' + formDateLabel(date));
+                add(true, shared ? '샘플 엑셀 공유/저장 창 열림' : '샘플 엑셀 파일 저장 시도 완료');
+                note('시트·드라이브에는 올리지 않았습니다. 동선 지도는 지역 선택 후 확인하세요.');
+            } catch (err) {
+                add(false, '홈 테스트 중단: ' + (err && err.message ? err.message : err));
+            }
+            if (box) box.innerHTML = lines.join('<br>');
+            alert('홈 테스트 결과를 확인하세요. 샘플 엑셀도 함께 받아 두었습니다.');
         }
 
         function makeTestPhoto(label) {

@@ -1,4 +1,4 @@
-// v4.47: clear fields immediately on photo delete; fix map load/tiles
+// v4.48: faster meter OCR feedback; home self-check with sample Excel; map tile fallback
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
