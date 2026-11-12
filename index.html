@@ -48,10 +48,24 @@
             border-radius: 10px;
             padding: 12px 8px;
             text-align: center;
+            border: none;
+            color: inherit;
+            width: 100%;
         }
+        .stat-tap { cursor: pointer; }
+        .stat-tap:active { opacity: 0.85; }
 
         .stat-value { font-size: 20px; font-weight: 700; color: #4ade80; }
         .stat-label { font-size: 10px; color: #888; margin-top: 2px; }
+        .stats-place {
+            background: #1c1c30;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+        .stats-place .meta { font-size: 12px; color: #aaa; margin-top: 2px; }
 
         .card {
             background: #16213e;
@@ -1038,7 +1052,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.36</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.37</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
@@ -1056,24 +1070,24 @@
                 </div>
             </div>
             <div class="stats-grid">
-                <div class="stat-card">
+                <button type="button" class="stat-card stat-tap" onclick="openStatsPlaces('today')">
                     <div class="stat-value" id="todayCount">0</div>
-                    <div class="stat-label">오늘</div>
-                </div>
-                <div class="stat-card">
+                    <div class="stat-label">오늘 · 눌러서 보기</div>
+                </button>
+                <button type="button" class="stat-card stat-tap" onclick="openStatsPlaces('week')">
                     <div class="stat-value" id="weekCount">0</div>
-                    <div class="stat-label">이번주</div>
-                </div>
-                <div class="stat-card">
+                    <div class="stat-label">이번주 · 눌러서 보기</div>
+                </button>
+                <button type="button" class="stat-card stat-tap" onclick="openStatsPlaces('total')">
                     <div class="stat-value" id="totalCount">0</div>
-                    <div class="stat-label">누적</div>
-                </div>
+                    <div class="stat-label">누적 · 눌러서 보기</div>
+                </button>
                 <div class="stat-card">
                     <div class="stat-value" id="progressPercent">0%</div>
                     <div class="stat-label">진행률</div>
                 </div>
             </div>
-            <div style="font-size:11px;color:#888;margin:-6px 0 12px;">숫자는 팀 전체(구글 시트) 기준입니다</div>
+            <div style="font-size:11px;color:#888;margin:-6px 0 12px;">숫자는 팀 전체(구글 시트) 기준 · 오늘/이번주/누적을 누르면 어디 했는지 나옵니다</div>
 
             <div id="selectScreen">
                 <div class="card">
@@ -1196,9 +1210,9 @@
                 <div class="card-header">🗺️ 지역 동선</div>
                 <div class="card-body">
                     <div class="info-box">
-                        <div class="text">지역을 고르면 시/군별 로드맵이 나옵니다. 주황은 남은 거점, 초록은 완료입니다. 다른 사람 완료는 구글 시트에서 불러옵니다.</div>
+                        <div class="text">지역·시군을 고르면 목록이 나옵니다. GPS가 켜져 있으면 <b>가까운 순</b>으로 볼 수 있고, 주소를 복사하거나 카카오·네이버 맵으로 찾아갈 수 있습니다.</div>
                     </div>
-                    <div class="legend">🟠 남은 거점 &nbsp; 🟢 완료 거점 &nbsp; 시/군을 누르면 방문 순서</div>
+                    <div class="legend">🟠 남은 거점 &nbsp; 🟢 완료 거점 &nbsp; 주소 복사 · 맵으로 길찾기</div>
                     <div class="form-group">
                         <label class="form-label">지역</label>
                         <select class="form-select" id="routeRegion"></select>
@@ -1217,6 +1231,15 @@
                             <option value="done">완료만</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">정렬</label>
+                        <select class="form-select" id="routeSort">
+                            <option value="near">가까운 순 (GPS)</option>
+                            <option value="hood">동네·주소 순</option>
+                            <option value="name">이름 순</option>
+                        </select>
+                    </div>
+                    <div class="text" id="routeGpsHint" style="font-size:12px;color:#aaa;margin:0 0 8px;">GPS를 켜 두면 현재 위치에서 가까운 충전소부터 보입니다.</div>
                     <div id="routeTeamWrap">
                     <div class="form-group">
                         <label class="form-label">몇 조로 나눌까요</label>
@@ -1469,12 +1492,23 @@
             </div>
 
             <div class="manual-sec">
-                <h3>7. 자주 막히는 것</h3>
+                <h3>7. 오늘·이번주 확인 / 동선</h3>
+                <ul>
+                    <li>홈의 <b>오늘·이번주·누적</b>을 누르면 어디를 했는지 목록이 나옵니다.</li>
+                    <li>동선 탭에서 정렬을 <b>가까운 순(GPS)</b>으로 두면 현재 위치에서 가까운 충전소부터 보입니다.</li>
+                    <li>각 충전소에 <b>주소 복사 · 카카오맵 · 네이버맵</b>이 있습니다. 복사한 주소를 내비에 붙여넣어도 됩니다.</li>
+                    <li>조를 나눠 다니면 거점 잠금은 쓰지 않습니다.</li>
+                </ul>
+            </div>
+
+            <div class="manual-sec">
+                <h3>8. 자주 막히는 것</h3>
                 <ul>
                     <li>칸이 비면 → 6·7번을 숫자만 크게 다시 찍거나, 확인 화면에서 직접 적습니다.</li>
                     <li>지하에서 판독이 안 되면 → 인터넷이 한 번 필요합니다. 안 되면 두 칸만 수기 입력하세요.</li>
                     <li>사진이 안 올라가면 → 업로드가 끝난 뒤 다시 완료를 누르세요.</li>
-                    <li>화면 위에 「새 버전」이 뜨면 → <b>지금 새로고침</b>을 누르세요.</li>
+                    <li>화면 위에 「새 버전」이 뜨면 → <b>강제 새로고침</b>을 누르세요.</li>
+                    <li>가까운 순이 안 되면 → 설정에 있는 구글 스크립트를 새 버전으로 한 번 배포하세요.</li>
                 </ul>
             </div>
 
@@ -1503,7 +1537,9 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.36';
+        const APP_VERSION = '4.37';
+        // Teams split work ahead of time, so zone locks are off by default.
+        const USE_ZONE_LOCK = false;
 
         async function forceAppReload() {
             try {
@@ -1661,6 +1697,7 @@
         }
 
         async function claimZoneLock() {
+            if (!USE_ZONE_LOCK) return { ok: true, skipped: true };
             const res = await googleJsonp('action=lock&' + lockQuery(), 12000);
             const lock = res.ok && res.data && res.data.lock;
             if (!lock) return { ok: true, unsure: true };
@@ -1668,12 +1705,14 @@
         }
 
         async function releaseZoneLock() {
+            if (!USE_ZONE_LOCK) return;
             try { await googleJsonp('action=unlock&' + lockQuery(), 8000); } catch (err) {}
         }
 
         let lockBeatTimer = 0;
         function startLockHeartbeat() {
             stopLockHeartbeat();
+            if (!USE_ZONE_LOCK) return;
             lockBeatTimer = setInterval(() => {
                 if (document.getElementById('inspectScreen').classList.contains('hidden')) {
                     stopLockHeartbeat();
@@ -2208,15 +2247,25 @@
                 const key = `${h.station}|${zone}`;
                 if (!map.has(key)) {
                     map.set(key, {
+                        region: h.region || '',
                         station: h.station,
                         city: h.city,
                         zone,
                         date: h.date,
-                        chargers: h.chargers || 0
+                        chargers: h.chargers || 0,
+                        inspector: h.inspector || ''
                     });
                 }
             });
             return [...map.values()];
+        }
+
+        function findStationRegion(city, station) {
+            if (!city || !station) return '';
+            for (const region of Object.keys(STATION_DATA || {})) {
+                if (STATION_DATA[region][city] && STATION_DATA[region][city][station]) return region;
+            }
+            return '';
         }
 
         function updateStats() {
@@ -2243,6 +2292,199 @@
             document.getElementById('totalCount').textContent = total;
             document.getElementById('progressPercent').textContent =
                 ((total / 4571) * 100).toFixed(1) + '%';
+        }
+
+        function statsPlaceRows(mode) {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const weekStart = getWeekStart();
+            const rows = uniqueTeamCompletions().filter((row) => {
+                const ds = parseSheetDate(row.date);
+                if (mode === 'today') return ds === todayStr;
+                if (mode === 'week') return ds && new Date(ds + 'T00:00:00') >= weekStart;
+                return true;
+            });
+            rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))
+                || String(a.city || '').localeCompare(String(b.city || ''), 'ko')
+                || String(a.station || '').localeCompare(String(b.station || ''), 'ko'));
+            return rows;
+        }
+
+        function openStatsPlaces(mode) {
+            const titles = { today: '오늘 점검', week: '이번주 점검', total: '누적 점검' };
+            const rows = statsPlaceRows(mode);
+            const body = rows.length
+                ? rows.map((row) => {
+                    const n = chargersForRow(row);
+                    const region = row.region || findStationRegion(row.city, row.station);
+                    const addr = stationAddressOf(region, row.city, row.station);
+                    return `<div class="stats-place">
+                        <div><b>${row.station || ''}</b> · ${row.zone || ''}</div>
+                        <div class="meta">${row.city || ''} · ${parseSheetDate(row.date) || ''} · ${n}대${row.inspector ? ' · ' + row.inspector : ''}</div>
+                        ${addr ? `<div class="meta">${addr}</div>
+                        <div class="route-btns" style="margin-top:6px;">
+                            <button type="button" class="btn btn-secondary btn-small" onclick='copyText(${JSON.stringify(addr)})'>주소 복사</button>
+                            <a class="btn btn-secondary btn-small" href="${kakaoMapUrl(addr)}" target="_blank" rel="noopener">카카오맵</a>
+                            <a class="btn btn-secondary btn-small" href="${naverMapUrl(addr)}" target="_blank" rel="noopener">네이버맵</a>
+                        </div>` : ''}
+                    </div>`;
+                }).join('')
+                : '<div class="stats-place">이 기간에 기록이 없습니다. 동기화 후 다시 눌러 보세요.</div>';
+            openSimpleSheet(titles[mode] || '점검 목록', rows.length + '곳', body);
+        }
+
+        function openSimpleSheet(title, sub, bodyHtml) {
+            let overlay = document.getElementById('simpleOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'simpleOverlay';
+                overlay.className = 'manual-overlay hidden';
+                overlay.innerHTML = `<div class="manual-sheet">
+                    <h2 id="simpleTitle"></h2>
+                    <div class="manual-ver" id="simpleSub"></div>
+                    <div id="simpleBody"></div>
+                    <div class="manual-actions" style="margin-top:12px;">
+                        <button type="button" class="btn btn-primary" onclick="closeSimpleSheet()">닫기</button>
+                    </div>
+                </div>`;
+                document.body.appendChild(overlay);
+            }
+            document.getElementById('simpleTitle').textContent = title;
+            document.getElementById('simpleSub').textContent = sub || '';
+            document.getElementById('simpleBody').innerHTML = bodyHtml || '';
+            overlay.classList.remove('hidden');
+        }
+
+        function closeSimpleSheet() {
+            const overlay = document.getElementById('simpleOverlay');
+            if (overlay) overlay.classList.add('hidden');
+        }
+
+        function stationAddressOf(region, city, station) {
+            try {
+                return (STATION_DATA[region] && STATION_DATA[region][city] && STATION_DATA[region][city][station] && STATION_DATA[region][city][station].address) || '';
+            } catch (err) {
+                return '';
+            }
+        }
+
+        function kakaoMapUrl(address) {
+            return 'https://map.kakao.com/link/search/' + encodeURIComponent(address || '');
+        }
+
+        function naverMapUrl(address) {
+            return 'https://map.naver.com/v5/search/' + encodeURIComponent(address || '');
+        }
+
+        async function copyText(text) {
+            const v = String(text || '').trim();
+            if (!v) {
+                alert('복사할 주소가 없습니다.');
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(v);
+                alert('주소를 복사했습니다. 내비 앱에 붙여넣으면 됩니다.');
+            } catch (err) {
+                prompt('주소를 복사하세요', v);
+            }
+        }
+
+        function gpsLatLng() {
+            if (!state.currentGPS) return null;
+            const lat = parseFloat(state.currentGPS.lat);
+            const lng = parseFloat(state.currentGPS.lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            return { lat, lng };
+        }
+
+        function haversineKm(a, b) {
+            const toRad = (d) => d * Math.PI / 180;
+            const R = 6371;
+            const dLat = toRad(b.lat - a.lat);
+            const dLng = toRad(b.lng - a.lng);
+            const s = Math.sin(dLat / 2) ** 2
+                + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+            return 2 * R * Math.asin(Math.sqrt(s));
+        }
+
+        function geoCacheGet() {
+            try { return JSON.parse(localStorage.getItem('stationGeoV1') || '{}'); } catch (err) { return {}; }
+        }
+
+        function geoCacheSet(map) {
+            try { localStorage.setItem('stationGeoV1', JSON.stringify(map)); } catch (err) {}
+        }
+
+        async function ensureStationGeo(items) {
+            const cache = geoCacheGet();
+            const missing = [];
+            items.forEach((it) => {
+                const key = (it.address || it.name || '').trim();
+                if (!key) return;
+                if (cache[key] && Number.isFinite(cache[key].lat)) {
+                    it.lat = cache[key].lat;
+                    it.lng = cache[key].lng;
+                } else {
+                    missing.push(key);
+                }
+            });
+            if (!missing.length) return cache;
+            const unique = [...new Set(missing)].slice(0, 40);
+            const res = await googleJsonp(
+                'action=geocode&addresses=' + encodeURIComponent(unique.join('\n')),
+                25000
+            );
+            const geos = res.ok && res.data && res.data.geos ? res.data.geos : {};
+            Object.keys(geos).forEach((addr) => {
+                if (geos[addr] && Number.isFinite(geos[addr].lat)) cache[addr] = geos[addr];
+            });
+            geoCacheSet(cache);
+            items.forEach((it) => {
+                const key = (it.address || it.name || '').trim();
+                if (cache[key]) {
+                    it.lat = cache[key].lat;
+                    it.lng = cache[key].lng;
+                }
+            });
+            return cache;
+        }
+
+        async function sortRouteItems(items) {
+            const sort = (document.getElementById('routeSort') || {}).value || 'near';
+            const hint = document.getElementById('routeGpsHint');
+            const list = items.slice();
+            if (sort === 'name') {
+                if (hint) hint.textContent = '이름 순으로 보고 있습니다.';
+                return list.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+            }
+            if (sort === 'hood') {
+                if (hint) hint.textContent = '동네·주소 순으로 보고 있습니다.';
+                return list.sort((a, b) => a.hood.localeCompare(b.hood, 'ko') || a.address.localeCompare(b.address, 'ko') || a.name.localeCompare(b.name, 'ko'));
+            }
+            const here = gpsLatLng();
+            if (!here) {
+                if (hint) hint.textContent = 'GPS가 없어 동네·주소 순으로 보여 줍니다. 위치 권한을 켜 주세요.';
+                return list.sort((a, b) => a.hood.localeCompare(b.hood, 'ko') || a.address.localeCompare(b.address, 'ko'));
+            }
+            if (hint) hint.textContent = '가까운 순 맞추는 중...';
+            await ensureStationGeo(list);
+            list.forEach((it) => {
+                it.km = (Number.isFinite(it.lat) && Number.isFinite(it.lng))
+                    ? haversineKm(here, { lat: it.lat, lng: it.lng })
+                    : null;
+            });
+            const withKm = list.filter((it) => it.km != null).length;
+            if (hint) {
+                hint.textContent = withKm
+                    ? `현재 위치 기준 가까운 순 · ${withKm}/${list.length}곳 거리 계산`
+                    : '거리 계산을 못 했습니다. 설정에서 구글 스크립트를 새 버전으로 배포하면 가까운 순이 됩니다. 지금은 동네 순입니다.';
+            }
+            return list.sort((a, b) => {
+                if (a.km == null && b.km == null) return a.name.localeCompare(b.name, 'ko');
+                if (a.km == null) return 1;
+                if (b.km == null) return -1;
+                return a.km - b.km;
+            });
         }
 
         function initRegions() {
@@ -2455,15 +2697,18 @@
                 clearMeterFields();
                 inspectZoneKey = key;
             }
-            startBtn.disabled = true;
-            startBtn.textContent = '거점 잠그는 중...';
-            const lock = await claimZoneLock();
-            startBtn.disabled = false;
-            if (!lock.ok) {
-                alert(`${lock.lockedBy || '다른 사람'}님이 이 거점을 찍고 있습니다.\n끝나면 들어가세요.`);
-                try { await fetchTeamProgress(true); } catch (err) {}
-                selectZone(zone, state.selectedZoneIdx);
-                return;
+            if (USE_ZONE_LOCK) {
+                startBtn.disabled = true;
+                startBtn.textContent = '거점 잠그는 중...';
+                const lock = await claimZoneLock();
+                startBtn.disabled = false;
+                startBtn.textContent = '점검 시작';
+                if (!lock.ok) {
+                    alert(`${lock.lockedBy || '다른 사람'}님이 이 거점을 찍고 있습니다.\n끝나면 들어가세요.`);
+                    try { await fetchTeamProgress(true); } catch (err) {}
+                    selectZone(zone, state.selectedZoneIdx);
+                    return;
+                }
             }
             document.getElementById('uploadStatus').textContent = '';
             showInspectScreen();
@@ -5094,9 +5339,11 @@
                 document.getElementById('routeTeams').value = String(suggestedTeamCount(items.length));
                 renderRoutePlan();
             });
-            document.getElementById('routeTeams').addEventListener('change', renderRoutePlan);
-            document.getElementById('routeTeamView').addEventListener('change', renderRoutePlan);
-            document.getElementById('routeFilter').addEventListener('change', renderRoutePlan);
+            document.getElementById('routeTeams').addEventListener('change', () => renderRoutePlan());
+            document.getElementById('routeTeamView').addEventListener('change', () => renderRoutePlan());
+            document.getElementById('routeFilter').addEventListener('change', () => renderRoutePlan());
+            const routeSort = document.getElementById('routeSort');
+            if (routeSort) routeSort.addEventListener('change', () => renderRoutePlan());
             document.getElementById('routeShareBtn').addEventListener('click', shareRoutePlan);
             document.getElementById('routeDownloadBtn').addEventListener('click', downloadRoutePlan);
             document.getElementById('routeSyncBtn').addEventListener('click', () => fetchTeamProgress(true));
@@ -5187,7 +5434,7 @@
             window.scrollTo(0, 0);
         }
 
-        function renderRoutePlan() {
+        async function renderRoutePlan() {
             const region = document.getElementById('routeRegion').value;
             const city = document.getElementById('routeCity').value;
             const teamWrap = document.getElementById('routeTeamWrap');
@@ -5211,7 +5458,8 @@
             }
             teamWrap.style.display = '';
             const allItems = collectRouteStations(region, city);
-            const items = applyRouteFilter(allItems);
+            const filtered = applyRouteFilter(allItems);
+            const items = await sortRouteItems(filtered);
             routePlan = { region, city, teams: splitContiguous(items, n), allItems };
             const viewSel = document.getElementById('routeTeamView');
             const prev = viewSel.value;
@@ -5243,14 +5491,17 @@
             list.innerHTML = blocks.map(({ team, items: teamItems }) => {
                 const html = teamItems.map((it, i) => {
                     const cls = it.done >= it.total && it.total ? 'done' : (it.done ? 'partial' : '');
-                    const kakao = `https://map.kakao.com/link/search/${encodeURIComponent(it.address || it.name)}`;
+                    const addr = it.address || it.name;
+                    const km = (it.km != null && Number.isFinite(it.km)) ? (` · ${it.km < 10 ? it.km.toFixed(1) : Math.round(it.km)}km`) : '';
                     return `<div class="route-item ${cls}">
                         <div><span class="route-num">${i + 1}</span><span class="route-name">${it.name}</span></div>
-                        <div class="route-meta">${it.address}<br>${it.hood} · 거점 ${it.done}/${it.total} 완료 · ${it.chargers}대</div>
+                        <div class="route-meta">${it.address || '주소 없음'}${km}<br>${it.hood} · 거점 ${it.done}/${it.total} 완료 · ${it.chargers}대</div>
                         ${zonePills(it)}
                         <div class="route-btns">
                             <button type="button" class="btn btn-primary" onclick='jumpToStation(${JSON.stringify(it.region)}, ${JSON.stringify(it.city)}, ${JSON.stringify(it.name)})'>이 충전소 점검</button>
-                            <a class="btn btn-secondary" href="${kakao}" target="_blank" rel="noopener">카카오맵</a>
+                            <button type="button" class="btn btn-secondary" onclick='copyText(${JSON.stringify(addr)})'>주소 복사</button>
+                            <a class="btn btn-secondary" href="${kakaoMapUrl(addr)}" target="_blank" rel="noopener">카카오맵</a>
+                            <a class="btn btn-secondary" href="${naverMapUrl(addr)}" target="_blank" rel="noopener">네이버맵</a>
                         </div>
                     </div>`;
                 }).join('');

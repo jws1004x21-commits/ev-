@@ -1,4 +1,4 @@
-// v4.36: force reload so phones pick up the new app version
+// v4.37: stats place list, near-first routes, locks off, address/nav helpers
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

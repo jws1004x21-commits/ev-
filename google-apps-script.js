@@ -1,5 +1,5 @@
 /**
- * 충전소 점검앱 v11 — Google Apps Script
+ * 충전소 점검앱 v12 — Google Apps Script
  *
  * 사용법:
  * 1. 구글 시트 → 확장 프로그램 → Apps Script
@@ -25,7 +25,7 @@ function setupDrive() {
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action;
   var p = e.parameter || {};
-  var payload = { ok: true, version: 'v11', message: '충전소 점검 서버 정상' };
+  var payload = { ok: true, version: 'v12', message: '충전소 점검 서버 정상' };
   if (action === 'progress') {
     payload.progress = loadProgress_();
     payload.locks = loadLocks_();
@@ -47,6 +47,9 @@ function doGet(e) {
   }
   if (action === 'heartbeat') {
     payload.lock = refreshLock_(p);
+  }
+  if (action === 'geocode') {
+    payload.geos = geocodeAddresses_(p.addresses || '');
   }
   var cb = e && e.parameter && e.parameter.callback;
   if (cb) {
@@ -518,6 +521,25 @@ function loadLocks_() {
       });
     } catch (err) {}
   });
+  return out;
+}
+
+function geocodeAddresses_(raw) {
+  var out = {};
+  var list = String(raw || '').split(/\n+/);
+  var geocoder = Maps.newGeocoder().setLanguage('ko');
+  for (var i = 0; i < list.length && i < 40; i++) {
+    var address = String(list[i] || '').trim();
+    if (!address || out[address]) continue;
+    try {
+      var res = geocoder.geocode(address);
+      if (res && res.status === 'OK' && res.results && res.results[0] && res.results[0].geometry) {
+        var loc = res.results[0].geometry.location;
+        out[address] = { lat: loc.lat, lng: loc.lng };
+      }
+      Utilities.sleep(80);
+    } catch (err) {}
+  }
   return out;
 }
 
