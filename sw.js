@@ -1,4 +1,4 @@
-// v4.26: known zone fields save automatically, photo readings are typed
+// v4.27: log keeps MCCB and meter number for each zone only
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

@@ -1081,23 +1081,13 @@
                         <div id="zonePhotoTotal" class="drive-count">이 거점 사진 0장 · 드라이브 전송 0장</div>
                         <div id="checklist"></div>
                         <div class="form-group" style="margin-top:16px;">
-                            <label class="form-label">이 거점만의 값 · 충전기 대수가 다르면 MCCB·계량기번호도 다릅니다</label>
+                            <label class="form-label">이 거점 MCCB·계량기번호 · 다른 거점 값을 넣지 마세요</label>
                             <div class="meter-grid">
-                                <div class="form-group">
-                                    <label class="form-label">전압 220 (V)</label>
-                                    <input type="number" inputmode="decimal" class="form-input" id="meterV220" placeholder="예: 221">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">전압 380 (V)</label>
-                                    <input type="number" inputmode="decimal" class="form-input" id="meterV380" placeholder="예: 381">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">접지저항 (Ω)</label>
-                                    <input type="number" inputmode="decimal" class="form-input" id="meterGround" placeholder="예: 2.1">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">절연저항 (MΩ)</label>
-                                    <input type="number" inputmode="decimal" class="form-input" id="meterInsul" placeholder="예: 120">
+                                <div class="form-group hidden">
+                                    <input type="number" id="meterV220">
+                                    <input type="number" id="meterV380">
+                                    <input type="number" id="meterGround">
+                                    <input type="number" id="meterInsul">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">MCCB용량</label>
@@ -1354,7 +1344,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.26';
+        const APP_VERSION = '4.27';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -3037,14 +3027,11 @@
                 const chargerEl = document.getElementById('logChargerNo');
                 if (chargerEl && !chargerEl.value) chargerEl.value = numbers;
                 const blocks = [
-                    { id: 'panel', guide: '배전반 사진을 보고 MCCB 용량을 직접 적으세요. 이 거점 충전기 ' + count + '대 값입니다.', fields: [['logMccb', 'MCCB용량', '예: 75A']] },
-                    { id: 'charger', guide: '계량기 사진을 보고 번호만 직접 적으세요.', fields: [['logMeterNo', '계량기번호', '사진에 보이는 번호']] },
-                    { id: 'voltage', guide: '전압 사진을 보고 직접 적으세요.', fields: [['meterV220', '전압 220', '221'], ['meterV380', '전압 380', '380']] },
-                    { id: 'resistance', guide: '접지저항 사진을 보고 직접 적으세요.', fields: [['meterGround', '접지저항', '2']] },
-                    { id: 'insulation', guide: '절연저항 사진을 보고 직접 적으세요.', fields: [['meterInsul', '절연저항', '120']] }
+                    { id: 'panel', guide: '거점 ' + (state.selectedZoneIdx + 1) + ' · 충전기 ' + count + '대 (' + numbers + ') 배전반 사진에 있는 MCCB만 적으세요.', fields: [['logMccb', '이 거점 MCCB용량', '예: 75A']] },
+                    { id: 'charger', guide: '이 거점 계량기 사진의 번호만 적으세요. 다른 거점 번호를 넣지 마세요.', fields: [['logMeterNo', '이 거점 계량기번호', '사진에 보이는 번호']] }
                 ];
-                title.textContent = '이 거점 일지';
-                sub.textContent = '알고 있는 칸은 자동으로 시트에 들어갑니다. MCCB·계량기·전압·저항은 사진을 보고 적은 것만 들어갑니다.';
+                title.textContent = '이 거점 MCCB · 계량기';
+                sub.textContent = '국소명·거점·충전기 수·번호·장소는 자동입니다. 전압·저항·절연 숫자는 일지에 넣지 않습니다.';
                 const autoCard = `<div class="review-block">
                     <h4>자동으로 시트에 들어갑니다</h4>
                     <div class="review-guide">국소명 · 거점 · 충전기 수 · 충전기 번호 · 장소. 사진에서 읽지 않습니다.</div>
@@ -3808,6 +3795,14 @@
         document.getElementById('completeZoneBtn').addEventListener('click', () => maybeComplete());
         document.getElementById('reviewBack').addEventListener('click', closeReview);
         document.getElementById('reviewGo').addEventListener('click', () => {
+            copyReviewMeters();
+            const mccb = String((document.getElementById('logMccb') || {}).value || '').trim();
+            const meterNo = String((document.getElementById('logMeterNo') || {}).value || '').trim();
+            if (!mccb || !meterNo) {
+                const sub = document.getElementById('reviewSub');
+                if (sub) sub.textContent = '이 거점 MCCB용량과 계량기번호를 사진 보고 적어야 시트에 저장됩니다.';
+                return;
+            }
             closeReview();
             finishComplete();
         });
@@ -4429,9 +4424,8 @@
                 { key: 'zoneIndex', title: '거점', w: 72 },
                 { key: 'chargers', title: '충전기수', w: 96 },
                 { key: 'chargerNo', title: '충전기번호', w: 130 },
-                { key: 'mccb', title: 'MCCB용량', w: 120 },
-                { key: 'ground', title: '접지저항', w: 110 },
-                { key: 'meterNo', title: '계량기번호', w: 180 },
+                { key: 'mccb', title: 'MCCB용량', w: 140 },
+                { key: 'meterNo', title: '계량기번호', w: 200 },
                 { key: 'place', title: '비고', w: 320 }
             ];
             const rowH = 58;
@@ -4497,18 +4491,18 @@
             box.dataset.open = '1';
             const date = logDateValue();
             const rows = rowsForDailyLog(date);
-            const cols = ['station', 'zoneIndex', 'chargers', 'chargerNo', 'mccb', 'ground', 'meterNo', 'place'];
-            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>접지저항</th><th>계량기번호</th><th>비고</th></tr>';
+            const cols = ['station', 'zoneIndex', 'chargers', 'chargerNo', 'mccb', 'meterNo', 'place'];
+            const head = '<tr><th>국소명</th><th>거점</th><th>충전기수</th><th>충전기번호</th><th>MCCB용량</th><th>계량기번호</th><th>비고</th></tr>';
             const body = rows.map((r) => '<tr>' + cols.map((key) => '<td>' + String(r[key] || '').replace(/</g, '&lt;') + '</td>').join('') + '</tr>').join('');
             box.innerHTML = '<div style="font-size:13px;margin-bottom:6px;">점검일 ' + formDateLabel(date) + ' · ' + rows.length + '거점 · 글자로 시트와 카톡에 들어갑니다.</div>'
-                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="8">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
+                + '<table><thead>' + head + '</thead><tbody>' + (body || '<tr><td colspan="7">이 날짜 기록이 없습니다.</td></tr>') + '</tbody></table>';
         }
 
         function dailyLogText(date, rows) {
             const lines = ['전기차 충전소 점검일지', '점검일: ' + formDateLabel(date), ''];
-            lines.push(['국소명', '거점', '충전기수', '충전기번호', 'MCCB용량', '접지저항', '계량기번호', '비고'].join('\t'));
+            lines.push(['국소명', '거점', '충전기수', '충전기번호', 'MCCB용량', '계량기번호', '비고'].join('\t'));
             rows.forEach((r) => {
-                lines.push([r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.ground, r.meterNo, r.place].join('\t'));
+                lines.push([r.station, r.zoneIndex, r.chargers, r.chargerNo, r.mccb, r.meterNo, r.place].join('\t'));
             });
             if (!rows.length) lines.push('이 날짜에 기록이 없습니다.');
             return lines.join('\n');
