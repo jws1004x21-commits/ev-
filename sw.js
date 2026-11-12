@@ -1,5 +1,5 @@
-// v4.61: auto-check pass/fail banner + short voice
-const SW_VER = '4.61';
+// v4.62: show numbered failed auto-check items in banner/alert/voice
+const SW_VER = '4.62';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
