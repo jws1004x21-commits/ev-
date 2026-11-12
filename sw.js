@@ -1,4 +1,4 @@
-// v4.45: clear MCCB/meter fields on photo delete; prefer 02xxxxx manufacturing no.
+// v4.46: meter MFG OCR accepts any digits; no leading-zero preference
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

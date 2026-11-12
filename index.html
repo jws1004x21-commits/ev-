@@ -1076,7 +1076,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.45</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.46</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
@@ -1197,7 +1197,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">계량기 제조번호</label>
-                                    <input type="text" class="form-input" id="logMeterNo" placeholder="명판 제조번호 (예: 0261660)">
+                                    <input type="text" class="form-input" id="logMeterNo" placeholder="명판에 보이는 제조번호 그대로">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">충전기번호</label>
@@ -1578,7 +1578,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.45';
+        const APP_VERSION = '4.46';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -3740,12 +3740,12 @@
         }
 
         function isPlausibleMeterMfg(n) {
-            if (!/^\d{7,8}$/.test(n)) return false;
-            if (!/^0/.test(n)) return false;
+            // 앞자리 제한 없음. 사진에 보이는 제조번호(보통 6~10자리)면 됨.
+            if (!/^\d{6,10}$/.test(n)) return false;
             if (/^0+$/.test(n) || /^(\d)\1+$/.test(n)) return false;
-            if (/^(15|16|18|19)/.test(n)) return false;
-            if (/^0220(220|380)/.test(n) || /^0380(220|380)/.test(n)) return false;
-            if (/^0(220|380)\d{3,4}$/.test(n) && !/^02\d{5}$/.test(n)) return false;
+            if (/^220$|^380$|^220380$|^380220$/.test(n)) return false;
+            if (/^(220|380)\d{0,2}$/.test(n)) return false;
+            if (/^0220(220|380)$/.test(n) || /^0380(220|380)$/.test(n)) return false;
             return true;
         }
 
@@ -3756,32 +3756,31 @@
             const push = (value, weight) => {
                 let n = String(value || '').replace(/\D/g, '');
                 if (!n) return;
-                // OCR이 앞자리 0을 빼 먹으면 6자리가 됨 → 0 붙여 제조번호 후보로.
-                if (/^[1-9]\d{5}$/.test(n)) n = '0' + n;
-                // 앞자리 0을 1로 오인하는 경우(02xxxxx → 12xxxxx)
-                if (/^12\d{5}$/.test(n)) {
-                    const fixed = '0' + n.slice(1);
-                    if (isPlausibleMeterMfg(fixed)) out.push({ n: fixed, w: weight });
-                }
-                if (n.length > 8 && /^0/.test(n)) {
-                    [n.slice(0, 7), n.slice(0, 8)].forEach((part) => {
-                        if (isPlausibleMeterMfg(part)) out.push({ n: part, w: weight });
+                if (n.length > 10) {
+                    // 너무 긴 숫자는 앞 7·8·10자리 후보만
+                    [7, 8, 10].forEach((len) => {
+                        if (n.length >= len) {
+                            const part = n.slice(0, len);
+                            if (isPlausibleMeterMfg(part)) out.push({ n: part, w: weight });
+                        }
                     });
                     return;
                 }
                 if (isPlausibleMeterMfg(n)) out.push({ n, w: weight });
             };
-            // NO. 단독은 다른 번호(형식/인증)를 잘 집음 → 제조번호 문구만 강하게
-            const labelRe = /(?:제조\s*번호|제조번호)[^\d]{0,10}(\d[\d\-\s]{5,14}\d)/gi;
+            // 제조번호 라벨 옆 숫자를 최우선. 그다음 NO./일반 숫자 덩어리.
+            const labelRe = /(?:제조\s*번호|제조번호)[^\d]{0,12}(\d[\d\-\s]{4,16}\d)/gi;
             let match;
-            while ((match = labelRe.exec(norm))) push(match[1], 8);
+            while ((match = labelRe.exec(norm))) push(match[1], 10);
             labelRe.lastIndex = 0;
-            while ((match = labelRe.exec(raw))) push(match[1], 8);
-            const softLabel = /(?:NO\.?|N0\.?|S\s*\/\s*N)[^\d]{0,8}(0[\d\-\s]{5,12}\d)/gi;
-            while ((match = softLabel.exec(norm))) push(match[1], 3);
-            (norm.match(/\b0(?:[\d\-\s]){5,12}\d\b/g) || []).forEach((part) => push(part, 2));
+            while ((match = labelRe.exec(raw))) push(match[1], 10);
+            const softLabel = /(?:NO\.?|N0\.?|S\s*\/\s*N|SERIAL)[^\d]{0,10}(\d[\d\-\s]{4,16}\d)/gi;
+            while ((match = softLabel.exec(norm))) push(match[1], 4);
+            softLabel.lastIndex = 0;
+            while ((match = softLabel.exec(raw))) push(match[1], 4);
+            (norm.match(/\b\d[\d\-\s]{4,16}\d\b/g) || []).forEach((part) => push(part, 2));
             const compact = norm.replace(/[^0-9]/g, ' ');
-            (compact.match(/\d{6,8}/g) || []).forEach((part) => push(part, 1));
+            (compact.match(/\d{6,10}/g) || []).forEach((part) => push(part, 1));
             return out;
         }
 
@@ -3794,20 +3793,15 @@
         }
 
         function pickMeterMfgWinner(votes) {
+            // 0 시작 우대 없음. 여러 번 같은 번호로 읽힌 값을 채택.
             const rows = [...votes.entries()].map(([n, score]) => ({
                 n,
-                score: score
-                    + (n.length === 7 ? 0.8 : 0)
-                    + (/^02\d{5}$/.test(n) ? 1.2 : 0)
-                    + (/^0[1-9]\d{5}$/.test(n) ? 0.4 : 0)
-            })).sort((a, b) => b.score - a.score || a.n.localeCompare(b.n));
+                score: score + (n.length === 7 || n.length === 8 ? 0.5 : 0)
+            })).sort((a, b) => b.score - a.score || b.n.length - a.n.length || a.n.localeCompare(b.n));
             if (!rows.length) return '';
-            // 0으로 시작하는 제조번호만. 1로 시작하는 잔여 값은 제외.
-            const zeroRows = rows.filter((r) => /^0/.test(r.n));
-            const use = zeroRows.length ? zeroRows : rows;
-            if (use.length === 1) return use[0].score >= 2 ? use[0].n : '';
-            if (use[0].score >= use[1].score + 1.2) return use[0].n;
-            if (use[0].score >= 5) return use[0].n;
+            if (rows.length === 1) return rows[0].score >= 2 ? rows[0].n : '';
+            if (rows[0].score >= rows[1].score + 1.2) return rows[0].n;
+            if (rows[0].score >= 5) return rows[0].n;
             return '';
         }
 
