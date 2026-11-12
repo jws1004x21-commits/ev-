@@ -1,4 +1,4 @@
-// v4.44: photos stay on phone until zone save; Drive upload only on complete
+// v4.45: clear MCCB/meter fields on photo delete; prefer 02xxxxx manufacturing no.
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
