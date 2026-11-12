@@ -1,5 +1,5 @@
-// v4.58: team report steps in manual (leader excel + member kakao zips)
-const SW_VER = '4.58';
+// v4.59: expanded full auto self-check on home
+const SW_VER = '4.59';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

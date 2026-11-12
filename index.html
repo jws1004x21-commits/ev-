@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.58">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.59">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1156,10 +1156,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.58</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.59</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전 있음 · 상단이 v4.58이어야 최신
+        새 버전 있음 · 상단이 v4.59이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1171,8 +1171,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.58">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.58</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.59">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.59</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
                         <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
@@ -1203,10 +1203,13 @@
             </div>
             <div id="homeSyncStatus" style="font-size:12px;color:#aaa;margin:-4px 0 12px;">앱을 열거나 홈으로 오면 자동으로 맞춥니다. 숫자가 다르면 동기화를 누르세요.</div>
             <div class="card" style="margin-bottom:12px;">
-                <div class="card-header">홈 점검 테스트</div>
+                <div class="card-header">전체 자동 점검</div>
                 <div class="card-body">
-                    <div class="text" style="font-size:12px;color:#aaa;margin-bottom:8px;">임의 샘플로 일지 양식·엑셀·지도 라이브러리를 확인합니다. 시트/드라이브에는 올리지 않습니다.</div>
-                    <button type="button" class="btn btn-primary" onclick="runHomeSelfCheck()">🧪 홈 테스트 실행 (엑셀 포함)</button>
+                    <div class="text" style="font-size:12px;color:#aaa;margin-bottom:8px;">
+                        앱 기능·엑셀·지도·비상모드·보고 zip·시트 연결을 한 번에 확인합니다. <b>시트/드라이브에는 올리지 않습니다.</b><br>
+                        실제 사진 업로드까지 보려면 설정 → <b>아무 사진으로 자동 테스트</b>를 쓰세요.
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="runHomeSelfCheck()">🧪 전체 자동 점검 실행</button>
                     <div id="homeSelfCheckResult" style="font-size:12px;color:#ccc;margin-top:10px;line-height:1.55;"></div>
                 </div>
             </div>
@@ -1499,8 +1502,8 @@
                     </div>
                     <button class="btn btn-secondary" onclick="testGoogleLink()">구글 연결 테스트</button>
                     <button class="btn btn-secondary" onclick="retryPendingUploads()">대기 중인 구글 업로드 재시도</button>
-                    <button class="btn btn-primary" onclick="runAutoTest()">🧪 아무 사진으로 자동 테스트</button>
-                    <button class="btn btn-secondary" style="margin-top:8px;" onclick="runHomeSelfCheck()">🧪 홈 테스트 (엑셀·지도·양식)</button>
+                    <button class="btn btn-primary" onclick="runAutoTest()">🧪 아무 사진으로 자동 테스트 (시트·드라이브 전송)</button>
+                    <button class="btn btn-secondary" style="margin-top:8px;" onclick="runHomeSelfCheck()">🧪 전체 자동 점검 (업로드 없음)</button>
                     <div class="upload-status" id="googleTestStatus"></div>
                     <div id="autoTestResults" style="margin-top:12px;font-size:13px;"></div>
                 </div>
@@ -1755,9 +1758,9 @@
         </div>
     </div>
 
-    <script src="station_data.js?v=4.58"></script>
+    <script src="station_data.js?v=4.59"></script>
     <script>
-        const APP_VERSION = '4.58';
+        const APP_VERSION = '4.59';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
@@ -7107,13 +7110,36 @@
         async function runHomeSelfCheck() {
             const box = document.getElementById('homeSelfCheckResult');
             const lines = [];
-            const add = (ok, text) => lines.push((ok ? '✅ ' : '❌ ') + text);
+            let fail = 0;
+            const add = (ok, text) => {
+                if (!ok) fail += 1;
+                lines.push((ok ? '✅ ' : '❌ ') + text);
+            };
             const note = (text) => lines.push('· ' + text);
-            if (box) box.innerHTML = '홈 테스트 진행 중…';
+            if (box) box.innerHTML = '전체 자동 점검 진행 중…';
             try {
                 add(!!APP_VERSION, '앱 버전 v' + APP_VERSION);
-                add(typeof clearFieldValue === 'function', '사진 삭제 시 용량·제조번호 초기화 로직');
-                add(typeof showRouteMap === 'function' && typeof drawRouteCanvas === 'function', '그림 지도(앱 내장 캔버스)');
+                try {
+                    const res = await fetch(versionCheckUrl(), { cache: 'no-store', credentials: 'omit' });
+                    const data = res.ok ? await res.json() : null;
+                    const remote = data && String(data.version || '').trim();
+                    add(!!remote, '서버 version.json 읽기 → ' + (remote || '실패'));
+                    if (remote) add(remote === APP_VERSION, '폰 버전과 서버 버전 일치 (' + APP_VERSION + ' / ' + remote + ')');
+                } catch (err) {
+                    add(false, 'version.json 확인 실패');
+                }
+
+                add(typeof STATION_DATA === 'object' && Object.keys(STATION_DATA || {}).length > 0, '충전소 데이터 로드');
+                add(!!document.getElementById('emergencyOverlay'), '비상모드 화면');
+                add(typeof openEmergencyMode === 'function' && typeof buildEmergencyMemo === 'function', '비상모드 메모/폴더 기능');
+                add(typeof clearFieldValue === 'function', '사진 삭제 시 용량·제조번호 초기화');
+                add(typeof showRouteMap === 'function' && typeof drawRouteCanvas === 'function', '그림 지도');
+                add(typeof routeMapZoom === 'function' && typeof setRouteMapFullscreen === 'function', '지도 확대·크게보기');
+                add(!!document.getElementById('routeMapZoomIn') && !!document.getElementById('routeMapExpandBtn'), '지도 옆 +/- · 크게보기 버튼');
+                add(!!document.getElementById('dailyLog') && !!document.getElementById('tab-history'), '내역(보고) 화면');
+                add(typeof exportTodayPack === 'function' && typeof exportTodayReport === 'function' && typeof downloadDailyLogExcel === 'function', '일지엑셀·오늘폴더·카톡보내기 함수');
+                add(typeof syncTeamNow === 'function' && typeof fetchTeamProgress === 'function', '팀 동기화 함수');
+                add(typeof buildZip === 'function' && typeof zonePhotoFiles === 'function', '거점 폴더 zip 구성');
 
                 const m1 = pickClearMeter('제조번호 0252508 기타');
                 const m2 = pickClearMeter('NO. 1250033');
@@ -7124,6 +7150,11 @@
                 add(pickClearMccb('정격 75A', true) === '75A', 'MCCB 샘플 75A');
                 add(pickClearMccb('50A', true) === '50A', 'MCCB 샘플 50A');
 
+                const memo = buildEmergencyMemo();
+                const folder = buildEmergencyFolder();
+                add(memo.indexOf('[비상점검 메모]') >= 0 && memo.indexOf('계량기번호') >= 0, '비상 메모 양식');
+                add(folder.split('/').length >= 3, '비상 폴더명 경로 → ' + folder);
+
                 const date = todayStamp();
                 const sampleRows = [
                     { station: '테스트충전소A', zoneIndex: 1, chargers: 4, chargerNo: '1~4', mccb: '75A', ground: '', meterNo: '0252508', place: '지하주차장', city: '대전', inspector: '홈테스트' },
@@ -7132,7 +7163,44 @@
                 ];
                 const bytes = dailyLogXlsxBytes(date, sampleRows);
                 const isZip = bytes && bytes.length > 400 && bytes[0] === 0x50 && bytes[1] === 0x4b;
-                add(!!isZip, '일지 엑셀 생성 (' + (bytes ? bytes.length : 0) + ' bytes, 양식 열: 국소명·거점·충전기수·충전기번호·MCCB·접지·계량기·비고)');
+                add(!!isZip, '일지 엑셀 생성 (' + (bytes ? bytes.length : 0) + ' bytes)');
+
+                const fakePhoto = makeTestPhoto('1. 전압');
+                const packItem = {
+                    record: {
+                        date: date,
+                        time: '12:00',
+                        region: '테스트',
+                        city: '테스트시',
+                        station: '자동점검충전소',
+                        zoneIndex: 1,
+                        zoneName: '입구',
+                        zoneId: 'auto-check',
+                        chargers: 2,
+                        inspector: '자동점검',
+                        mccb: '75A',
+                        meterNo: '0252508'
+                    },
+                    photos: {
+                        voltage: [{ data: fakePhoto, filename: '01_1.전압_01.jpg' }],
+                        resistance: [{ data: makeTestPhoto('2. 저항'), filename: '02_2.저항_01.jpg' }]
+                    }
+                };
+                const photoPaths = zonePhotoFiles(packItem).map((p) => p.path).join('|');
+                add(photoPaths.indexOf('사진/') >= 0 && photoPaths.indexOf('거점') >= 0, '보고 사진 경로(시군/충전소/거점)');
+                const bundle = await buildDailyBundle({ date: date, items: [packItem] });
+                const names = (bundle.entries || []).map((e) => e.name);
+                add(names.some((n) => n === '점검일지.xlsx'), '오늘 묶음에 점검일지.xlsx');
+                add(names.some((n) => String(n).indexOf('사진/') === 0), '오늘 묶음에 거점별 사진 포함');
+                add(!!bundle.zipFile && bundle.zipFile.size > 500, '오늘 보고 zip 생성 (' + (bundle.zipFile ? bundle.zipFile.size : 0) + ' bytes)');
+
+                try {
+                    await idbSet('autocheck', { at: Date.now(), v: APP_VERSION });
+                    const round = await idbGet('autocheck');
+                    add(!!round && round.v === APP_VERSION, '폰(IndexedDB) 임시 저장');
+                } catch (err) {
+                    add(false, '폰 임시 저장 실패');
+                }
 
                 try {
                     const sample = prepareMapPoints([
@@ -7145,23 +7213,42 @@
                         card.classList.remove('hidden');
                         bindRouteMapCanvas();
                         drawRouteCanvas(sample);
-                        add(true, '홈에서 그림 지도 미리보기 표시');
+                        routeMapZoom(1.2);
+                        routeMapReset();
+                        add(true, '지도 그리기·확대·전체보기');
                     } else add(false, 'routeMapCard 없음');
                 } catch (err) {
                     add(false, '그림 지도 테스트 실패 · ' + (err && err.message ? err.message : err));
                 }
 
-                const file = new File([bytes], '홈테스트_점검일지_' + date + '.xlsx', {
+                const probe = await probeGoogleVersion();
+                const ver = probe.ok && probe.data && String(probe.data.version || '');
+                const verNum = Number(String(ver).replace(/^v/i, ''));
+                add(probe.ok && verNum >= 3, probe.ok ? ('구글 Apps Script 연결 · ' + (ver || '버전미확인')) : '구글 Apps Script 연결 실패(인터넷/배포 확인)');
+
+                try {
+                    await fetchTeamProgress(true);
+                    add(Array.isArray(state.teamProgress), '팀 동기화(시트 완료 목록 읽기) · ' + (state.teamProgress || []).length + '건');
+                } catch (err) {
+                    add(false, '팀 동기화 실패');
+                }
+
+                const file = new File([bytes], '자동점검_점검일지_' + date + '.xlsx', {
                     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 });
-                const shared = await shareOrSaveFile(file, '홈테스트 점검일지 ' + formDateLabel(date));
-                add(true, shared ? '샘플 엑셀 공유/저장 창 열림' : '샘플 엑셀 파일 저장 시도 완료');
-                note('시트·드라이브에는 올리지 않았습니다. 동선 지도는 지역 선택 후 확인하세요.');
+                const shared = await shareOrSaveFile(file, '자동점검 점검일지 ' + formDateLabel(date));
+                add(true, shared ? '샘플 엑셀 공유/저장 창 열림' : '샘플 엑셀 저장 시도 완료');
+
+                note('이 점검은 시트/드라이브에 올리지 않았습니다.');
+                note('실제 사진 업로드 확인은 설정 → 아무 사진으로 자동 테스트.');
+                note(fail ? ('실패 ' + fail + '건 · 빨간 ❌ 항목을 알려주세요.') : '핵심 기능 자동 점검 통과.');
             } catch (err) {
-                add(false, '홈 테스트 중단: ' + (err && err.message ? err.message : err));
+                add(false, '자동 점검 중단: ' + (err && err.message ? err.message : err));
             }
             if (box) box.innerHTML = lines.join('<br>');
-            alert('홈 테스트 결과를 확인하세요. 샘플 엑셀도 함께 받아 두었습니다.');
+            alert(fail
+                ? ('자동 점검 결과: 실패 ' + fail + '건. 화면의 ❌ 항목을 확인하세요.')
+                : '자동 점검 통과. 샘플 엑셀도 받아 두었습니다.');
         }
 
         function makeTestPhoto(label) {
