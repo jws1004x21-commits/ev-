@@ -1,4 +1,4 @@
-// v4.28: report is the paper log plus photos in each zone folder
+// v4.29: read only the MCCB amp rating and the meter number from the panel photo
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
