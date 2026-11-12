@@ -1,5 +1,5 @@
-// v4.70: replace canvas map with Leaflet OSM + markercluster
-const SW_VER = '4.70';
+// v4.71: force reload unregisters SW before reading version.json
+const SW_VER = '4.71';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
@@ -9,10 +9,6 @@ self.addEventListener('activate', (event) => {
         const keys = await caches.keys();
         await Promise.all(keys.map((k) => caches.delete(k)));
         await self.clients.claim();
-        const clients = await self.clients.matchAll({ type: 'window' });
-        clients.forEach((c) => {
-            try { c.postMessage({ type: 'SW_ACTIVATED', version: SW_VER }); } catch (err) {}
-        });
     })());
 });
 
