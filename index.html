@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.60">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.61">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1156,10 +1156,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.60</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.61</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전 있음 · 상단이 v4.60이어야 최신
+        새 버전 있음 · 상단이 v4.61이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1171,8 +1171,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.60">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.60</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.61">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.61</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
                         <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
@@ -1207,6 +1207,7 @@
                 <div class="card-body">
                     <div class="text" style="font-size:12px;color:#aaa;margin-bottom:8px;">
                         한 번에 확인: 앱 기능 · 엑셀 · 지도 · 비상모드 · 보고 zip · <b>더미 사진→드라이브</b> · <b>시트 기록</b> · <b>팀 동기화</b>.<br>
+                        끝나면 <b>초록=이상 없음</b> / <b>빨강=문제 있음</b> 문구 + 알림 + 짧은 음성이 납니다.<br>
                         테스트 행/폴더(<b>테스트/자동테스트</b>)는 나중에 지워도 됩니다.
                     </div>
                     <button type="button" class="btn btn-primary" onclick="runHomeSelfCheck()">🧪 전체 자동 점검 실행 (더미사진+동기화 포함)</button>
@@ -1758,9 +1759,9 @@
         </div>
     </div>
 
-    <script src="station_data.js?v=4.60"></script>
+    <script src="station_data.js?v=4.61"></script>
     <script>
-        const APP_VERSION = '4.60';
+        const APP_VERSION = '4.61';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
@@ -7344,10 +7345,27 @@
             } catch (err) {
                 add(false, '자동 점검 중단: ' + (err && err.message ? err.message : err));
             }
-            if (box) box.innerHTML = lines.join('<br>');
+            const passTitle = '✅ 이상 없음 · 전체 자동 점검 통과';
+            const failTitle = '❌ 문제 있음 · 실패 ' + fail + '건';
+            const summary = fail
+                ? '<div style="margin:0 0 10px;padding:12px;border-radius:12px;background:#7f1d1d;color:#fecaca;font-size:16px;font-weight:800;">' + failTitle + '<div style="font-size:12px;font-weight:600;margin-top:6px;">아래 ❌ 항목을 확인하세요.</div></div>'
+                : '<div style="margin:0 0 10px;padding:12px;border-radius:12px;background:#14532d;color:#bbf7d0;font-size:16px;font-weight:800;">' + passTitle + '<div style="font-size:12px;font-weight:600;margin-top:6px;">더미 사진·시트·동기화까지 확인됐습니다.</div></div>';
+            if (box) box.innerHTML = summary + lines.join('<br>');
+            const speakText = fail
+                ? '자동 점검 결과, 문제 있습니다. 실패 ' + fail + '건입니다.'
+                : '자동 점검 결과, 이상 없습니다.';
+            try {
+                if (window.speechSynthesis) {
+                    window.speechSynthesis.cancel();
+                    const u = new SpeechSynthesisUtterance(speakText);
+                    u.lang = 'ko-KR';
+                    u.rate = 1;
+                    window.speechSynthesis.speak(u);
+                }
+            } catch (err) {}
             alert(fail
-                ? ('자동 점검 결과: 실패 ' + fail + '건. 화면의 ❌ 항목을 확인하세요.')
-                : '전체 자동 점검 통과. 더미 업로드·동기화·샘플 엑셀까지 확인했습니다.');
+                ? ('❌ 문제 있음\n실패 ' + fail + '건\n화면의 ❌ 항목을 확인하세요.')
+                : '✅ 이상 없음\n전체 자동 점검 통과했습니다.');
         }
 
         function makeTestPhoto(label) {

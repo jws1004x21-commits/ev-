@@ -1,5 +1,5 @@
-// v4.60: full auto-check includes dummy photo upload + team sync
-const SW_VER = '4.60';
+// v4.61: auto-check pass/fail banner + short voice
+const SW_VER = '4.61';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

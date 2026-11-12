@@ -3,7 +3,7 @@
   "short_name": "충전소점검",
   "description": "전기차 충전소 정기점검 관리 앱",
   "id": "/ev-/",
-  "start_url": "/ev-/index.html?v=4.60",
+  "start_url": "/ev-/index.html?v=4.61",
   "scope": "/ev-/",
   "display": "standalone",
   "background_color": "#1a1a2e",
