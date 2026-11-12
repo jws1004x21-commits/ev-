@@ -3,11 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.56">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1153,10 +1156,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.55</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.56</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전이 있습니다. 지금 강제 새로고침 하세요. (안 바뀌면 이 버튼)
+        새 버전 있음 · 상단이 v4.56이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1168,7 +1171,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">버전이 안 바뀌면 이 버튼을 누르세요. 상단이 <b>v4.55</b>이어야 최신입니다.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.56">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.56</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
                     <button type="button" class="btn btn-secondary btn-small" style="margin-top:10px;" onclick="openManual()">📖 앱 사용설명서</button>
                 </div>
             </div>
@@ -1686,16 +1690,17 @@
         </div>
     </div>
 
-    <script src="station_data.js"></script>
+    <script src="station_data.js?v=4.56"></script>
     <script>
-        const APP_VERSION = '4.55';
+        const APP_VERSION = '4.56';
+        const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
         async function forceAppReload() {
             let remote = '';
             try {
-                const res = await fetch(versionCheckUrl(), { cache: 'no-store' });
+                const res = await fetch(APP_ORIGIN_URL + 'version.json?t=' + Date.now(), { cache: 'no-store', credentials: 'omit' });
                 if (res.ok) {
                     const data = await res.json();
                     remote = String(data.version || '').trim();
@@ -1713,10 +1718,11 @@
                     await Promise.all(regs.map((r) => r.unregister()));
                 }
             } catch (err) {}
-            // 홈 화면 아이콘/캐시가 옛 HTML을 붙잡는 경우 → index.html 로 직접 진입
-            const base = location.origin + location.pathname.replace(/\/[^/]*$/, '/');
+            try { sessionStorage.clear(); } catch (err) {}
             const ver = remote || APP_VERSION || String(Date.now());
-            location.replace(base + 'index.html?v=' + encodeURIComponent(ver) + '&r=' + Date.now());
+            // 홈화면 PWA 캐시를 피하려고 절대 주소 + 새 쿼리로 강제 진입
+            const target = APP_ORIGIN_URL + 'index.html?v=' + encodeURIComponent(ver) + '&r=' + Date.now();
+            location.replace(target);
         }
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
@@ -1805,13 +1811,12 @@
         }
 
         function versionCheckUrl() {
-            const path = location.pathname.replace(/[^/]+$/, '');
-            return path + 'version.json?t=' + Date.now();
+            return APP_ORIGIN_URL + 'version.json?t=' + Date.now();
         }
 
         async function checkAppVersion() {
             try {
-                const res = await fetch(versionCheckUrl(), { cache: 'no-store' });
+                const res = await fetch(versionCheckUrl(), { cache: 'no-store', credentials: 'omit' });
                 if (!res.ok) return;
                 const data = await res.json();
                 const remote = String(data.version || '').trim();
@@ -1820,13 +1825,16 @@
                 if (remote && remote !== APP_VERSION) {
                     banner.classList.add('show');
                     const key = 'didAutoReload_' + remote;
-                    if (!sessionStorage.getItem(key)) {
-                        sessionStorage.setItem(key, '1');
+                    if (!localStorage.getItem(key)) {
+                        localStorage.setItem(key, '1');
                         forceAppReload();
+                        return;
                     }
                 } else {
                     banner.classList.remove('show');
                 }
+                const fresh = document.getElementById('openFreshLink');
+                if (fresh) fresh.href = APP_ORIGIN_URL + 'index.html?v=' + encodeURIComponent(remote || APP_VERSION) + '&r=' + Date.now();
             } catch (err) {}
         }
 
@@ -7432,7 +7440,12 @@
         }
 
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/ev-/sw.js').catch(() => {});
+            navigator.serviceWorker.register('/ev-/sw.js?v=' + encodeURIComponent(APP_VERSION), { updateViaCache: 'none' })
+                .then((reg) => {
+                    try { reg.update(); } catch (err) {}
+                    setInterval(() => { try { reg.update(); } catch (err) {} }, 60 * 1000);
+                })
+                .catch(() => {});
         }
         init();
     </script>
