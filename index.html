@@ -84,6 +84,7 @@
             color: #eee;
             font-size: 15px;
         }
+        .form-input[data-auto="1"] { border-color: #f59e0b; }
 
         .form-select {
             appearance: none;
@@ -1353,7 +1354,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.22';
+        const APP_VERSION = '4.23';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -2734,7 +2735,7 @@
             return ocrWorkerPromise;
         }
 
-        function preprocessReading(dataUrl) {
+        function preprocessReading(dataUrl, mode) {
             return new Promise((resolve, reject) => {
                 const img = new Image();
                 img.onload = () => {
@@ -2746,9 +2747,18 @@
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const d = image.data;
-                    for (let i = 0; i < d.length; i += 4) {
+                    const gray = new Float32Array(d.length / 4);
+                    let sum = 0;
+                    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
                         const g = Math.max(0, Math.min(255, ((0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) - 128) * 1.7 + 128));
-                        d[i] = d[i + 1] = d[i + 2] = g;
+                        gray[p] = g;
+                        sum += g;
+                    }
+                    const mean = sum / gray.length;
+                    for (let p = 0; p < gray.length; p++) {
+                        const v = mode === 'binary' ? (gray[p] >= mean ? 255 : 0) : gray[p];
+                        const i = p * 4;
+                        d[i] = d[i + 1] = d[i + 2] = v;
                     }
                     ctx.putImageData(image, 0, 0);
                     resolve(canvas);
@@ -2782,21 +2792,41 @@
             };
         }
 
-        function pickMccb(text) {
+        function mccbList(text, requireA) {
             const sizes = [20, 30, 32, 40, 50, 60, 63, 75, 80, 100, 125, 150, 160, 175, 200, 225, 250];
             const raw = readingText(text);
             const found = [];
-            (raw.match(/\d{2,3}\s*A/g) || []).forEach((part) => {
+            const source = requireA ? (raw.match(/\d{2,3}\s*A/g) || []) : (raw.match(/\d{2,3}/g) || []);
+            source.forEach((part) => {
                 const n = parseInt(part, 10);
                 if (sizes.indexOf(n) >= 0) found.push(n + 'A');
             });
-            if (!found.length) {
-                (raw.match(/\d{2,3}/g) || []).forEach((part) => {
-                    const n = parseInt(part, 10);
-                    if (sizes.indexOf(n) >= 0) found.push(n + 'A');
-                });
-            }
-            return [...new Set(found)].slice(0, 3).join(', ');
+            return [...new Set(found)];
+        }
+
+        function agreedValue(left, right, tolerance) {
+            if (!left || !right) return '';
+            const a = parseFloat(left);
+            const b = parseFloat(right);
+            if (!Number.isFinite(a) || !Number.isFinite(b)) return '';
+            return Math.abs(a - b) <= tolerance ? String(a) : '';
+        }
+
+        function agreedMccb(textA, textB) {
+            const strict = mccbList(textA, true).filter((item) => mccbList(textB, true).indexOf(item) >= 0);
+            if (strict.length) return strict.slice(0, 2).join(', ');
+            const loose = mccbList(textA, false).filter((item) => mccbList(textB, false).indexOf(item) >= 0);
+            return loose.slice(0, 2).join(', ');
+        }
+
+        function agreedMeter(textA, textB) {
+            const left = pickMeterNo(textA);
+            const right = pickMeterNo(textB);
+            if (!left || !right) return '';
+            const na = left.replace(/^0+/, '');
+            const nb = right.replace(/^0+/, '');
+            if (!na || na !== nb) return '';
+            return left.length >= right.length ? left : right;
         }
 
         function pickMeterNo(text) {
@@ -2838,11 +2868,20 @@
             return true;
         }
 
-        async function ocrPhoto(dataUrl) {
-            const canvas = await preprocessReading(dataUrl);
+        function trustedText(result) {
+            const data = (result && result.data) || {};
+            const words = data.words || [];
+            const good = words.filter((word) => Number(word.confidence) >= 62 && String(word.text || '').trim());
+            if (good.length) return good.map((word) => readingText(word.text)).join(' ');
+            if (Number(data.confidence) >= 75) return readingText(data.text);
+            return '';
+        }
+
+        async function ocrPhotoPasses(dataUrl) {
             const worker = await getOcrWorker();
-            const result = await worker.recognize(canvas);
-            return (result && result.data && result.data.text) || '';
+            const contrast = await worker.recognize(await preprocessReading(dataUrl, 'contrast'));
+            const binary = await worker.recognize(await preprocessReading(dataUrl, 'binary'));
+            return { contrast: trustedText(contrast), binary: trustedText(binary) };
         }
 
         async function readZonePhotosIntoFields() {
@@ -2850,54 +2889,71 @@
             const sub = document.getElementById('reviewSub');
             if (sub) sub.textContent = '이 거점 사진에서 숫자를 읽는 중... 처음 한 번은 잠시 걸립니다.';
             const notes = [];
-            const remember = (label, value, wrote) => {
+            const held = [];
+            const remember = (id, label, value, wrote) => {
+                const existing = (document.getElementById(id) || {}).value;
                 if (wrote && value) notes.push(label + ' ' + value);
+                else if (!value && !existing) held.push(label);
             };
             try {
                 if (!((document.getElementById('logChargerNo') || {}).value)) {
-                    remember('충전기번호', chargerNoDefault(), setMeterAuto('logChargerNo', chargerNoDefault()));
+                    remember('logChargerNo', '충전기번호', chargerNoDefault(), setMeterAuto('logChargerNo', chargerNoDefault()));
                 }
                 const jobs = [
-                    ['voltage', (text) => {
-                        const found = pickVoltages(text);
-                        remember('220V', found.v220, setMeterAuto('meterV220', found.v220));
-                        remember('380V', found.v380, setMeterAuto('meterV380', found.v380));
+                    ['voltage', (pass) => {
+                        const a = pickVoltages(pass.contrast);
+                        const b = pickVoltages(pass.binary);
+                        const v220 = agreedValue(a.v220, b.v220, 1);
+                        const v380 = agreedValue(a.v380, b.v380, 1);
+                        remember('meterV220', '220V', v220, setMeterAuto('meterV220', v220));
+                        remember('meterV380', '380V', v380, setMeterAuto('meterV380', v380));
                     }],
-                    ['resistance', (text) => {
-                        const found = pickSmallReading(text, 30);
-                        remember('접지', found, setMeterAuto('meterGround', found));
+                    ['resistance', (pass) => {
+                        const found = agreedValue(pickSmallReading(pass.contrast, 30), pickSmallReading(pass.binary, 30), 0.2);
+                        remember('meterGround', '접지', found, setMeterAuto('meterGround', found));
                     }],
-                    ['insulation', (text) => {
-                        const found = pickSmallReading(text, 2000);
-                        remember('절연', found, setMeterAuto('meterInsul', found));
+                    ['insulation', (pass) => {
+                        const found = agreedValue(pickSmallReading(pass.contrast, 2000), pickSmallReading(pass.binary, 2000), 1);
+                        remember('meterInsul', '절연', found, setMeterAuto('meterInsul', found));
                     }],
-                    ['panel', (text) => {
-                        const found = pickMccb(text);
-                        remember('MCCB', found, setMeterAuto('logMccb', found));
+                    ['panel', (pass) => {
+                        const found = agreedMccb(pass.contrast, pass.binary);
+                        remember('logMccb', 'MCCB', found, setMeterAuto('logMccb', found));
                     }],
-                    ['charger', (text) => {
-                        const meter = pickMeterNo(text);
-                        const mccb = pickMccb(text);
-                        remember('계량기', meter, setMeterAuto('logMeterNo', meter));
-                        remember('MCCB', mccb, setMeterAuto('logMccb', mccb));
+                    ['charger', (pass) => {
+                        const meter = agreedMeter(pass.contrast, pass.binary);
+                        const mccb = agreedMccb(pass.contrast, pass.binary);
+                        remember('logMeterNo', '계량기', meter, setMeterAuto('logMeterNo', meter));
+                        remember('logMccb', 'MCCB', mccb, setMeterAuto('logMccb', mccb));
                     }]
                 ];
+                let skippedBlur = false;
                 for (let j = 0; j < jobs.length; j++) {
-                    const shots = photosOf(jobs[j][0]).filter((item) => item.data || item.thumb).slice(-2);
-                    let merged = '';
-                    for (let s = 0; s < shots.length; s++) {
-                        if (token !== photoReadToken) return;
-                        merged += '\n' + await ocrPhoto(shots[s].data || shots[s].thumb);
+                    const shots = photosOf(jobs[j][0]).filter((item) => item.data && !item.blurry).slice(-1);
+                    if (!shots.length) {
+                        if (photosOf(jobs[j][0]).some((item) => item.blurry || item.thumb)) skippedBlur = true;
+                        continue;
                     }
-                    if (merged.trim()) jobs[j][1](merged);
+                    if (token !== photoReadToken) return;
+                    const score = await blurScore(shots[0].data);
+                    if (score < 45) {
+                        skippedBlur = true;
+                        continue;
+                    }
+                    const pass = await ocrPhotoPasses(shots[0].data);
+                    if (token !== photoReadToken) return;
+                    jobs[j][1](pass);
                 }
                 if (token !== photoReadToken) return;
                 updateMeterHint();
                 persistWorking();
                 if (sub) {
-                    sub.textContent = notes.length
-                        ? '사진에서 넣음: ' + notes.join(', ') + '. 틀린 칸만 고치세요.'
-                        : '사진에서 숫자를 못 찾았습니다. 보이는 숫자를 칸에 적으세요.';
+                    const uniqueHeld = [...new Set(held)];
+                    const parts = [];
+                    if (notes.length) parts.push('넣은 값: ' + notes.join(', ') + '. 노란 칸은 확인하세요.');
+                    if (uniqueHeld.length) parts.push(uniqueHeld.join(', ') + ' 는 두 번 읽은 값이 달라 비워 두었습니다.');
+                    if (skippedBlur) parts.push('흐리거나 작은 사진은 읽지 않았습니다. 숫자를 크게 다시 찍으세요.');
+                    sub.textContent = parts.join(' ') || '사진에서 확실한 숫자를 못 찾았습니다. 보이는 숫자만 적으세요.';
                 }
             } catch (err) {
                 if (token !== photoReadToken || !sub) return;
@@ -2947,7 +3003,7 @@
                     { id: 'insulation', guide: '절연저항 사진을 보고 적으세요.', fields: [['meterInsul', '절연저항', '120']] }
                 ];
                 title.textContent = '이 거점 사진에서 읽는 중';
-                sub.textContent = '충전기 ' + count + '대 (' + numbers + '). 사진의 숫자를 칸에 넣습니다. 틀린 곳만 고치세요.';
+                sub.textContent = '충전기 ' + count + '대 (' + numbers + '). 두 번 읽어서 같은 숫자만 넣습니다. 노란 칸을 확인하세요.';
                 body.innerHTML = blocks.map((block) => {
                     const type = photoTypes.find((p) => p.id === block.id);
                     const shots = photosOf(block.id);

@@ -1,4 +1,4 @@
-// v4.22: fill the log from the numbers read in each zone's photos
+// v4.23: keep a photo number only when two reads agree
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
