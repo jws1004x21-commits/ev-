@@ -1,4 +1,4 @@
-// v4.40: clearer shared-sheet sync so every phone can match the same latest
+// v4.41: phone clear keeps sheet/drive; sync restores latest from sheet
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

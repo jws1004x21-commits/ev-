@@ -1052,7 +1052,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.40</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.41</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 아래 버튼으로 강제 새로고침 하세요.
@@ -1545,7 +1545,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.40';
+        const APP_VERSION = '4.41';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -6282,11 +6282,15 @@
         }
 
         function clearAllData() {
-            if (confirm('정말 모든 데이터를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
+            if (!confirm('이 폰에만 저장된 기록을 지웁니다.\n구글 시트·드라이브는 그대로입니다.\n다음에 팀 동기화하면 시트 최신으로 다시 맞춰집니다.')) return;
+            if (!confirm('정말 이 폰 데이터만 삭제할까요?')) return;
+            try {
                 localStorage.removeItem('inspectionStateV2');
-                indexedDB.deleteDatabase('ev-inspection-db');
-                location.reload();
-            }
+                localStorage.removeItem('teamProgressV1');
+                localStorage.removeItem('stationGeoV1');
+            } catch (err) {}
+            try { indexedDB.deleteDatabase('ev-inspection-db'); } catch (err) {}
+            location.reload();
         }
 
         if ('serviceWorker' in navigator) {
