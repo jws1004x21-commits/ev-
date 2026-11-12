@@ -1,4 +1,4 @@
-// v4.30: Excel daily log download and close-up MCCB/meter photo fill
+// v4.31: stronger close-up OCR for MCCB rating and meter number
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

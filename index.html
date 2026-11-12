@@ -1345,7 +1345,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.30';
+        const APP_VERSION = '4.31';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -2924,9 +2924,11 @@
             });
         }
 
-        async function ocrCanvas(canvas, psm) {
+        async function ocrCanvas(canvas, psm, whitelist) {
             const worker = await getOcrWorker();
-            await worker.setParameters({ tessedit_pageseg_mode: String(psm) });
+            const params = { tessedit_pageseg_mode: String(psm) };
+            if (whitelist != null) params.tessedit_char_whitelist = whitelist;
+            await worker.setParameters(params);
             const result = await worker.recognize(canvas);
             return readingText((result && result.data && result.data.text) || '');
         }
@@ -2938,6 +2940,11 @@
             (raw.match(/\d{2,3}\s*A/g) || []).forEach((part) => {
                 const n = parseInt(part, 10);
                 if (sizes.indexOf(n) >= 0) found.push(n + 'A');
+            });
+            // Close-up OCR often reads trailing A as 8/B/R.
+            (raw.match(/\b\d{2,3}\s*[A8BR]\b/g) || []).forEach((part) => {
+                const m = part.match(/(\d{2,3})\s*[A8BR]/);
+                if (m && sizes.indexOf(parseInt(m[1], 10)) >= 0) found.push(parseInt(m[1], 10) + 'A');
             });
             let unique = [...new Set(found)];
             if (unique.length === 1) return unique[0];
@@ -2959,17 +2966,72 @@
             return unique.length === 1 ? unique[0] : '';
         }
 
+        function preprocessCloseCanvas(source, mode) {
+            const minSide = Math.min(source.width, source.height);
+            const scale = minSide < 420 ? 420 / minSide : (minSide < 700 ? 1.8 : 1.25);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(source.width * scale));
+            canvas.height = Math.max(1, Math.round(source.height * scale));
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+            const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const d = image.data;
+            let min = 255;
+            let max = 0;
+            const gray = new Float32Array(d.length / 4);
+            for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+                const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+                gray[p] = g;
+                if (g < min) min = g;
+                if (g > max) max = g;
+            }
+            const span = Math.max(1, max - min);
+            let sum = 0;
+            for (let p = 0; p < gray.length; p++) {
+                let v = ((gray[p] - min) / span) * 255;
+                v = Math.max(0, Math.min(255, (v - 128) * 1.85 + 128));
+                gray[p] = v;
+                sum += v;
+            }
+            const mean = sum / gray.length;
+            for (let p = 0; p < gray.length; p++) {
+                let v = gray[p];
+                if (mode === 'binary') v = v >= mean ? 255 : 0;
+                const i = p * 4;
+                d[i] = d[i + 1] = d[i + 2] = v;
+                d[i + 3] = 255;
+            }
+            ctx.putImageData(image, 0, 0);
+            return canvas;
+        }
+
         async function ocrCloseValue(dataUrl, kind) {
-            const passes = [
-                [0, 0, 1, 1, 2.5, 7],
-                [0.05, 0.15, 0.90, 0.70, 3, 6],
-                [0, 0, 1, 1, 2, 11]
+            const source = await cropRegion(dataUrl, 0, 0, 1, 1, 1);
+            const canvases = [
+                preprocessCloseCanvas(source, 'contrast'),
+                preprocessCloseCanvas(source, 'binary')
             ];
-            for (let i = 0; i < passes.length; i++) {
-                const [rx, ry, rw, rh, scale, psm] = passes[i];
-                const text = await ocrCanvas(await cropRegion(dataUrl, rx, ry, rw, rh, scale), psm);
-                const value = kind === 'mccb' ? pickClearMccb(text, true) : pickClearMeter(text);
-                if (value) return value;
+            const tries = kind === 'mccb'
+                ? [
+                    { psm: 8, wl: '0123456789A' },
+                    { psm: 7, wl: '0123456789A' },
+                    { psm: 6, wl: '0123456789A' },
+                    { psm: 11, wl: '0123456789A' }
+                ]
+                : [
+                    { psm: 7, wl: '0123456789- ' },
+                    { psm: 6, wl: '0123456789- ' },
+                    { psm: 11, wl: '0123456789' },
+                    { psm: 7, wl: '' }
+                ];
+            for (let c = 0; c < canvases.length; c++) {
+                for (let t = 0; t < tries.length; t++) {
+                    const text = await ocrCanvas(canvases[c], tries[t].psm, tries[t].wl);
+                    const value = kind === 'mccb' ? pickClearMccb(text, true) : pickClearMeter(text);
+                    if (value) return value;
+                }
             }
             return '';
         }
@@ -3179,8 +3241,8 @@
                 const chargerEl = document.getElementById('logChargerNo');
                 if (chargerEl && !chargerEl.value) chargerEl.value = numbers;
                 const blocks = [
-                    { id: 'mccbClose', guide: '거점 ' + (state.selectedZoneIdx + 1) + ' · 충전기 ' + count + '대. 75A처럼 용량 글자만 화면 가득 찍으면 이 칸에 들어갑니다.', fields: [['logMccb', '이 거점 MCCB용량', '예: 75A']], also: 'panel' },
-                    { id: 'meterClose', guide: '계량기 명판의 번호만 화면 가득 찍으면 이 칸에 들어갑니다. 다르면 이 칸만 고치세요.', fields: [['logMeterNo', '이 거점 계량기번호', '사진에 보이는 번호'], ['meterGround', '접지저항', '없으면 비워 두세요']], also: 'charger' }
+                    { id: 'mccbClose', guide: '거점 ' + (state.selectedZoneIdx + 1) + ' · 충전기 ' + count + '대. 배전반 전체가 아니라 75A처럼 용량만 화면 절반 이상 크게 찍으세요.', fields: [['logMccb', '이 거점 MCCB용량', '예: 75A']], also: 'panel' },
+                    { id: 'meterClose', guide: '계량기 전체보다 명판 번호만 화면 절반 이상 크게 찍으세요. 다르면 이 칸만 고치세요.', fields: [['logMeterNo', '이 거점 계량기번호', '사진에 보이는 번호'], ['meterGround', '접지저항', '없으면 비워 두세요']], also: 'charger' }
                 ];
                 title.textContent = '이 거점 MCCB · 계량기';
                 sub.textContent = '국소명·거점·충전기 수·번호·장소는 자동입니다. MCCB·계량기번호는 숫자만 확대해 찍으세요.';
@@ -3592,14 +3654,19 @@
             if (!photoId || !type || !fileList || !fileList.length) return 0;
             if (square === undefined) square = cameraSquare;
             const meter = ['voltage', 'resistance', 'insulation'].includes(photoId);
+            const closeRead = photoId === 'mccbClose' || photoId === 'meterClose';
             let added = 0;
             for (const file of fileList) {
                 if (!file.type.startsWith('image/')) continue;
                 let dataUrl = await readFile(file);
                 if (square) dataUrl = await cropCenterSquare(dataUrl);
-                const full = await compressImage(dataUrl, meter ? 1920 : 1600, meter ? 0.85 : 0.75);
+                const full = await compressImage(
+                    dataUrl,
+                    closeRead ? 2200 : (meter ? 1920 : 1600),
+                    closeRead ? 0.9 : (meter ? 0.85 : 0.75)
+                );
                 const thumb = await compressImage(full, 720, 0.6);
-                const blurry = meter && (await blurScore(full)) < 55;
+                const blurry = (meter || closeRead) && (await blurScore(full)) < (closeRead ? 40 : 55);
                 const item = {
                     thumb,
                     data: full,
