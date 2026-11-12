@@ -1353,7 +1353,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.21';
+        const APP_VERSION = '4.22';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -2700,6 +2700,211 @@
             document.getElementById('reviewOverlay').classList.add('hidden');
         }
 
+        let ocrWorkerPromise = null;
+        let photoReadToken = 0;
+
+        function loadTesseract() {
+            if (window.Tesseract) return Promise.resolve(window.Tesseract);
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+                script.onload = () => resolve(window.Tesseract);
+                script.onerror = () => reject(new Error('ocr-lib'));
+                document.head.appendChild(script);
+            });
+        }
+
+        function getOcrWorker() {
+            if (!ocrWorkerPromise) {
+                ocrWorkerPromise = (async () => {
+                    const Tesseract = await loadTesseract();
+                    const worker = await Tesseract.createWorker('eng', 1, {
+                        langPath: 'https://tessdata.projectnaptha.com/4.0.0_fast'
+                    });
+                    await worker.setParameters({
+                        tessedit_char_whitelist: '0123456789.A',
+                        tessedit_pageseg_mode: '11'
+                    });
+                    return worker;
+                })().catch((err) => {
+                    ocrWorkerPromise = null;
+                    throw err;
+                });
+            }
+            return ocrWorkerPromise;
+        }
+
+        function preprocessReading(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const scale = Math.max(1, Math.min(2, 1400 / img.width));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const d = image.data;
+                    for (let i = 0; i < d.length; i += 4) {
+                        const g = Math.max(0, Math.min(255, ((0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) - 128) * 1.7 + 128));
+                        d[i] = d[i + 1] = d[i + 2] = g;
+                    }
+                    ctx.putImageData(image, 0, 0);
+                    resolve(canvas);
+                };
+                img.onerror = () => reject(new Error('image'));
+                img.src = dataUrl;
+            });
+        }
+
+        function readingText(text) {
+            return String(text || '').replace(/[oO]/g, '0').replace(/[lI|]/g, '1').toUpperCase();
+        }
+
+        function pickVoltages(text) {
+            const parts = readingText(text).match(/\d{2,4}(?:\.\d{1,2})?/g) || [];
+            let best220 = null;
+            let best380 = null;
+            parts.forEach((part) => {
+                const n = parseFloat(part);
+                if (n >= 190 && n <= 260) {
+                    const dist = Math.abs(n - 220);
+                    if (!best220 || dist < best220.dist) best220 = { n, dist };
+                } else if (n >= 330 && n <= 450) {
+                    const dist = Math.abs(n - 380);
+                    if (!best380 || dist < best380.dist) best380 = { n, dist };
+                }
+            });
+            return {
+                v220: best220 ? String(best220.n) : '',
+                v380: best380 ? String(best380.n) : ''
+            };
+        }
+
+        function pickMccb(text) {
+            const sizes = [20, 30, 32, 40, 50, 60, 63, 75, 80, 100, 125, 150, 160, 175, 200, 225, 250];
+            const raw = readingText(text);
+            const found = [];
+            (raw.match(/\d{2,3}\s*A/g) || []).forEach((part) => {
+                const n = parseInt(part, 10);
+                if (sizes.indexOf(n) >= 0) found.push(n + 'A');
+            });
+            if (!found.length) {
+                (raw.match(/\d{2,3}/g) || []).forEach((part) => {
+                    const n = parseInt(part, 10);
+                    if (sizes.indexOf(n) >= 0) found.push(n + 'A');
+                });
+            }
+            return [...new Set(found)].slice(0, 3).join(', ');
+        }
+
+        function pickMeterNo(text) {
+            const groups = readingText(text).match(/\d{6,14}/g) || [];
+            groups.sort((a, b) => b.length - a.length);
+            return groups[0] || '';
+        }
+
+        function pickSmallReading(text, max) {
+            const parts = readingText(text).match(/\d{1,4}(?:\.\d{1,2})?/g) || [];
+            const decimal = parts.find((part) => part.indexOf('.') >= 0 && parseFloat(part) >= 0.1 && parseFloat(part) <= max);
+            if (decimal) return String(parseFloat(decimal));
+            const whole = parts.find((part) => {
+                const n = parseFloat(part);
+                return n >= 0.1 && n <= max;
+            });
+            return whole ? String(parseFloat(whole)) : '';
+        }
+
+        function setMeterAuto(id, value) {
+            if (!value) return false;
+            const el = document.getElementById(id);
+            if (el && el.value && el.dataset.auto !== '1') return false;
+            let next = String(value);
+            if (el && el.dataset.auto === '1' && el.value && id === 'logMccb') {
+                next = [...new Set((el.value + ', ' + value).split(/,\s*/).filter(Boolean))].join(', ');
+            } else if (el && el.dataset.auto === '1' && el.value) {
+                return false;
+            }
+            if (el) {
+                el.value = next;
+                el.dataset.auto = '1';
+            }
+            document.querySelectorAll('#reviewBody [data-meter="' + id + '"]').forEach((input) => {
+                if (input.value && input.dataset.auto !== '1') return;
+                input.value = next;
+                input.dataset.auto = '1';
+            });
+            return true;
+        }
+
+        async function ocrPhoto(dataUrl) {
+            const canvas = await preprocessReading(dataUrl);
+            const worker = await getOcrWorker();
+            const result = await worker.recognize(canvas);
+            return (result && result.data && result.data.text) || '';
+        }
+
+        async function readZonePhotosIntoFields() {
+            const token = ++photoReadToken;
+            const sub = document.getElementById('reviewSub');
+            if (sub) sub.textContent = '이 거점 사진에서 숫자를 읽는 중... 처음 한 번은 잠시 걸립니다.';
+            const notes = [];
+            const remember = (label, value, wrote) => {
+                if (wrote && value) notes.push(label + ' ' + value);
+            };
+            try {
+                if (!((document.getElementById('logChargerNo') || {}).value)) {
+                    remember('충전기번호', chargerNoDefault(), setMeterAuto('logChargerNo', chargerNoDefault()));
+                }
+                const jobs = [
+                    ['voltage', (text) => {
+                        const found = pickVoltages(text);
+                        remember('220V', found.v220, setMeterAuto('meterV220', found.v220));
+                        remember('380V', found.v380, setMeterAuto('meterV380', found.v380));
+                    }],
+                    ['resistance', (text) => {
+                        const found = pickSmallReading(text, 30);
+                        remember('접지', found, setMeterAuto('meterGround', found));
+                    }],
+                    ['insulation', (text) => {
+                        const found = pickSmallReading(text, 2000);
+                        remember('절연', found, setMeterAuto('meterInsul', found));
+                    }],
+                    ['panel', (text) => {
+                        const found = pickMccb(text);
+                        remember('MCCB', found, setMeterAuto('logMccb', found));
+                    }],
+                    ['charger', (text) => {
+                        const meter = pickMeterNo(text);
+                        const mccb = pickMccb(text);
+                        remember('계량기', meter, setMeterAuto('logMeterNo', meter));
+                        remember('MCCB', mccb, setMeterAuto('logMccb', mccb));
+                    }]
+                ];
+                for (let j = 0; j < jobs.length; j++) {
+                    const shots = photosOf(jobs[j][0]).filter((item) => item.data || item.thumb).slice(-2);
+                    let merged = '';
+                    for (let s = 0; s < shots.length; s++) {
+                        if (token !== photoReadToken) return;
+                        merged += '\n' + await ocrPhoto(shots[s].data || shots[s].thumb);
+                    }
+                    if (merged.trim()) jobs[j][1](merged);
+                }
+                if (token !== photoReadToken) return;
+                updateMeterHint();
+                persistWorking();
+                if (sub) {
+                    sub.textContent = notes.length
+                        ? '사진에서 넣음: ' + notes.join(', ') + '. 틀린 칸만 고치세요.'
+                        : '사진에서 숫자를 못 찾았습니다. 보이는 숫자를 칸에 적으세요.';
+                }
+            } catch (err) {
+                if (token !== photoReadToken || !sub) return;
+                sub.textContent = '사진을 읽지 못했습니다. 인터넷을 확인하거나 숫자를 직접 적으세요.';
+            }
+        }
+
         function openReview(mode) {
             const overlay = document.getElementById('reviewOverlay');
             const title = document.getElementById('reviewTitle');
@@ -2741,8 +2946,8 @@
                     { id: 'resistance', guide: '접지저항 사진을 보고 적으세요.', fields: [['meterGround', '접지저항', '2']] },
                     { id: 'insulation', guide: '절연저항 사진을 보고 적으세요.', fields: [['meterInsul', '절연저항', '120']] }
                 ];
-                title.textContent = '이 거점 사진 보고 적기';
-                sub.textContent = '충전기 ' + count + '대 (' + numbers + '). MCCB·계량기번호는 대수마다 달라서 이 사진으로 확인합니다. 사진을 누르면 커집니다.';
+                title.textContent = '이 거점 사진에서 읽는 중';
+                sub.textContent = '충전기 ' + count + '대 (' + numbers + '). 사진의 숫자를 칸에 넣습니다. 틀린 곳만 고치세요.';
                 body.innerHTML = blocks.map((block) => {
                     const type = photoTypes.find((p) => p.id === block.id);
                     const shots = photosOf(block.id);
@@ -2761,6 +2966,7 @@
                 go.textContent = '이 거점 글자 저장';
             }
             overlay.classList.remove('hidden');
+            if (!(mode === 'missing' || missing.length)) readZonePhotosIntoFields();
         }
 
         function layoutSquareGuide() {
@@ -3508,7 +3714,11 @@
             const id = e.target.getAttribute('data-meter');
             if (!id) return;
             const dest = document.getElementById(id);
-            if (dest) dest.value = e.target.value;
+            if (dest) {
+                dest.value = e.target.value;
+                delete dest.dataset.auto;
+            }
+            delete e.target.dataset.auto;
             updateMeterHint();
             persistWorking();
         });

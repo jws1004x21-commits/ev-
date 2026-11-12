@@ -1,4 +1,4 @@
-// v4.21: confirm MCCB and meter number from this zone's photos
+// v4.22: fill the log from the numbers read in each zone's photos
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
