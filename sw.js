@@ -1,4 +1,4 @@
-// v4.32: fix 175A glue error on close-up MCCB photos
+// v4.33: safer MCCB close-up read without breaking real 175A
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

@@ -1345,7 +1345,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.32';
+        const APP_VERSION = '4.33';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -2940,21 +2940,19 @@
             const pushSize = (n) => {
                 if (sizes.indexOf(n) >= 0) found.push(n + 'A');
             };
-            // Overlapping scan so "175A" also yields "75A" when OCR glued a leading digit.
-            const ampRe = /(?=(\d{2,3}\s*[A8BR]))/g;
-            let m;
-            while ((m = ampRe.exec(raw)) !== null) {
-                const num = parseInt(m[1], 10);
-                pushSize(num);
-                ampRe.lastIndex = m.index + 1;
-            }
             (raw.match(/\d{2,3}\s*A/g) || []).forEach((part) => pushSize(parseInt(part, 10)));
+            // Close-up OCR often reads trailing A as 8/B/R ("758" → 75A).
+            (raw.match(/\b\d{2,3}\s*[A8BR]\b/g) || []).forEach((part) => {
+                const m = part.match(/(\d{2,3})\s*[A8BR]/);
+                if (m) pushSize(parseInt(m[1], 10));
+            });
+            // Only when OCR itself returned BOTH "75A" and "175A", prefer the shorter one.
+            // Do not invent 75A from a lone "175A" — that would break a real 175A breaker.
             let unique = [...new Set(found)];
             if (unique.length > 1) {
                 const nums = unique.map((u) => parseInt(u, 10));
-                // Prefer 75A over 175A when both appear from the same OCR glue error.
-                const nested = nums.filter((n) => nums.some((big) => big !== n && String(big).endsWith(String(n))));
-                if (nested.length === 1) unique = [nested[0] + 'A'];
+                const glued = nums.filter((n) => nums.some((big) => big !== n && String(big) === '1' + String(n)));
+                if (glued.length === 1) unique = [glued[0] + 'A'];
             }
             if (unique.length === 1) return unique[0];
             if (!loose) return '';
@@ -2966,8 +2964,8 @@
             unique = [...new Set(looseFound)];
             if (unique.length > 1) {
                 const nums = unique.map((u) => parseInt(u, 10));
-                const nested = nums.filter((n) => nums.some((big) => big !== n && String(big).endsWith(String(n))));
-                if (nested.length === 1) unique = [nested[0] + 'A'];
+                const glued = nums.filter((n) => nums.some((big) => big !== n && String(big) === '1' + String(n)));
+                if (glued.length === 1) unique = [glued[0] + 'A'];
             }
             return unique.length === 1 ? unique[0] : '';
         }
@@ -3022,11 +3020,16 @@
         }
 
         async function ocrCloseValue(dataUrl, kind) {
-            const source = await cropRegion(dataUrl, 0, 0, 1, 1, 1);
-            const canvases = [
-                preprocessCloseCanvas(source, 'contrast'),
-                preprocessCloseCanvas(source, 'binary')
-            ];
+            // MCCB close-ups often include the toggle on the left; the rating on the white label is usually right/center.
+            const sources = kind === 'mccb'
+                ? [
+                    await cropRegion(dataUrl, 0.35, 0.05, 0.60, 0.90, 1),
+                    await cropRegion(dataUrl, 0, 0, 1, 1, 1)
+                ]
+                : [
+                    await cropRegion(dataUrl, 0, 0.15, 1, 0.70, 1),
+                    await cropRegion(dataUrl, 0, 0, 1, 1, 1)
+                ];
             const tries = kind === 'mccb'
                 ? [
                     { psm: 8, wl: '0123456789A' },
@@ -3040,11 +3043,17 @@
                     { psm: 11, wl: '0123456789' },
                     { psm: 7, wl: '' }
                 ];
-            for (let c = 0; c < canvases.length; c++) {
-                for (let t = 0; t < tries.length; t++) {
-                    const text = await ocrCanvas(canvases[c], tries[t].psm, tries[t].wl);
-                    const value = kind === 'mccb' ? pickClearMccb(text, true) : pickClearMeter(text);
-                    if (value) return value;
+            for (let s = 0; s < sources.length; s++) {
+                const canvases = [
+                    preprocessCloseCanvas(sources[s], 'contrast'),
+                    preprocessCloseCanvas(sources[s], 'binary')
+                ];
+                for (let c = 0; c < canvases.length; c++) {
+                    for (let t = 0; t < tries.length; t++) {
+                        const text = await ocrCanvas(canvases[c], tries[t].psm, tries[t].wl);
+                        const value = kind === 'mccb' ? pickClearMccb(text, true) : pickClearMeter(text);
+                        if (value) return value;
+                    }
                 }
             }
             return '';
