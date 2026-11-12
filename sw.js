@@ -1,4 +1,4 @@
-// v4.52: built-in canvas picture map (no external map tiles/API)
+// v4.53: clarify phone export vs zone-complete Drive/Sheet vs evening pack in manual
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

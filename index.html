@@ -1099,7 +1099,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.52</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.53</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 지금 강제 새로고침 하세요. (안 바뀌면 이 버튼)
@@ -1114,7 +1114,7 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">버전이 안 바뀌면 이 버튼을 누르세요. 상단이 <b>v4.52</b>이어야 최신입니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">버전이 안 바뀌면 이 버튼을 누르세요. 상단이 <b>v4.53</b>이어야 최신입니다.</div>
                     <button type="button" class="btn btn-secondary btn-small" style="margin-top:10px;" onclick="openManual()">📖 앱 사용설명서</button>
                 </div>
             </div>
@@ -1250,7 +1250,8 @@
                     ⚠️ 필수 사진은 종류마다 최소 1장씩 촬영해야 완료할 수 있습니다
                 </div>
                 <div class="upload-status" id="uploadStatus"></div>
-                <button class="btn btn-secondary" id="saveToPhoneBtn">📥 사진을 폰으로 내보내기</button>
+                <button class="btn btn-secondary" id="saveToPhoneBtn">📥 사진을 폰으로 내보내기 (백업 zip)</button>
+                <div style="font-size:12px;color:#aaa;margin:6px 0 10px;">내보내기 = 폰에 zip만 저장. 구글에는 안 올라갑니다. 구글(시트+드라이브)은 아래 <b>거점 완료</b> 때 올라갑니다.</div>
                 <button class="btn btn-primary" id="completeZoneBtn" disabled>이 거점 점검 완료</button>
                 <button class="btn btn-secondary" id="backBtn">뒤로</button>
             </div>
@@ -1351,6 +1352,14 @@
             <div class="card">
                 <div class="card-header">📋 점검 내역</div>
                 <div class="card-body">
+                    <div class="info-box" style="margin-bottom:10px;">
+                        <div class="title">저녁 보고 안내</div>
+                        <div class="text">
+                            ① 낮에 <b>거점 저장</b>한 것만 시트·드라이브에 있습니다.<br>
+                            ② 여기서 <b>일지 엑셀</b> + <b>오늘 폴더</b>를 만들면 양식에 맞춰 시군/충전소/거점 폴더가 생깁니다.<br>
+                            ③ 「사진을 폰으로 내보내기」는 거점 작업 중 백업용이고, 저녁 전체 보고와는 다릅니다.
+                        </div>
+                    </div>
                     <button class="btn btn-primary btn-small" onclick="syncAndShowDailyLog()" style="margin-bottom:8px;">🔄 동기화 후 오늘 점검일지</button>
                     <button class="btn btn-primary btn-small" onclick="downloadDailyLogExcel()" style="margin-bottom:8px;">📥 일지 엑셀 내려받기</button>
                     <button class="btn btn-secondary btn-small" onclick="shareDailyLog()" style="margin-bottom:8px;">📤 일지 글자로 보내기</button>
@@ -1359,10 +1368,11 @@
                         <input type="date" class="form-input" id="logDate">
                     </div>
                     <div id="dailyLog" class="daily-log"></div>
-                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">손으로 쓰던 일지 양식 그대로 엑셀로 내려받습니다. MCCB용량·계량기번호는 거점마다 다르면 그 줄에 각각 들어갑니다. 사진은 거점 폴더로 정리됩니다.</div>
-                    <button class="btn btn-secondary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📁 오늘 폴더로 저장</button>
+                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">일지 열: 국소명, 거점, 충전기수, 충전기번호, MCCB용량, 접지저항, 계량기번호, 비고</div>
+                    <button class="btn btn-secondary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📁 오늘 폴더로 저장 (시군/충전소/거점)</button>
+                    <button class="btn btn-secondary btn-small" onclick="exportTodayReport()" style="margin-bottom:8px;">📤 오늘 점검 카톡으로 보내기 (zip)</button>
                     <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📋 전체 기록만 엑셀</button>
-                    <div style="font-size:12px;color:#aaa;margin-bottom:12px;">카톡에는 그날 zip 하나를 보냅니다. 받는 사람이 압축을 풀면 시/군 · 충전소 · 거점 폴더로 사진이 정리되고, 점검목록.html 에서 사진이 보입니다. 컴퓨터는 아래 폴더 저장을 누르면 압축 없이 폴더가 만들어집니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin-bottom:12px;">zip을 풀면 점검일지 + 사진/시군/충전소/거점 폴더가 나옵니다. 거점 완료를 안 한 것은 묶음에 없습니다.</div>
                     <div id="historyList"></div>
                 </div>
             </div>
@@ -1504,93 +1514,85 @@
             <div class="manual-ver" id="manualVersion">최신 버전</div>
 
             <div class="manual-sec">
-                <h3>1. 한 줄로 보면</h3>
-                <ol>
-                    <li>이름 적기 → 충전소·거점 고르기</li>
-                    <li>필수 사진 찍기</li>
-                    <li><b>MCCB용량·계량기번호만 숫자 크게</b> 찍기</li>
-                    <li>확인 후 거점 저장</li>
-                    <li>내역에서 <b>일지 엑셀 내려받기</b></li>
-                </ol>
-                <div class="tip">보고는 「엑셀 일지 + 거점별 사진」입니다. 손으로 쓰던 표와 같은 열입니다.</div>
+                <h3>1. 어디에 무엇이 저장되나 (제일 중요)</h3>
+                <ul>
+                    <li><b>사진만 찍었을 때</b> → <b>이 폰 앱 안</b>에만 임시 저장. 구글에는 아직 안 감.</li>
+                    <li><b>사진을 폰으로 내보내기</b> → 지금 거점 사진을 zip으로 <b>폰 다운로드/파일</b>에 저장. (백업용 · 구글과 별개)</li>
+                    <li><b>이 거점 점검 완료 → 저장</b> → <b>구글 시트</b>에 한 줄 기록 + <b>구글 드라이브</b> 거점 폴더에 사진 업로드.</li>
+                    <li><b>저녁 보고 (내역)</b> → 오늘 점검한 것을 <b>일지 양식 엑셀</b> + <b>시군/충전소/거점 폴더 사진</b>으로 다시 묶어서 폰에 저장·카톡 전송.</li>
+                </ul>
+                <div class="tip">정리: 찍기=폰앱 / 거점완료=시트+드라이브 / 저녁=일지엑셀+폴더묶음. 서로 역할이 다릅니다.</div>
             </div>
 
             <div class="manual-sec">
-                <h3>2. 시작하기</h3>
+                <h3>2. 하루 일과 순서</h3>
                 <ol>
-                    <li>홈에서 <b>본인 이름</b>을 적습니다. 없으면 시작·완료가 안 됩니다.</li>
-                    <li>지역 → 시/군 → 충전소를 고릅니다.</li>
-                    <li>거점을 누르고 <b>점검 시작</b>을 누릅니다.</li>
+                    <li>홈에서 <b>이름</b> 적기</li>
+                    <li>충전소·거점 고르기 → 사진 찍기 (앱에만 저장)</li>
+                    <li>6·7번으로 MCCB·제조번호 크게 찍기</li>
+                    <li><b>이 거점 점검 완료</b> → 확인 → <b>이 거점 저장</b> (이때 시트·드라이브)</li>
+                    <li>다음 거점 반복</li>
+                    <li>저녁에 <b>내역</b> → 동기화 → 일지 엑셀 / 오늘 폴더로 저장</li>
                 </ol>
             </div>
 
             <div class="manual-sec">
                 <h3>3. 사진 찍는 법</h3>
                 <ul>
-                    <li>카메라는 닫지 말고, 위 제목을 누르거나 좌우로 넘겨 <b>항목만</b> 바꿉니다.</li>
-                    <li><b>1~5, 8번</b>은 필수입니다. (전압·저항·절연·충전기·배전반·전체샷)</li>
-                    <li><b>6. MCCB용량</b> · <b>7. 계량기번호</b>는 일지에 들어가는 칸입니다.</li>
-                    <li>배전반 전체가 아니라, <b>50A·75A</b> 글자 / 계량기 <b>번호만</b> 화면 절반 이상 크게 찍으세요.</li>
-                    <li>줌+, 핀치, 위아래 드래그로 키울 수 있습니다.</li>
-                </ul>
-                <div class="tip">멀리서 찍은 뒤 나중에 확대하면 글자가 뭉개져 자동 입력이 안 됩니다. 찍을 때 숫자만 크게 찍으세요.</div>
-            </div>
-
-            <div class="manual-sec">
-                <h3>4. 자동으로 들어가는 것</h3>
-                <ul>
-                    <li>국소명, 거점, 충전기 수, 충전기 번호(1~4, 5~8…), 비고(장소)</li>
-                    <li>MCCB용량·계량기번호는 6·7번 확대 사진에서 읽습니다.</li>
-                    <li>용량은 현장에서 거의 <b>50A 또는 75A</b>입니다.</li>
-                    <li>전압·저항·절연 <b>숫자는 일지에 안 넣습니다.</b> 사진만 있으면 됩니다.</li>
-                    <li>접지저항 칸은 있어도 되고, 비워 둬도 저장됩니다.</li>
+                    <li><b>앱 카메라</b>가 기본입니다. 셔터만 누르면 확인 없이 연속 촬영됩니다.</li>
+                    <li><b>폰카메라</b>는 OS 「사용/확인」이 한 번 뜬 뒤, 바로 다음 촬영이 다시 열립니다.</li>
+                    <li><b>1~5, 8번</b> 필수. <b>6·7번</b>은 일지용 용량·제조번호.</li>
+                    <li>50A·75A / 제조번호는 <b>숫자만 화면 절반 이상</b> 크게.</li>
+                    <li>찍은 사진은 목록에서 눌러 <b>좌우로 밀어</b> 확인할 수 있습니다.</li>
                 </ul>
             </div>
 
             <div class="manual-sec">
-                <h3>5. 사진 · 거점 저장</h3>
+                <h3>4. 거점 완료 = 구글 연동</h3>
                 <ol>
-                    <li>찍은 사진은 <b>바로 이 폰(앱)</b>에만 저장됩니다. 구글 드라이브에는 아직 안 올라갑니다.</li>
-                    <li>잘못 찍으면 × 또는 <b>다시 찍기</b>로 지우면 됩니다. 드라이브에 잘못된 장이 쌓이지 않습니다.</li>
-                    <li><b>이 거점 점검 완료</b> → 확인 화면에서 MCCB·제조번호를 봅니다.</li>
-                    <li><b>이 거점 저장</b>을 누르면 그때 사진이 드라이브로 올라가고, 시트에도 기록됩니다.</li>
+                    <li><b>이 거점 점검 완료</b>를 누릅니다.</li>
+                    <li>확인 화면에서 MCCB·제조번호가 맞는지 봅니다. 틀리면 고칩니다.</li>
+                    <li><b>이 거점 저장</b> → 사진이 드라이브로 올라가고, 시트에 기록이 들어갑니다.</li>
                 </ol>
-                <div class="tip">같은 거점을 다시 저장하면 시트 같은 줄이 덮어씌워집니다. 거점을 바꾸면 MCCB·계량기 칸은 비워집니다.</div>
+                <div class="tip">드라이브 경로: 내 드라이브 / 전기차충전소점검_대전팀 / 점검사진 / 지역 / 시군 / 충전소 / 거점폴더</div>
             </div>
 
             <div class="manual-sec">
-                <h3>6. 그날 보고 (엑셀)</h3>
+                <h3>5. 저녁에 오늘 전체 보고</h3>
                 <ol>
                     <li>아래 메뉴 <b>내역</b>으로 갑니다.</li>
-                    <li><b>동기화 후 오늘 점검일지</b>를 한 번 누릅니다.</li>
-                    <li><b>일지 엑셀 내려받기</b>를 누릅니다.</li>
-                    <li>파일 열: 국소명, 거점, 충전기수, 충전기번호, MCCB용량, 접지저항, 계량기번호, 비고</li>
+                    <li><b>동기화 후 오늘 점검일지</b> (팀 시트 최신 맞춤)</li>
+                    <li><b>일지 엑셀 내려받기</b> → 양식 열: 국소명, 거점, 충전기수, 충전기번호, MCCB용량, 접지저항, 계량기번호, 비고</li>
+                    <li><b>오늘 폴더로 저장</b> → 시군 / 충전소 / 거점 폴더 + 일지 파일이 만들어집니다.</li>
+                    <li>카톡으로 보낼 때 → <b>오늘 점검 카톡으로 보내기</b> zip (풀면 폴더 그대로)</li>
                 </ol>
-                <div class="tip">카톡으로 보낼 때는 「오늘 점검 카톡으로 보내기」 zip을 쓰면 일지·사진 폴더가 같이 갑니다.</div>
+                <div class="tip">거점 완료를 안 한 것은 저녁 묶음에 안 들어갑니다. 꼭 거점마다 저장하세요.</div>
             </div>
 
             <div class="manual-sec">
-                <h3>7. 오늘·이번주 확인 / 동선</h3>
+                <h3>6. 「사진을 폰으로 내보내기」는?</h3>
                 <ul>
-                    <li>홈의 <b>오늘·이번주·누적</b>을 누르면 어디를 했는지 목록이 나옵니다.</li>
-                    <li><b>진행률</b>을 누르면 지역별로 얼마나 됐는지 보입니다.</li>
-                    <li>기록은 <b>구글 시트 하나</b>입니다. 홈의 <b>팀 동기화</b>를 누르면 그 시트 최신이 이 폰에 맞춰집니다.</li>
-                    <li>다른 사람도 각자 동기화(또는 앱을 다시 열기)하면 <b>모두가 같은 숫자</b>를 봅니다. 한 사람만 눌러서는 남의 폰이 자동으로 바뀌진 않습니다.</li>
-                    <li>동선에서 <b>지역만</b> 고르면 그 지역 전체가 나오고, 정렬이 <b>가까운 순(GPS)</b>이면 지금 위치에서 가까운 곳부터 보입니다.</li>
-                    <li>시/군 버튼으로 좁힐 수도 있습니다.</li>
-                    <li>각 충전소에 <b>주소 복사 · 카카오맵 · 네이버맵</b>이 있습니다. 복사한 주소를 내비에 붙여넣어도 됩니다.</li>
-                    <li>조를 나눠 다니면 거점 잠금은 쓰지 않습니다.</li>
+                    <li><b>지금 보고 있는 거점</b> 사진만 zip으로 폰에 받는 백업입니다.</li>
+                    <li>구글 드라이브 업로드와는 <b>다릅니다.</b> 내보내기만 했다고 시트/드라이브에 안 들어갑니다.</li>
+                    <li>드라이브에 올리려면 반드시 <b>거점 저장</b>을 하세요.</li>
+                </ul>
+            </div>
+
+            <div class="manual-sec">
+                <h3>7. 팀 동기화 / 동선</h3>
+                <ul>
+                    <li>기록의 기준은 <b>구글 시트 하나</b>. 홈 <b>팀 동기화</b>로 맞춥니다.</li>
+                    <li>동선에서 지역·그림 지도·가까운 순·카카오/네이버 길안내를 씁니다.</li>
                 </ul>
             </div>
 
             <div class="manual-sec">
                 <h3>8. 자주 막히는 것</h3>
                 <ul>
-                    <li>칸이 비면 → 6·7번을 숫자만 크게 다시 찍거나, 확인 화면에서 직접 적습니다.</li>
-                    <li>지하에서 판독이 안 되면 → 인터넷이 한 번 필요합니다. 안 되면 두 칸만 수기 입력하세요.</li>
-                    <li>사진이 안 올라가면 → 업로드가 끝난 뒤 다시 완료를 누르세요.</li>
-                    <li>화면 위에 「새 버전」이 뜨면 → <b>강제 새로고침</b>을 누르세요.</li>
-                    <li>가까운 순이 안 되면 → 설정에 있는 구글 스크립트를 새 버전으로 한 번 배포하세요.</li>
+                    <li>버전이 안 바뀌면 → 홈 <b>강제 새로고침</b> (상단 v번호 확인)</li>
+                    <li>칸이 비면 → 6·7번 다시 찍거나 직접 적기</li>
+                    <li>드라이브에 사진이 없으면 → 거점 저장을 했는지 확인</li>
+                    <li>저녁 폴더가 비면 → 오늘 이 폰에서 거점 완료한 것이 있는지 확인</li>
                 </ul>
             </div>
 
@@ -1621,7 +1623,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.52';
+        const APP_VERSION = '4.53';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
