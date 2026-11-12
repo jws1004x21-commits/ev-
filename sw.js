@@ -1,4 +1,4 @@
-// v4.29: read only the MCCB amp rating and the meter number from the panel photo
+// v4.30: Excel daily log download and close-up MCCB/meter photo fill
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

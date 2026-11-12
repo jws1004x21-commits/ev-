@@ -1192,13 +1192,14 @@
                 <div class="card-header">📋 점검 내역</div>
                 <div class="card-body">
                     <button class="btn btn-primary btn-small" onclick="syncAndShowDailyLog()" style="margin-bottom:8px;">🔄 동기화 후 오늘 점검일지</button>
+                    <button class="btn btn-primary btn-small" onclick="downloadDailyLogExcel()" style="margin-bottom:8px;">📥 일지 엑셀 내려받기</button>
                     <button class="btn btn-secondary btn-small" onclick="shareDailyLog()" style="margin-bottom:8px;">📤 일지 글자로 보내기</button>
                     <div class="form-group" style="margin-bottom:8px;">
                         <label class="form-label">점검일</label>
                         <input type="date" class="form-input" id="logDate">
                     </div>
                     <div id="dailyLog" class="daily-log"></div>
-                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">보고는 두 가지입니다. 일지 글자는 위 표이고, 사진은 거점 폴더로 정리됩니다. 같은 거점은 한 줄입니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">손으로 쓰던 일지 양식 그대로 엑셀로 내려받습니다. MCCB용량·계량기번호는 거점마다 다르면 그 줄에 각각 들어갑니다. 사진은 거점 폴더로 정리됩니다.</div>
                     <button class="btn btn-secondary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📁 오늘 폴더로 저장</button>
                     <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📋 전체 기록만 엑셀</button>
                     <div style="font-size:12px;color:#aaa;margin-bottom:12px;">카톡에는 그날 zip 하나를 보냅니다. 받는 사람이 압축을 풀면 시/군 · 충전소 · 거점 폴더로 사진이 정리되고, 점검목록.html 에서 사진이 보입니다. 컴퓨터는 아래 폴더 저장을 누르면 압축 없이 폴더가 만들어집니다.</div>
@@ -1344,7 +1345,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.29';
+        const APP_VERSION = '4.30';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -1352,9 +1353,11 @@
             { id: 'resistance', label: '2. 저항', required: true },
             { id: 'insulation', label: '3. 절연', required: true },
             { id: 'charger', label: '4. 충전기', required: true },
-            { id: 'panel', label: '4. 배전반', required: true },
-            { id: 'overview', label: '5. 충전소 전체샷', required: true },
-            { id: 'issue', label: '6. 특이사항', required: false }
+            { id: 'panel', label: '5. 배전반', required: true },
+            { id: 'mccbClose', label: '6. MCCB용량', required: false },
+            { id: 'meterClose', label: '7. 계량기번호', required: false },
+            { id: 'overview', label: '8. 충전소 전체샷', required: true },
+            { id: 'issue', label: '9. 특이사항', required: false }
         ];
 
         let state = {
@@ -2928,14 +2931,23 @@
             return readingText((result && result.data && result.data.text) || '');
         }
 
-        function pickClearMccb(text) {
+        function pickClearMccb(text, loose) {
             const sizes = [20, 30, 32, 40, 50, 60, 63, 75, 80, 100, 125, 150, 160, 175, 200, 225, 250];
             const found = [];
-            (readingText(text).match(/\d{2,3}\s*A/g) || []).forEach((part) => {
+            const raw = readingText(text);
+            (raw.match(/\d{2,3}\s*A/g) || []).forEach((part) => {
                 const n = parseInt(part, 10);
                 if (sizes.indexOf(n) >= 0) found.push(n + 'A');
             });
-            const unique = [...new Set(found)];
+            let unique = [...new Set(found)];
+            if (unique.length === 1) return unique[0];
+            if (!loose) return '';
+            const looseFound = [];
+            (raw.match(/\b\d{2,3}\b/g) || []).forEach((part) => {
+                const n = parseInt(part, 10);
+                if (sizes.indexOf(n) >= 0) looseFound.push(n + 'A');
+            });
+            unique = [...new Set(looseFound)];
             return unique.length === 1 ? unique[0] : '';
         }
 
@@ -2945,6 +2957,21 @@
             const good = groups.filter((group) => /^0/.test(group) && !/^0+$/.test(group) && !/^(15|16|18|19)/.test(group));
             const unique = [...new Set(good)];
             return unique.length === 1 ? unique[0] : '';
+        }
+
+        async function ocrCloseValue(dataUrl, kind) {
+            const passes = [
+                [0, 0, 1, 1, 2.5, 7],
+                [0.05, 0.15, 0.90, 0.70, 3, 6],
+                [0, 0, 1, 1, 2, 11]
+            ];
+            for (let i = 0; i < passes.length; i++) {
+                const [rx, ry, rw, rh, scale, psm] = passes[i];
+                const text = await ocrCanvas(await cropRegion(dataUrl, rx, ry, rw, rh, scale), psm);
+                const value = kind === 'mccb' ? pickClearMccb(text, true) : pickClearMeter(text);
+                if (value) return value;
+            }
+            return '';
         }
 
         function setReadValue(id, value) {
@@ -2967,24 +2994,26 @@
 
         async function readMccbAndMeter() {
             const sub = document.getElementById('reviewSub');
-            if (sub) sub.textContent = '배전반 사진에서 MCCB 용량과 계량기 번호만 확대 판독 중...';
-            const shots = photosOf('panel').filter((item) => item.data).slice(-1)
-                .concat(photosOf('charger').filter((item) => item.data).slice(-1));
-            if (!shots.length) {
-                if (sub) sub.textContent = '배전반 사진이 없으면 MCCB와 계량기번호는 직접 적으세요.';
+            if (sub) sub.textContent = 'MCCB용량·계량기번호 확대 사진부터 읽는 중...';
+            const mccbShots = photosOf('mccbClose').filter((item) => item.data).slice(-1)
+                .concat(photosOf('panel').filter((item) => item.data).slice(-1));
+            const meterShots = photosOf('meterClose').filter((item) => item.data).slice(-1)
+                .concat(photosOf('charger').filter((item) => item.data).slice(-1))
+                .concat(photosOf('panel').filter((item) => item.data).slice(-1));
+            if (!mccbShots.length && !meterShots.length) {
+                if (sub) sub.textContent = 'MCCB용량·계량기번호는 숫자만 크게 확대해 찍으면 칸에 들어갑니다. 없으면 직접 적으세요.';
                 return;
             }
             try {
                 let mccb = '';
                 let meter = '';
-                for (let i = 0; i < shots.length; i++) {
-                    if (!mccb) mccb = pickClearMccb(await ocrCanvas(await cropRegion(shots[i].data, 0.08, 0.40, 0.40, 0.30, 3), 7));
-                    if (!meter) meter = pickClearMeter(await ocrCanvas(await cropRegion(shots[i].data, 0.40, 0.05, 0.48, 0.42, 3), 6));
+                for (let i = 0; i < mccbShots.length && !mccb; i++) {
+                    mccb = await ocrCloseValue(mccbShots[i].data, 'mccb');
+                    if (!mccb) mccb = pickClearMccb(await ocrCanvas(await cropRegion(mccbShots[i].data, 0.08, 0.40, 0.40, 0.30, 3), 7), true);
                 }
-                if (!mccb || !meter) {
-                    const full = await ocrCanvas(await cropRegion(shots[0].data, 0, 0, 1, 1, 1.5), 11);
-                    if (!mccb) mccb = pickClearMccb(full);
-                    if (!meter) meter = pickClearMeter(full);
+                for (let i = 0; i < meterShots.length && !meter; i++) {
+                    meter = await ocrCloseValue(meterShots[i].data, 'meter');
+                    if (!meter) meter = pickClearMeter(await ocrCanvas(await cropRegion(meterShots[i].data, 0.40, 0.05, 0.48, 0.42, 3), 6));
                 }
                 const notes = [];
                 if (setReadValue('logMccb', mccb)) notes.push('MCCB ' + mccb);
@@ -2993,9 +3022,35 @@
                 if (!sub) return;
                 sub.textContent = notes.length
                     ? '사진에서 넣음: ' + notes.join(', ') + '. 맞으면 그대로 저장하고, 다르면 그 칸만 고치세요.'
-                    : '용량 또는 계량기 번호가 한 개로 확정되지 않았습니다. 빈칸만 적으세요.';
+                    : '용량·번호가 한 개로 안 보이면 빈칸입니다. 6·7번으로 숫자만 크게 다시 찍으세요.';
             } catch (err) {
                 if (sub) sub.textContent = '판독에 실패했습니다. MCCB와 계량기번호만 직접 적으세요.';
+            }
+        }
+
+        async function readCloseShotNow(photoId, dataUrl) {
+            try {
+                if (photoId === 'mccbClose') {
+                    const mccb = await ocrCloseValue(dataUrl, 'mccb');
+                    if (setReadValue('logMccb', mccb)) {
+                        persistWorking();
+                        updateMeterHint();
+                        showCameraWarn('MCCB ' + mccb + ' 넣었습니다.');
+                    } else {
+                        showCameraWarn('용량이 한 개로 안 보입니다. 75A처럼 숫자만 크게 다시 찍으세요.');
+                    }
+                } else if (photoId === 'meterClose') {
+                    const meter = await ocrCloseValue(dataUrl, 'meter');
+                    if (setReadValue('logMeterNo', meter)) {
+                        persistWorking();
+                        updateMeterHint();
+                        showCameraWarn('계량기 ' + meter + ' 넣었습니다.');
+                    } else {
+                        showCameraWarn('계량기 번호가 한 개로 안 보입니다. 번호만 크게 다시 찍으세요.');
+                    }
+                }
+            } catch (err) {
+                showCameraWarn('판독 실패. 숫자만 크게 다시 찍거나 직접 적으세요.');
             }
         }
 
@@ -3124,11 +3179,11 @@
                 const chargerEl = document.getElementById('logChargerNo');
                 if (chargerEl && !chargerEl.value) chargerEl.value = numbers;
                 const blocks = [
-                    { id: 'panel', guide: '거점 ' + (state.selectedZoneIdx + 1) + ' · 충전기 ' + count + '대. 차단기 용량(75A처럼 A가 붙은 글자)만 읽습니다.', fields: [['logMccb', '이 거점 MCCB용량', '예: 75A']] },
-                    { id: 'charger', guide: '계량기 명판의 번호만 읽습니다. 다르면 이 칸만 고치세요.', fields: [['logMeterNo', '이 거점 계량기번호', '사진에 보이는 번호'], ['meterGround', '접지저항', '없으면 비워 두세요']] }
+                    { id: 'mccbClose', guide: '거점 ' + (state.selectedZoneIdx + 1) + ' · 충전기 ' + count + '대. 75A처럼 용량 글자만 화면 가득 찍으면 이 칸에 들어갑니다.', fields: [['logMccb', '이 거점 MCCB용량', '예: 75A']], also: 'panel' },
+                    { id: 'meterClose', guide: '계량기 명판의 번호만 화면 가득 찍으면 이 칸에 들어갑니다. 다르면 이 칸만 고치세요.', fields: [['logMeterNo', '이 거점 계량기번호', '사진에 보이는 번호'], ['meterGround', '접지저항', '없으면 비워 두세요']], also: 'charger' }
                 ];
                 title.textContent = '이 거점 MCCB · 계량기';
-                sub.textContent = '국소명·거점·충전기 수·번호·장소는 자동입니다. 전압·저항·절연 숫자는 일지에 넣지 않습니다.';
+                sub.textContent = '국소명·거점·충전기 수·번호·장소는 자동입니다. MCCB·계량기번호는 숫자만 확대해 찍으세요.';
                 const autoCard = `<div class="review-block">
                     <h4>자동으로 시트에 들어갑니다</h4>
                     <div class="review-guide">국소명 · 거점 · 충전기 수 · 충전기 번호 · 장소. 사진에서 읽지 않습니다.</div>
@@ -3143,14 +3198,16 @@
                 body.innerHTML = autoCard + blocks.map((block) => {
                     const type = photoTypes.find((p) => p.id === block.id);
                     const shots = photosOf(block.id);
+                    const alsoThumbs = block.also && photosOf(block.also).length ? '<div class="review-thumbs" style="margin-top:6px;">' + thumbsOf(block.also) + '</div>' : '';
                     return `<div class="review-block">
                         <h4>${type.label} · ${shots.length}장</h4>
                         <div class="review-guide">${block.guide}</div>
                         <div class="review-thumbs">${thumbsOf(block.id)}</div>
+                        ${alsoThumbs}
                         <div class="meter-grid" style="margin-top:8px;">${block.fields.map((f) => fieldInput(f[0], f[1], f[2])).join('')}</div>
-                        <button type="button" class="btn btn-secondary btn-small" data-shot="${block.id}" style="margin-top:8px;">다시 찍기</button>
+                        <button type="button" class="btn btn-secondary btn-small" data-shot="${block.id}" style="margin-top:8px;">숫자만 크게 찍기</button>
                     </div>`;
-                }).join('') + ['overview', 'issue'].filter((id) => photosOf(id).length).map((id) => {
+                }).join('') + ['panel', 'overview', 'issue'].filter((id) => photosOf(id).length).map((id) => {
                     const type = photoTypes.find((p) => p.id === id);
                     return `<div class="review-block"><h4>${type.label} · ${photosOf(id).length}장</h4><div class="review-thumbs">${thumbsOf(id)}</div></div>`;
                 }).join('');
@@ -3559,6 +3616,7 @@
                 renderChecklist();
                 enqueueUpload(item);
                 if (blurry) showCameraWarn('숫자가 흐릴 수 있습니다. 다시 찍어 주세요.');
+                if (photoId === 'mccbClose' || photoId === 'meterClose') readCloseShotNow(photoId, full);
             }
             if (navigator.vibrate) navigator.vibrate(50);
             persistWorking();
@@ -4632,6 +4690,100 @@
             downloadFileToPhone(new File([blob], '점검일지_' + date + '.txt', { type: 'text/plain' }));
         }
 
+        function xlsxEscape(text) {
+            return String(text == null ? '' : text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function xlsxColName(index) {
+            let n = index + 1;
+            let name = '';
+            while (n > 0) {
+                const rem = (n - 1) % 26;
+                name = String.fromCharCode(65 + rem) + name;
+                n = Math.floor((n - 1) / 26);
+            }
+            return name;
+        }
+
+        function xlsxInlineCell(row, col, value) {
+            const ref = xlsxColName(col) + String(row);
+            return '<c r="' + ref + '" t="inlineStr"><is><t>' + xlsxEscape(value) + '</t></is></c>';
+        }
+
+        function dailyLogXlsxBytes(date, rows) {
+            const headers = ['국소명', '거점', '충전기수', '충전기번호', 'MCCB용량', '접지저항', '계량기번호', '비고'];
+            const keys = ['station', 'zoneIndex', 'chargers', 'chargerNo', 'mccb', 'ground', 'meterNo', 'place'];
+            const sheetRows = [];
+            sheetRows.push('<row r="1">' + xlsxInlineCell(1, 0, '전기차 충전소 점검일지') + xlsxInlineCell(1, 6, '점검일: ' + formDateLabel(date)) + '</row>');
+            sheetRows.push('<row r="2">' + headers.map((title, i) => xlsxInlineCell(2, i, title)).join('') + '</row>');
+            rows.forEach((row, idx) => {
+                const r = idx + 3;
+                sheetRows.push('<row r="' + r + '">' + keys.map((key, i) => xlsxInlineCell(r, i, row[key] || '')).join('') + '</row>');
+            });
+            if (!rows.length) {
+                sheetRows.push('<row r="3">' + xlsxInlineCell(3, 0, '이 날짜 기록이 없습니다.') + '</row>');
+            }
+            const sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+                + '<sheetViews><sheetView workbookViewId="0"/></sheetViews>'
+                + '<cols>'
+                + '<col min="1" max="1" width="28" customWidth="1"/>'
+                + '<col min="2" max="2" width="8" customWidth="1"/>'
+                + '<col min="3" max="3" width="10" customWidth="1"/>'
+                + '<col min="4" max="4" width="12" customWidth="1"/>'
+                + '<col min="5" max="5" width="12" customWidth="1"/>'
+                + '<col min="6" max="6" width="10" customWidth="1"/>'
+                + '<col min="7" max="7" width="14" customWidth="1"/>'
+                + '<col min="8" max="8" width="32" customWidth="1"/>'
+                + '</cols>'
+                + '<sheetData>' + sheetRows.join('') + '</sheetData>'
+                + '</worksheet>';
+            const workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+                + '<sheets><sheet name="점검일지" sheetId="1" r:id="rId1"/></sheets></workbook>';
+            const relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+                + '</Relationships>';
+            const workbookRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+                + '</Relationships>';
+            const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+                + '<Default Extension="xml" ContentType="application/xml"/>'
+                + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+                + '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                + '</Types>';
+            return buildZip([
+                { name: '[Content_Types].xml', bytes: utf8Bytes(contentTypes) },
+                { name: '_rels/.rels', bytes: utf8Bytes(relsXml) },
+                { name: 'xl/workbook.xml', bytes: utf8Bytes(workbookXml) },
+                { name: 'xl/_rels/workbook.xml.rels', bytes: utf8Bytes(workbookRelsXml) },
+                { name: 'xl/worksheets/sheet1.xml', bytes: utf8Bytes(sheetXml) }
+            ]);
+        }
+
+        async function downloadDailyLogExcel() {
+            const date = logDateValue();
+            await fetchTeamProgress(true);
+            const rows = rowsForDailyLog(date);
+            if (!rows.length) {
+                alert('이 날짜 점검 기록이 없습니다. 먼저 거점을 저장하거나 동기화하세요.');
+                return;
+            }
+            const file = new File([dailyLogXlsxBytes(date, rows)], '점검일지_' + date + '.xlsx', {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+            const shared = await shareOrSaveFile(file, '전기차 충전소 점검일지 ' + formDateLabel(date));
+            if (!shared) alert('점검일지_' + date + '.xlsx 를 저장했습니다. 손으로 쓰던 표와 같은 열입니다.');
+        }
+
         function suggestedTeamCount(n) {
             if (n >= 40) return 3;
             if (n >= 18) return 2;
@@ -5323,10 +5475,24 @@
                 };
             }));
             const formBytes = formBlob ? new Uint8Array(await formBlob.arrayBuffer()) : null;
+            const xlsxRows = (items || []).map((it) => {
+                const record = it.record || {};
+                return {
+                    station: record.station || '',
+                    zoneIndex: record.zoneIndex || '',
+                    chargers: record.chargers || '',
+                    chargerNo: record.chargerNo || '',
+                    mccb: record.mccb || '',
+                    ground: record.ground || '',
+                    meterNo: record.meterNo || '',
+                    place: record.zoneName || ''
+                };
+            });
             const entries = [
                 { name: '먼저읽기.txt', bytes: utf8Bytes(readme) },
                 { name: '점검목록.html', bytes: utf8Bytes(dailyHtml(stamp, items)) },
-                { name: '점검기록.csv', bytes: utf8Bytes(dailyCsv(items)) }
+                { name: '점검기록.csv', bytes: utf8Bytes(dailyCsv(items)) },
+                { name: '점검일지.xlsx', bytes: dailyLogXlsxBytes(stamp, xlsxRows) }
             ];
             if (formBytes && formBytes.length) entries.unshift({ name: '점검일지.jpg', bytes: formBytes });
             items.forEach((it) => {
