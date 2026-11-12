@@ -1,5 +1,5 @@
-// v4.63: auto-check verifies dummy via record API (progress hides tests)
-const SW_VER = '4.63';
+// v4.70: replace canvas map with Leaflet OSM + markercluster
+const SW_VER = '4.70';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

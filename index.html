@@ -10,10 +10,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.63">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.70">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -44,14 +47,14 @@
             border-radius: 12px;
             overflow: hidden;
             border: 1px solid #2a3550;
-            background: #0b1220;
-        }
-        #routeMapCanvas {
-            width: 100%;
+            background: #dbe4f0;
             height: 360px;
-            display: block;
-            touch-action: none;
-            background: transparent;
+        }
+        #routeMapLeaflet {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: #dbe4f0;
         }
         .route-map-side-btns {
             position: absolute;
@@ -61,14 +64,16 @@
             display: flex;
             flex-direction: column;
             gap: 6px;
-            z-index: 3;
+            z-index: 1100;
+            pointer-events: none;
         }
         .route-map-side-btns button {
+            pointer-events: auto;
             width: 42px;
             height: 42px;
             border-radius: 12px;
             border: 1px solid #3a4a6a;
-            background: rgba(15, 23, 42, 0.88);
+            background: rgba(15, 23, 42, 0.92);
             color: #f8fafc;
             font-size: 18px;
             font-weight: 700;
@@ -99,8 +104,8 @@
             min-height: 0;
             padding: 8px 10px 12px;
         }
-        #routeMapCard.route-map-fs .route-map-stage { flex: 1; min-height: 0; border-radius: 10px; }
-        #routeMapCard.route-map-fs #routeMapCanvas { height: 100%; min-height: 60vh; }
+        #routeMapCard.route-map-fs .route-map-stage { flex: 1; min-height: 0; border-radius: 10px; height: auto; }
+        #routeMapCard.route-map-fs #routeMapLeaflet { min-height: 60vh; }
         body.route-map-fs-open { overflow: hidden; }
         #routeMapMeta {
             font-size: 12px;
@@ -108,6 +113,21 @@
             margin-top: 8px;
             line-height: 1.45;
         }
+        #routeMapMeta .map-filter-chip {
+            display: inline-block;
+            margin: 2px 4px 0 0;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: #e2e8f0;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        #routeMapMeta .map-filter-chip.on-pending { background: #9a3412; border-color: #FF8C00; color: #ffedd5; }
+        #routeMapMeta .map-filter-chip.on-done { background: #14532d; border-color: #28A745; color: #dcfce7; }
+        #routeMapMeta .map-filter-chip.on-all { background: #1d4ed8; border-color: #60a5fa; color: #dbeafe; }
         #routeMapPick {
             margin-top: 8px;
             padding: 10px;
@@ -120,6 +140,47 @@
         #routeMapPick.hidden { display: none; }
         #routeMapPick .map-pop-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
         #routeMapPick .map-pop-btns .btn { font-size: 12px; padding: 8px 10px; }
+        .leaflet-popup-content { font-size: 13px; line-height: 1.45; margin: 10px 12px; min-width: 160px; }
+        .leaflet-popup-content .map-pop-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .leaflet-popup-content .map-pop-btns button,
+        .leaflet-popup-content .map-pop-btns a {
+            font-size: 12px;
+            padding: 7px 9px;
+            border-radius: 8px;
+            border: none;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 700;
+        }
+        .leaflet-popup-content .btn-done { background: #28A745; color: #fff; }
+        .leaflet-popup-content .btn-pending { background: #FF8C00; color: #fff; }
+        .leaflet-popup-content .btn-go { background: #2563eb; color: #fff; }
+        .leaflet-popup-content .btn-soft { background: #e2e8f0; color: #0f172a; }
+        .ev-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.45);
+        }
+        .ev-dot.pending { background: #FF8C00; }
+        .ev-dot.done { background: #28A745; }
+        .ev-me-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #2563eb;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 4px rgba(37,99,235,0.28);
+        }
+        .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
+            background-color: rgba(37, 99, 235, 0.22) !important;
+        }
+        .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
+            background-color: rgba(30, 64, 175, 0.88) !important;
+            color: #fff !important;
+            font-weight: 800 !important;
+        }
 
         .stats-grid {
             display: grid;
@@ -1156,10 +1217,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.63</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.70</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전 있음 · 상단이 v4.63이어야 최신
+        새 버전 있음 · 상단이 v4.70이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1171,8 +1232,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.63">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.63</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.70">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.70</b>이어야 최신입니다. 안 바뀌면 위 두 버튼을 누르고, 그래도 안 되면 홈화면 앱을 지운 뒤 브라우저로 다시 여세요.</div>
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
                         <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
@@ -1338,13 +1399,13 @@
                 <div class="card-header">🗺️ 지역 동선</div>
                 <div class="card-body">
                     <div class="info-box">
-                        <div class="text"><b>전국</b> 또는 지역을 고르면 <b>앱 안 그림 지도</b>가 바로 뜹니다(인터넷 지도 API 없음). 길안내는 점을 눌러 <b>카카오·네이버</b>로 갑니다.</div>
+                        <div class="text"><b>전국</b> 또는 지역을 고르면 <b>오픈스트리트맵 실지도</b>가 뜹니다(API 키 없음). 축소 시 숫자 묶음, 확대 시 도로·건물. 길안내는 점 터치 후 카카오·네이버.</div>
                     </div>
                     <div class="legend">🟠 남음 &nbsp; 🟢 완료 &nbsp; 🔵 현재 위치 · 점 클릭</div>
                     <div class="form-group">
                         <label class="form-label">표시</label>
                         <select class="form-select" id="routeViewMode">
-                            <option value="map">그림 지도</option>
+                            <option value="map">실지도(OSM)</option>
                             <option value="list">목록</option>
                             <option value="both">지도 + 목록</option>
                         </select>
@@ -1405,20 +1466,20 @@
             </div>
             <div class="card hidden" id="routeMapCard">
                 <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                    <span>우리나라 지도</span>
+                    <span>오픈스트리트맵 (실지도)</span>
                     <button type="button" class="btn btn-secondary btn-small" id="routeMapExpandBtn">크게 보기</button>
                 </div>
                 <div class="card-body" style="padding-top:8px;">
                     <div class="route-map-stage" id="routeMapStage">
-                        <canvas id="routeMapCanvas" width="640" height="420" aria-label="우리나라 그림 지도"></canvas>
+                        <div id="routeMapLeaflet" aria-label="오픈스트리트맵 거점 지도"></div>
                         <div class="route-map-side-btns" aria-label="지도 확대축소">
                             <button type="button" id="routeMapZoomIn" title="확대">+</button>
                             <button type="button" id="routeMapZoomOut" title="축소">−</button>
                             <button type="button" class="sm-label" id="routeMapReset" title="전체">전체</button>
-                            <button type="button" class="sm-label" id="routeMapFitBtn" title="선택지역">맞춤</button>
+                            <button type="button" class="sm-label" id="routeMapFitBtn" title="내위치">맞춤</button>
                         </div>
                     </div>
-                    <div id="routeMapMeta">멀리서는 시군, 확대하면 거점 이름. 옆 버튼·두 손가락·크게 보기 지원.</div>
+                    <div id="routeMapMeta">거점 표시 · 로드 중…</div>
                     <div id="routeMapPick" class="hidden"></div>
                 </div>
             </div>
@@ -1719,7 +1780,7 @@
                 <ul>
                     <li>기록의 기준은 <b>구글 시트 하나</b>. 홈 <b>팀 동기화</b>로 맞춥니다.</li>
                     <li>다른 폰에서 동기화해도 같은 시트 최신을 각자 자기 폰에 읽어 옵니다.</li>
-                    <li>동선에서 지역·그림 지도·가까운 순·카카오/네이버 길안내를 씁니다.</li>
+                    <li>동선에서 지역·OSM 실지도(클러스터)·가까운 순·카카오/네이버 길안내를 씁니다.</li>
                 </ul>
             </div>
 
@@ -1759,9 +1820,11 @@
         </div>
     </div>
 
-    <script src="station_data.js?v=4.63"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
+    <script src="station_data.js?v=4.70"></script>
     <script>
-        const APP_VERSION = '4.63';
+        const APP_VERSION = '4.70';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
@@ -2822,31 +2885,17 @@
         }
 
         let routeMapToken = 0;
-        let routeMapHits = [];
         let routeMapPoints = [];
-        let routeMapView = { scale: 1, ox: 0, oy: 0 };
-        let routeMapGesture = { mode: '', x: 0, y: 0, ox: 0, oy: 0, dist: 0, scale: 1 };
         let routeMapFs = false;
-        let routeMapCssH = 360;
+        let routeMapFilter = 'all'; // all | pending | done
+        let routeLeafletMap = null;
+        let routeClusterLayer = null;
+        let routeGpsMarker = null;
+        let routeMapStatusOverride = {}; // key -> true(완료) / false(미점검)
+        let routeMapBound = false;
+        const YUSEONG_CENTER = [36.362, 127.356];
 
-        // 남한 실루엣(대략 해안선). 외부 타일 없이 앱 내장.
-        const KOREA_LAND = [
-            [126.12, 37.77], [126.38, 37.82], [126.62, 37.95], [126.95, 37.98], [127.18, 38.12],
-            [127.42, 38.28], [127.72, 38.32], [128.05, 38.38], [128.35, 38.45], [128.62, 38.42],
-            [128.95, 38.18], [129.18, 37.82], [129.35, 37.55], [129.42, 37.18], [129.45, 36.85],
-            [129.38, 36.42], [129.42, 36.05], [129.35, 35.72], [129.28, 35.42], [129.18, 35.15],
-            [129.05, 34.95], [128.82, 34.88], [128.55, 34.78], [128.28, 34.85], [128.05, 34.78],
-            [127.78, 34.72], [127.48, 34.62], [127.18, 34.52], [126.92, 34.42], [126.72, 34.38],
-            [126.48, 34.42], [126.28, 34.58], [126.18, 34.82], [126.12, 35.08], [126.08, 35.35],
-            [126.05, 35.68], [126.08, 36.02], [126.12, 36.35], [126.18, 36.68], [126.22, 36.98],
-            [126.12, 37.22], [126.05, 37.45], [126.12, 37.77]
-        ];
-        const JEJU_LAND = [
-            [126.22, 33.28], [126.38, 33.48], [126.58, 33.55], [126.82, 33.52], [126.98, 33.42],
-            [126.95, 33.28], [126.78, 33.18], [126.52, 33.15], [126.32, 33.18], [126.22, 33.28]
-        ];
-
-        // 시/군 대략 좌표(앱 내장). 외부 지도 API/타일 없이 그림 지도를 바로 그림.
+        // 시/군 대략 좌표(좌표 없을 때 보조). 실지도는 OSM 타일 사용.
         const CITY_GEO = {
             '강진군': [34.642, 126.767], '고흥군': [34.611, 127.285], '공주시': [36.447, 127.119],
             '광양시': [34.941, 127.696], '광주 광산구': [35.140, 126.793], '광주 남구': [35.133, 126.902],
@@ -2878,103 +2927,234 @@
             return key ? { lat: CITY_GEO[key][0], lng: CITY_GEO[key][1] } : null;
         }
 
-        function shortCityName(city) {
-            return String(city || '')
-                .replace(/\s*(광산구|남구|동구|북구|서구|대덕구|유성구|중구|덕진구|완산구|동남구|서북구|상당구|서원구|청원구|흥덕구|마산회원구)$/, '')
-                .trim();
+        function mapPointKey(it) {
+            return [it.region || '', it.city || '', it.name || ''].join('|');
         }
 
-        function projectKoreaBase(lat, lng, w, h, pad) {
-            // 위도·경도 비율을 맞춰 한반도가 찌그러지지 않게
-            const minLat = 33.05; const maxLat = 38.65; const minLng = 125.55; const maxLng = 129.65;
-            const p = pad || 14;
-            const latSpan = maxLat - minLat;
-            const lngSpan = maxLng - minLng;
-            const usableW = w - p * 2;
-            const usableH = h - p * 2;
-            const midLat = (minLat + maxLat) / 2;
-            const lngScale = Math.cos(midLat * Math.PI / 180);
-            const aspect = (lngSpan * lngScale) / latSpan;
-            let drawW = usableW;
-            let drawH = usableW / aspect;
-            if (drawH > usableH) {
-                drawH = usableH;
-                drawW = usableH * aspect;
+        function mapPointDone(it) {
+            const key = mapPointKey(it);
+            if (Object.prototype.hasOwnProperty.call(routeMapStatusOverride, key)) {
+                return !!routeMapStatusOverride[key];
             }
-            const ox = p + (usableW - drawW) / 2;
-            const oy = p + (usableH - drawH) / 2;
-            const x = ox + ((lng - minLng) / lngSpan) * drawW;
-            const y = oy + (1 - (lat - minLat) / latSpan) * drawH;
-            return { x, y };
+            return !!(it.doneAll || (it.done >= it.total && it.total));
         }
 
-        function projectKorea(lat, lng, w, h, pad) {
-            const base = projectKoreaBase(lat, lng, w, h, pad);
-            return {
-                x: (base.x - w / 2) * routeMapView.scale + w / 2 + routeMapView.ox,
-                y: (base.y - h / 2) * routeMapView.scale + h / 2 + routeMapView.oy
-            };
+        function prepareMapPoints(items) {
+            return items.map((it, idx) => {
+                let lat = Number(it.lat);
+                let lng = Number(it.lng);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                    const city = cityGeoOf(it.city);
+                    if (city) {
+                        const jitter = ((idx % 9) - 4) * 0.008;
+                        lat = city.lat + jitter;
+                        lng = city.lng + (((idx * 3) % 9) - 4) * 0.008;
+                    }
+                }
+                const point = {
+                    ...it,
+                    lat,
+                    lng,
+                    doneAll: it.done >= it.total && it.total
+                };
+                point.doneAll = mapPointDone(point);
+                return point;
+            }).filter((it) => Number.isFinite(it.lat) && Number.isFinite(it.lng));
         }
 
-        function getRouteMapSize() {
-            const canvas = document.getElementById('routeMapCanvas');
-            const stage = document.getElementById('routeMapStage');
-            const cssW = (canvas && canvas.clientWidth) || (stage && stage.clientWidth) || 640;
-            let cssH = routeMapCssH;
-            if (routeMapFs && stage) {
-                cssH = Math.max(280, stage.clientHeight || window.innerHeight * 0.72);
-            } else if (canvas && canvas.clientHeight > 80) {
-                cssH = canvas.clientHeight;
-            }
-            return { w: cssW, h: cssH };
+        function filteredMapPoints() {
+            const all = routeMapPoints || [];
+            if (routeMapFilter === 'pending') return all.filter((p) => !mapPointDone(p));
+            if (routeMapFilter === 'done') return all.filter((p) => mapPointDone(p));
+            return all;
         }
 
-        function fillPoly(ctx, ring, w, h) {
-            ctx.beginPath();
-            ring.forEach(([lng, lat], i) => {
-                const p = projectKorea(lat, lng, w, h, 12);
-                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        function updateRouteMapMeta() {
+            const meta = document.getElementById('routeMapMeta');
+            if (!meta) return;
+            const all = routeMapPoints || [];
+            const left = all.filter((p) => !mapPointDone(p)).length;
+            const done = all.length - left;
+            const allOn = routeMapFilter === 'all' ? ' on-all' : '';
+            const pendOn = routeMapFilter === 'pending' ? ' on-pending' : '';
+            const doneOn = routeMapFilter === 'done' ? ' on-done' : '';
+            meta.innerHTML = '거점 표시 · 전체 <b>' + all.length + '</b>곳 · '
+                + '<button type="button" class="map-filter-chip' + allOn + '" data-map-filter="all">전체</button>'
+                + '<button type="button" class="map-filter-chip' + pendOn + '" data-map-filter="pending">주황 ' + left + '</button>'
+                + '<button type="button" class="map-filter-chip' + doneOn + '" data-map-filter="done">초록 ' + done + '</button>'
+                + '<div style="margin-top:4px;color:#94a3b8;">점 터치 → 상세 · 축소 시 숫자 묶음 · 확대 시 도로·건물</div>';
+            meta.querySelectorAll('[data-map-filter]').forEach((btn) => {
+                btn.onclick = () => {
+                    const next = btn.getAttribute('data-map-filter') || 'all';
+                    routeMapFilter = (routeMapFilter === next && next !== 'all') ? 'all' : next;
+                    renderLeafletMarkers(false);
+                };
             });
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
         }
 
-        function fitRouteMapToPoints(points, padScale) {
-            const list = (points || routeMapPoints || []).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
-            const { w, h } = getRouteMapSize();
-            if (!list.length) {
-                routeMapReset();
+        function stationDotIcon(done) {
+            return L.divIcon({
+                className: '',
+                html: '<div class="ev-dot ' + (done ? 'done' : 'pending') + '"></div>',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8],
+                popupAnchor: [0, -8]
+            });
+        }
+
+        function gpsDotIcon() {
+            return L.divIcon({
+                className: '',
+                html: '<div class="ev-me-dot" title="현재위치"></div>',
+                iconSize: [14, 14],
+                iconAnchor: [7, 7]
+            });
+        }
+
+        function mapPopupHtml(it) {
+            const done = mapPointDone(it);
+            const addr = it.address || it.name || '';
+            const status = done ? '점검 완료' : '미점검';
+            const key = mapPointKey(it);
+            return '<b>' + String(it.name || '').replace(/</g, '&lt;') + '</b><br>'
+                + String(it.region || '').replace(/</g, '&lt;') + ' · ' + String(it.city || '').replace(/</g, '&lt;') + '<br>'
+                + String(addr || '').replace(/</g, '&lt;') + '<br>'
+                + '상태: <b style="color:' + (done ? '#28A745' : '#FF8C00') + '">' + status + '</b>'
+                + ' · 거점 ' + (it.done || 0) + '/' + (it.total || 0)
+                + '<div class="map-pop-btns">'
+                + '<button type="button" class="btn-done" onclick=\'setRouteMapStatus(' + JSON.stringify(key) + ', true)\'>점검 완료</button>'
+                + '<button type="button" class="btn-pending" onclick=\'setRouteMapStatus(' + JSON.stringify(key) + ', false)\'>미점검</button>'
+                + '<button type="button" class="btn-go" onclick=\'jumpToStation(' + JSON.stringify(it.region) + ', ' + JSON.stringify(it.city) + ', ' + JSON.stringify(it.name) + ')\'>점검하기</button>'
+                + '<button type="button" class="btn-soft" onclick=\'copyText(' + JSON.stringify(addr) + ')\'>주소 복사</button>'
+                + '<a class="btn-soft" href="' + kakaoMapUrl(addr) + '" target="_blank" rel="noopener">카카오</a>'
+                + '<a class="btn-soft" href="' + naverMapUrl(addr) + '" target="_blank" rel="noopener">네이버</a>'
+                + '</div>';
+        }
+
+        function showMapPick(it) {
+            const box = document.getElementById('routeMapPick');
+            if (!box || !it) return;
+            box.classList.remove('hidden');
+            box.innerHTML = mapPopupHtml(it);
+        }
+
+        window.setRouteMapStatus = function setRouteMapStatus(key, done) {
+            routeMapStatusOverride[key] = !!done;
+            const it = (routeMapPoints || []).find((p) => mapPointKey(p) === key);
+            if (it) {
+                it.doneAll = !!done;
+                showMapPick(it);
+            }
+            renderLeafletMarkers(false);
+        };
+
+        function ensureLeafletMap() {
+            if (typeof L === 'undefined') return null;
+            const el = document.getElementById('routeMapLeaflet');
+            if (!el) return null;
+            if (routeLeafletMap) return routeLeafletMap;
+            routeLeafletMap = L.map(el, {
+                zoomControl: false,
+                attributionControl: true,
+                maxZoom: 19
+            }).setView(YUSEONG_CENTER, 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(routeLeafletMap);
+            routeClusterLayer = L.markerClusterGroup({
+                showCoverageOnHover: false,
+                maxClusterRadius: 55,
+                spiderfyOnMaxZoom: true,
+                disableClusteringAtZoom: 17
+            });
+            routeLeafletMap.addLayer(routeClusterLayer);
+            return routeLeafletMap;
+        }
+
+        function updateGpsMarker() {
+            if (!routeLeafletMap) return;
+            const here = typeof gpsLatLng === 'function' ? gpsLatLng() : null;
+            if (!here || !Number.isFinite(here.lat) || !Number.isFinite(here.lng)) {
+                if (routeGpsMarker) {
+                    routeLeafletMap.removeLayer(routeGpsMarker);
+                    routeGpsMarker = null;
+                }
                 return;
             }
-            let minLat = 90; let maxLat = -90; let minLng = 180; let maxLng = -180;
-            list.forEach((p) => {
-                minLat = Math.min(minLat, p.lat);
-                maxLat = Math.max(maxLat, p.lat);
-                minLng = Math.min(minLng, p.lng);
-                maxLng = Math.max(maxLng, p.lng);
-            });
-            if (maxLat - minLat < 0.08) { minLat -= 0.08; maxLat += 0.08; }
-            if (maxLng - minLng < 0.1) { minLng -= 0.1; maxLng += 0.1; }
-            const cLat = (minLat + maxLat) / 2;
-            const cLng = (minLng + maxLng) / 2;
-            const a = projectKoreaBase(maxLat, minLng, w, h, 12);
-            const b = projectKoreaBase(minLat, maxLng, w, h, 12);
-            const boxW = Math.max(40, Math.abs(b.x - a.x));
-            const boxH = Math.max(40, Math.abs(b.y - a.y));
-            const margin = padScale || 0.72;
-            const scale = Math.max(1.1, Math.min(5.5, Math.min((w * margin) / boxW, (h * margin) / boxH)));
-            const center = projectKoreaBase(cLat, cLng, w, h, 12);
-            routeMapView.scale = scale;
-            routeMapView.ox = w / 2 - ((center.x - w / 2) * scale + w / 2);
-            routeMapView.oy = h / 2 - ((center.y - h / 2) * scale + h / 2);
-            drawRouteCanvas(routeMapPoints);
+            if (!routeGpsMarker) {
+                routeGpsMarker = L.marker([here.lat, here.lng], { icon: gpsDotIcon(), zIndexOffset: 1000 })
+                    .bindTooltip('현재위치', { direction: 'right', offset: [8, 0] });
+                routeGpsMarker.addTo(routeLeafletMap);
+            } else {
+                routeGpsMarker.setLatLng([here.lat, here.lng]);
+            }
         }
 
-        function zoomToCityCluster(cluster) {
-            if (!cluster) return;
-            const near = (routeMapPoints || []).filter((p) => shortCityName(p.city) === cluster.name || p.city === cluster.name);
-            fitRouteMapToPoints(near.length ? near : [{ lat: cluster.lat, lng: cluster.lng }], 0.55);
+        function renderLeafletMarkers(fit) {
+            const map = ensureLeafletMap();
+            if (!map || !routeClusterLayer) {
+                const meta = document.getElementById('routeMapMeta');
+                if (meta) meta.textContent = '지도 라이브러리 로드 실패. 인터넷 연결 후 강제 새로고침하세요.';
+                return;
+            }
+            routeClusterLayer.clearLayers();
+            const points = filteredMapPoints();
+            points.forEach((it) => {
+                const done = mapPointDone(it);
+                const marker = L.marker([it.lat, it.lng], { icon: stationDotIcon(done) });
+                marker.bindPopup(mapPopupHtml(it), { maxWidth: 280 });
+                marker.on('popupopen', () => showMapPick(it));
+                routeClusterLayer.addLayer(marker);
+            });
+            updateGpsMarker();
+            updateRouteMapMeta();
+            if (fit) fitRouteMapToPoints(points);
+            setTimeout(() => {
+                try { map.invalidateSize(); } catch (err) {}
+            }, 80);
+        }
+
+        // 기존 호출 호환
+        function drawRouteCanvas(points) {
+            if (points) routeMapPoints = points;
+            renderLeafletMarkers(false);
+        }
+
+        function fitRouteMapToPoints(points) {
+            const map = ensureLeafletMap();
+            if (!map) return;
+            const list = (points || filteredMapPoints() || []).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+            if (!list.length) {
+                map.setView(YUSEONG_CENTER, 12);
+                return;
+            }
+            const bounds = L.latLngBounds(list.map((p) => [p.lat, p.lng]));
+            map.fitBounds(bounds.pad(0.18), { maxZoom: 15 });
+        }
+
+        function routeMapZoom(factor) {
+            const map = ensureLeafletMap();
+            if (!map) return;
+            if (factor > 1) map.zoomIn();
+            else map.zoomOut();
+        }
+
+        function routeMapReset() {
+            fitRouteMapToPoints(routeMapPoints);
+        }
+
+        function routeMapFitMyLocation() {
+            const map = ensureLeafletMap();
+            if (!map) return;
+            const here = typeof gpsLatLng === 'function' ? gpsLatLng() : null;
+            updateGpsMarker();
+            if (here && Number.isFinite(here.lat)) {
+                map.setView([here.lat, here.lng], Math.max(map.getZoom(), 15));
+            } else {
+                map.setView(YUSEONG_CENTER, 14);
+                alert('현재 위치를 아직 못 받았습니다. 위치 권한을 허용한 뒤 다시 눌러 주세요.');
+            }
         }
 
         function setRouteMapFullscreen(on) {
@@ -2985,15 +3165,19 @@
             card.classList.toggle('route-map-fs', routeMapFs);
             document.body.classList.toggle('route-map-fs-open', routeMapFs);
             if (btn) btn.textContent = routeMapFs ? '닫기' : '크게 보기';
-            requestAnimationFrame(() => drawRouteCanvas(routeMapPoints));
+            requestAnimationFrame(() => {
+                if (routeLeafletMap) {
+                    try { routeLeafletMap.invalidateSize(); } catch (err) {}
+                }
+                renderLeafletMarkers(false);
+            });
         }
 
         function clearRouteMap() {
             routeMapToken += 1;
-            routeMapHits = [];
             routeMapPoints = [];
-            routeMapView = { scale: 1, ox: 0, oy: 0 };
             if (routeMapFs) setRouteMapFullscreen(false);
+            if (routeClusterLayer) routeClusterLayer.clearLayers();
             const card = document.getElementById('routeMapCard');
             const pick = document.getElementById('routeMapPick');
             if (card) card.classList.add('hidden');
@@ -3003,288 +3187,10 @@
             }
         }
 
-        function prepareMapPoints(items) {
-            return items.map((it, idx) => {
-                let lat = Number(it.lat);
-                let lng = Number(it.lng);
-                if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-                    const city = cityGeoOf(it.city);
-                    if (city) {
-                        const jitter = ((idx % 9) - 4) * 0.01;
-                        lat = city.lat + jitter;
-                        lng = city.lng + (((idx * 3) % 9) - 4) * 0.01;
-                    }
-                }
-                return {
-                    ...it,
-                    lat,
-                    lng,
-                    doneAll: it.done >= it.total && it.total
-                };
-            }).filter((it) => Number.isFinite(it.lat) && Number.isFinite(it.lng));
-        }
-
-        function cityClusters(points) {
-            const map = new Map();
-            points.forEach((it) => {
-                const key = shortCityName(it.city) || it.city || '기타';
-                if (!map.has(key)) map.set(key, { name: key, lat: 0, lng: 0, n: 0, left: 0, done: 0 });
-                const c = map.get(key);
-                c.lat += it.lat;
-                c.lng += it.lng;
-                c.n += 1;
-                if (it.doneAll) c.done += 1; else c.left += 1;
-            });
-            return [...map.values()].map((c) => ({
-                ...c,
-                lat: c.lat / c.n,
-                lng: c.lng / c.n
-            }));
-        }
-
-        function drawRouteCanvas(points) {
-            const canvas = document.getElementById('routeMapCanvas');
-            const meta = document.getElementById('routeMapMeta');
-            if (!canvas) return;
-            routeMapPoints = points || routeMapPoints || [];
-            points = routeMapPoints;
-            const dpr = Math.min(2, window.devicePixelRatio || 1);
-            const size = getRouteMapSize();
-            const w = size.w;
-            const h = size.h;
-            canvas.style.height = h + 'px';
-            canvas.width = Math.round(w * dpr);
-            canvas.height = Math.round(h * dpr);
-            const ctx = canvas.getContext('2d');
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            ctx.clearRect(0, 0, w, h);
-            const g = ctx.createLinearGradient(0, 0, w, h);
-            g.addColorStop(0, '#06101c');
-            g.addColorStop(1, '#0f2a44');
-            ctx.fillStyle = g;
-            ctx.fillRect(0, 0, w, h);
-
-            // 바다 톤
-            ctx.fillStyle = 'rgba(56, 120, 168, 0.18)';
-            ctx.fillRect(0, 0, w, h);
-
-            ctx.fillStyle = '#2f6b4f';
-            ctx.strokeStyle = '#7dca9a';
-            ctx.lineWidth = 1.4;
-            fillPoly(ctx, KOREA_LAND, w, h);
-            fillPoly(ctx, JEJU_LAND, w, h);
-
-            // 권역 안내 (멀리서만)
-            if (routeMapView.scale < 1.8) {
-                ctx.font = 'bold 13px sans-serif';
-                ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                [['충청', 36.55, 127.25], ['호남', 35.35, 126.85], ['제주', 33.38, 126.55]].forEach(([name, lat, lng]) => {
-                    const p = projectKorea(lat, lng, w, h, 12);
-                    ctx.fillText(name, p.x - 14, p.y);
-                });
-            }
-
-            const clusters = cityClusters(points);
-            const showStations = routeMapView.scale >= 1.55 || points.length <= 18;
-            routeMapHits = [];
-
-            // 멀리: 시군 묶음 / 가까이: 거점 점 + 이름
-            if (!showStations) {
-                clusters.forEach((c) => {
-                    const p = projectKorea(c.lat, c.lng, w, h, 12);
-                    if (p.x < -50 || p.y < -40 || p.x > w + 50 || p.y > h + 40) return;
-                    const r = Math.max(10, Math.min(18, 8 + c.n));
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-                    ctx.fillStyle = c.left ? '#f97316' : '#22c55e';
-                    ctx.fill();
-                    ctx.strokeStyle = '#041018';
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
-                    ctx.font = 'bold 11px sans-serif';
-                    ctx.fillStyle = '#fff';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(String(c.n), p.x, p.y + 4);
-                    ctx.textAlign = 'left';
-                    const label = c.name;
-                    ctx.font = 'bold 12px sans-serif';
-                    ctx.lineWidth = 3;
-                    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-                    ctx.strokeText(label, p.x + r + 4, p.y + 4);
-                    ctx.fillStyle = '#f8fafc';
-                    ctx.fillText(label, p.x + r + 4, p.y + 4);
-                    routeMapHits.push({ x: p.x, y: p.y, r: r + 14, kind: 'city', cluster: c });
-                });
-            } else {
-                // 시군 라벨은 약하게
-                clusters.slice(0, 40).forEach((c) => {
-                    const p = projectKorea(c.lat, c.lng, w, h, 12);
-                    if (p.x < -40 || p.y < -20 || p.x > w + 40 || p.y > h + 20) return;
-                    ctx.font = 'bold 11px sans-serif';
-                    ctx.fillStyle = 'rgba(226,232,240,0.7)';
-                    ctx.fillText(c.name, p.x + 8, p.y - 10);
-                });
-                points.forEach((it) => {
-                    const p = projectKorea(it.lat, it.lng, w, h, 12);
-                    if (p.x < -30 || p.y < -30 || p.x > w + 30 || p.y > h + 30) return;
-                    const r = Math.max(5, Math.min(10, 4.5 * Math.min(2.2, routeMapView.scale)));
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-                    ctx.fillStyle = it.doneAll ? '#22c55e' : '#f97316';
-                    ctx.fill();
-                    ctx.strokeStyle = '#041018';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                    if (routeMapView.scale >= 2.1) {
-                        const nm = String(it.name || '').slice(0, 10);
-                        ctx.font = 'bold 11px sans-serif';
-                        ctx.lineWidth = 3;
-                        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-                        ctx.strokeText(nm, p.x + 8, p.y + 4);
-                        ctx.fillStyle = '#fff7ed';
-                        ctx.fillText(nm, p.x + 8, p.y + 4);
-                    }
-                    routeMapHits.push({ x: p.x, y: p.y, r: r + 12, kind: 'station', item: it });
-                });
-            }
-
-            const here = typeof gpsLatLng === 'function' ? gpsLatLng() : null;
-            if (here && Number.isFinite(here.lat)) {
-                const p = projectKorea(here.lat, here.lng, w, h, 12);
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
-                ctx.fillStyle = '#60a5fa';
-                ctx.fill();
-                ctx.strokeStyle = '#1d4ed8';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.font = 'bold 11px sans-serif';
-                ctx.fillStyle = '#bfdbfe';
-                ctx.fillText('현재위치', p.x + 10, p.y - 8);
-            }
-
-            const left = points.filter((p) => !p.doneAll).length;
-            const done = points.length - left;
-            if (meta) {
-                meta.textContent = showStations
-                    ? `거점 표시 · ${points.length}곳 · 🟠${left} 🟢${done} · 점 터치 · 옆 +/- 또는 핀치`
-                    : `시군 묶음 · ${clusters.length}개 · 시군 누르면 확대 · 크게 보기 추천`;
-            }
-        }
-
-        function routeMapZoom(factor, cx, cy) {
-            const size = getRouteMapSize();
-            const x = cx == null ? size.w / 2 : cx;
-            const y = cy == null ? size.h / 2 : cy;
-            const prev = routeMapView.scale;
-            const next = Math.max(0.85, Math.min(7, prev * factor));
-            routeMapView.ox = x - (x - routeMapView.ox) * (next / prev);
-            routeMapView.oy = y - (y - routeMapView.oy) * (next / prev);
-            routeMapView.scale = next;
-            drawRouteCanvas(routeMapPoints);
-        }
-
-        function routeMapReset() {
-            routeMapView = { scale: 1, ox: 0, oy: 0 };
-            drawRouteCanvas(routeMapPoints);
-        }
-
-        function showMapPick(it) {
-            const box = document.getElementById('routeMapPick');
-            if (!box || !it) return;
-            const addr = it.address || it.name;
-            box.classList.remove('hidden');
-            box.innerHTML = `<b>${it.name}</b><br>${it.region || ''} · ${it.city || ''}<br>${addr || ''}<br>거점 ${it.done}/${it.total}`
-                + `<div class="map-pop-btns">`
-                + `<button type="button" class="btn btn-primary" onclick='jumpToStation(${JSON.stringify(it.region)}, ${JSON.stringify(it.city)}, ${JSON.stringify(it.name)})'>점검</button>`
-                + `<button type="button" class="btn btn-secondary" onclick='copyText(${JSON.stringify(addr)})'>주소 복사</button>`
-                + `<a class="btn btn-secondary" href="${kakaoMapUrl(addr)}" target="_blank" rel="noopener">카카오맵</a>`
-                + `<a class="btn btn-secondary" href="${naverMapUrl(addr)}" target="_blank" rel="noopener">네이버맵</a>`
-                + `</div>`;
-        }
-
         function bindRouteMapCanvas() {
-            const canvas = document.getElementById('routeMapCanvas');
-            if (!canvas || canvas.dataset.bound === '1') return;
-            canvas.dataset.bound = '1';
-            const pointers = new Map();
-            const pickAt = (clientX, clientY) => {
-                const rect = canvas.getBoundingClientRect();
-                const x = clientX - rect.left;
-                const y = clientY - rect.top;
-                let best = null;
-                let bestD = 1e9;
-                routeMapHits.forEach((hit) => {
-                    const d = Math.hypot(hit.x - x, hit.y - y);
-                    if (d <= hit.r && d < bestD) {
-                        best = hit;
-                        bestD = d;
-                    }
-                });
-                if (!best) return;
-                if (best.kind === 'city') zoomToCityCluster(best.cluster);
-                else if (best.item) showMapPick(best.item);
-            };
-            canvas.addEventListener('pointerdown', (e) => {
-                canvas.setPointerCapture(e.pointerId);
-                pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-                if (pointers.size === 1) {
-                    routeMapGesture.mode = 'pan';
-                    routeMapGesture.x = e.clientX;
-                    routeMapGesture.y = e.clientY;
-                    routeMapGesture.ox = routeMapView.ox;
-                    routeMapGesture.oy = routeMapView.oy;
-                    routeMapGesture.moved = false;
-                } else if (pointers.size === 2) {
-                    const pts = [...pointers.values()];
-                    routeMapGesture.mode = 'pinch';
-                    routeMapGesture.dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
-                    routeMapGesture.scale = routeMapView.scale;
-                }
-            });
-            canvas.addEventListener('pointermove', (e) => {
-                if (!pointers.has(e.pointerId)) return;
-                pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-                if (routeMapGesture.mode === 'pan' && pointers.size === 1) {
-                    const dx = e.clientX - routeMapGesture.x;
-                    const dy = e.clientY - routeMapGesture.y;
-                    if (Math.hypot(dx, dy) > 8) routeMapGesture.moved = true;
-                    routeMapView.ox = routeMapGesture.ox + dx;
-                    routeMapView.oy = routeMapGesture.oy + dy;
-                    drawRouteCanvas(routeMapPoints);
-                } else if (routeMapGesture.mode === 'pinch' && pointers.size === 2) {
-                    const pts = [...pointers.values()];
-                    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
-                    const rect = canvas.getBoundingClientRect();
-                    const cx = (pts[0].x + pts[1].x) / 2 - rect.left;
-                    const cy = (pts[0].y + pts[1].y) / 2 - rect.top;
-                    const factor = dist / (routeMapGesture.dist || dist);
-                    const next = Math.max(0.85, Math.min(7, routeMapGesture.scale * factor));
-                    const prev = routeMapView.scale;
-                    routeMapView.ox = cx - (cx - routeMapView.ox) * (next / prev);
-                    routeMapView.oy = cy - (cy - routeMapView.oy) * (next / prev);
-                    routeMapView.scale = next;
-                    drawRouteCanvas(routeMapPoints);
-                }
-            });
-            const end = (e) => {
-                const wasPan = routeMapGesture.mode === 'pan';
-                const moved = !!routeMapGesture.moved;
-                pointers.delete(e.pointerId);
-                if (pointers.size < 2 && routeMapGesture.mode === 'pinch') routeMapGesture.mode = 'pan';
-                if (!pointers.size) {
-                    if (wasPan && !moved) pickAt(e.clientX, e.clientY);
-                    routeMapGesture.mode = '';
-                    routeMapGesture.moved = false;
-                }
-            };
-            canvas.addEventListener('pointerup', end);
-            canvas.addEventListener('pointercancel', end);
-            canvas.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                const rect = canvas.getBoundingClientRect();
-                routeMapZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - rect.left, e.clientY - rect.top);
-            }, { passive: false });
+            if (routeMapBound) return;
+            routeMapBound = true;
+            ensureLeafletMap();
             const zin = document.getElementById('routeMapZoomIn');
             const zout = document.getElementById('routeMapZoomOut');
             const zreset = document.getElementById('routeMapReset');
@@ -3293,11 +3199,11 @@
             if (zin) zin.onclick = () => routeMapZoom(1.35);
             if (zout) zout.onclick = () => routeMapZoom(1 / 1.35);
             if (zreset) zreset.onclick = () => routeMapReset();
-            if (zfit) zfit.onclick = () => fitRouteMapToPoints(routeMapPoints, 0.7);
+            if (zfit) zfit.onclick = () => routeMapFitMyLocation();
             if (zexp) zexp.onclick = () => setRouteMapFullscreen(!routeMapFs);
             window.addEventListener('resize', () => {
-                if (!document.getElementById('routeMapCard')?.classList.contains('hidden')) {
-                    drawRouteCanvas(routeMapPoints);
+                if (!document.getElementById('routeMapCard')?.classList.contains('hidden') && routeLeafletMap) {
+                    try { routeLeafletMap.invalidateSize(); } catch (err) {}
                 }
             });
             document.addEventListener('keydown', (e) => {
@@ -3317,28 +3223,25 @@
             card.classList.remove('hidden');
             bindRouteMapCanvas();
             let points = prepareMapPoints(items || []);
-            routeMapView = { scale: 1, ox: 0, oy: 0 };
-            drawRouteCanvas(points);
-            if (points.length && points.length <= 80) {
-                // 선택 지역만 보이면 바로 맞춤
-                const cities = new Set(points.map((p) => shortCityName(p.city)));
-                if (cities.size <= 12) fitRouteMapToPoints(points, 0.75);
-            }
+            routeMapPoints = points;
+            renderLeafletMarkers(true);
             const hint = document.getElementById('routeGpsHint');
-            if (hint) hint.textContent = '멀리서는 시군, 확대하면 거점. 크게 보기 + 옆 +/- 추천. 도로는 카카오·네이버.';
+            if (hint) hint.textContent = 'OSM 실지도 · 축소=숫자묶음 · 확대=도로/건물 · 점 터치=상세 · 전체/맞춤(내위치)';
             try {
                 await ensureStationGeo(items || [], {
                     maxRounds: 8,
                     onProgress: () => {
                         if (token !== routeMapToken) return;
                         points = prepareMapPoints(items || []);
-                        drawRouteCanvas(points);
+                        routeMapPoints = points;
+                        renderLeafletMarkers(false);
                     }
                 });
             } catch (err) {}
             if (token !== routeMapToken) return;
             points = prepareMapPoints(items || []);
-            drawRouteCanvas(points);
+            routeMapPoints = points;
+            renderLeafletMarkers(true);
         }
 
         async function applyRouteView(items, listHtml) {
@@ -6822,7 +6725,7 @@
             document.getElementById('routeSummary').classList.remove('hidden');
             document.getElementById('routeSummaryTitle').textContent = `${label} 전체 · 남은 거점 ${leftZ}개`;
             document.getElementById('routeSummaryText').textContent =
-                `시/군 ${cities.length} · 충전소 ${allItems.length}곳 · 거점 ${zones}개 · 그림 지도·가까운 순`;
+                `시/군 ${cities.length} · 충전소 ${allItems.length}곳 · 거점 ${zones}개 · OSM 실지도·가까운 순`;
             document.getElementById('routeShareBtn').disabled = !allItems.length;
             document.getElementById('routeDownloadBtn').disabled = !allItems.length;
             routePlan = { region, city: '', teams: [filtered], allItems };
@@ -6893,7 +6796,7 @@
                 document.getElementById('routeDownloadBtn').disabled = true;
                 clearRouteMap();
                 list.style.display = '';
-                list.innerHTML = '<div class="info-box"><div class="text"><b>전국</b> 또는 호남권·충청권을 고르면 그림 지도로 전체 위치를 볼 수 있습니다. 시/군을 고르면 그 시군만 좁혀 봅니다.</div></div>';
+                list.innerHTML = '<div class="info-box"><div class="text"><b>전국</b> 또는 호남권·충청권을 고르면 OSM 실지도로 전체 위치를 볼 수 있습니다. 시/군을 고르면 그 시군만 좁혀 봅니다.</div></div>';
                 routePlan = { region: '', city: '', teams: [] };
                 return;
             }
@@ -7085,11 +6988,15 @@
                 renderRoutePlan();
                 fetchTeamProgress(false);
                 setTimeout(() => {
-                    const canvas = document.getElementById('routeMapCanvas');
-                    if (canvas && !document.getElementById('routeMapCard').classList.contains('hidden')) {
-                        // 탭 전환 후 다시 그려 크기 맞춤
+                    if (!document.getElementById('routeMapCard').classList.contains('hidden')) {
+                        if (routeLeafletMap) {
+                            try { routeLeafletMap.invalidateSize(); } catch (err) {}
+                        }
                         const items = (routePlan && (routePlan.teams[0] || routePlan.allItems)) || [];
-                        if (items.length) drawRouteCanvas(prepareMapPoints(items));
+                        if (items.length) {
+                            routeMapPoints = prepareMapPoints(items);
+                            renderLeafletMarkers(false);
+                        }
                     }
                 }, 250);
             }
@@ -7147,9 +7054,11 @@
                 add(!!document.getElementById('emergencyOverlay'), '비상모드 화면');
                 add(typeof openEmergencyMode === 'function' && typeof buildEmergencyMemo === 'function', '비상모드 메모/폴더 기능');
                 add(typeof clearFieldValue === 'function', '사진 삭제 시 용량·제조번호 초기화');
-                add(typeof showRouteMap === 'function' && typeof drawRouteCanvas === 'function', '그림 지도');
+                add(typeof L !== 'undefined', 'Leaflet 라이브러리');
+                add(typeof L !== 'undefined' && typeof L.markerClusterGroup === 'function', 'Leaflet.markercluster');
+                add(typeof showRouteMap === 'function' && typeof renderLeafletMarkers === 'function', 'OSM 실지도 렌더');
                 add(typeof routeMapZoom === 'function' && typeof setRouteMapFullscreen === 'function', '지도 확대·크게보기');
-                add(!!document.getElementById('routeMapZoomIn') && !!document.getElementById('routeMapExpandBtn'), '지도 옆 +/- · 크게보기 버튼');
+                add(!!document.getElementById('routeMapLeaflet') && !!document.getElementById('routeMapZoomIn'), '지도 컨테이너·+/- 버튼');
                 add(!!document.getElementById('dailyLog') && !!document.getElementById('tab-history'), '내역(보고) 화면');
                 add(typeof exportTodayPack === 'function' && typeof exportTodayReport === 'function' && typeof downloadDailyLogExcel === 'function', '일지엑셀·오늘폴더·카톡보내기 함수');
                 add(typeof syncTeamNow === 'function' && typeof fetchTeamProgress === 'function', '팀 동기화 함수');
@@ -7218,21 +7127,21 @@
 
                 try {
                     const sample = prepareMapPoints([
-                        { name: '테스트A', city: '대전 서구', region: '충청권', done: 0, total: 1, address: '대전' },
-                        { name: '테스트B', city: '전주시 완산구', region: '호남권', done: 1, total: 1, address: '전주' }
+                        { name: '테스트A', city: '대전 유성구', region: '충청권', done: 0, total: 1, address: '대전', lat: 36.362, lng: 127.356 },
+                        { name: '테스트B', city: '대전 서구', region: '충청권', done: 1, total: 1, address: '대전', lat: 36.355, lng: 127.384 }
                     ]);
-                    add(sample.length === 2, '그림 지도 좌표 샘플 ' + sample.length + '곳');
+                    add(sample.length === 2, '실지도 좌표 샘플 ' + sample.length + '곳');
                     const card = document.getElementById('routeMapCard');
                     if (card) {
                         card.classList.remove('hidden');
                         bindRouteMapCanvas();
-                        drawRouteCanvas(sample);
+                        routeMapPoints = sample;
+                        renderLeafletMarkers(true);
                         routeMapZoom(1.2);
-                        routeMapReset();
-                        add(true, '지도 그리기·확대·전체보기');
+                        add(!!routeLeafletMap, 'Leaflet 지도 표시·클러스터');
                     } else add(false, 'routeMapCard 없음');
                 } catch (err) {
-                    add(false, '그림 지도 테스트 실패 · ' + (err && err.message ? err.message : err));
+                    add(false, '실지도 테스트 실패 · ' + (err && err.message ? err.message : err));
                 }
 
                 const probe = await probeGoogleVersion();
