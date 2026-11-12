@@ -1354,7 +1354,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.25';
+        const APP_VERSION = '4.26';
         const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzE-BfYWzjRC3atnA6lCDCqTW8n0qj2vODyWu0jpfnIDMm-R-GINyOivFJkA6JWjRoF/exec';
 
         const photoTypes = [
@@ -3016,9 +3016,13 @@
                 const count = zone.chargers || 0;
                 const numbers = (document.getElementById('logChargerNo') || {}).value || chargerNoDefault();
                 const fieldInput = (id, label, ph) => {
-                    const val = String((document.getElementById(id) || {}).value || '').replace(/"/g, '&quot;');
-                    const confirm = id === 'logChargerNo' ? '' : `<button type="button" class="btn btn-secondary btn-small" data-confirm="${id}" style="margin-top:6px;">사진과 같음</button>`;
-                    return `<label class="form-label">${label}</label><input class="form-input" data-meter="${id}" data-label="${label}" value="${val}" placeholder="${ph}">${confirm}`;
+                    const src = document.getElementById(id);
+                    if (src && src.dataset.auto === '1') {
+                        src.value = '';
+                        delete src.dataset.auto;
+                    }
+                    const val = String((src && src.value) || '').replace(/"/g, '&quot;');
+                    return `<label class="form-label">${label}</label><input class="form-input" data-meter="${id}" data-label="${label}" value="${val}" placeholder="${ph}">`;
                 };
                 const thumbsOf = (id) => {
                     const shots = photosOf(id);
@@ -3030,16 +3034,29 @@
                             : `<div class="remote-ph">${item.filename || '사진'}</div>`;
                     }).join('');
                 };
+                const chargerEl = document.getElementById('logChargerNo');
+                if (chargerEl && !chargerEl.value) chargerEl.value = numbers;
                 const blocks = [
-                    { id: 'panel', guide: '배전반 사진을 보고 MCCB 용량을 적으세요. 충전기 ' + count + '대인 이 거점 값입니다. 다른 거점과 다를 수 있습니다.', fields: [['logMccb', 'MCCB용량', '사진에 보이는 용량']] },
-                    { id: 'charger', guide: '충전기·계량기 사진을 보고 이 거점 번호만 적으세요. 충전기 ' + count + '대, 번호 ' + numbers + '.', fields: [['logMeterNo', '계량기번호', '사진에 보이는 번호'], ['logChargerNo', '충전기번호', numbers]] },
-                    { id: 'voltage', guide: '전압 사진을 크게 보고 적으세요.', fields: [['meterV220', '전압 220', '221'], ['meterV380', '전압 380', '380']] },
-                    { id: 'resistance', guide: '접지저항 사진을 보고 적으세요.', fields: [['meterGround', '접지저항', '2']] },
-                    { id: 'insulation', guide: '절연저항 사진을 보고 적으세요.', fields: [['meterInsul', '절연저항', '120']] }
+                    { id: 'panel', guide: '배전반 사진을 보고 MCCB 용량을 직접 적으세요. 이 거점 충전기 ' + count + '대 값입니다.', fields: [['logMccb', 'MCCB용량', '예: 75A']] },
+                    { id: 'charger', guide: '계량기 사진을 보고 번호만 직접 적으세요.', fields: [['logMeterNo', '계량기번호', '사진에 보이는 번호']] },
+                    { id: 'voltage', guide: '전압 사진을 보고 직접 적으세요.', fields: [['meterV220', '전압 220', '221'], ['meterV380', '전압 380', '380']] },
+                    { id: 'resistance', guide: '접지저항 사진을 보고 직접 적으세요.', fields: [['meterGround', '접지저항', '2']] },
+                    { id: 'insulation', guide: '절연저항 사진을 보고 직접 적으세요.', fields: [['meterInsul', '절연저항', '120']] }
                 ];
-                title.textContent = '이 거점 사진에서 읽는 중';
-                sub.textContent = '충전기 ' + count + '대 (' + numbers + '). 노란 칸은 사진에서 읽은 초안입니다. 사진과 같음을 누른 글자만 일지에 들어갑니다.';
-                body.innerHTML = blocks.map((block) => {
+                title.textContent = '이 거점 일지';
+                sub.textContent = '알고 있는 칸은 자동으로 시트에 들어갑니다. MCCB·계량기·전압·저항은 사진을 보고 적은 것만 들어갑니다.';
+                const autoCard = `<div class="review-block">
+                    <h4>자동으로 시트에 들어갑니다</h4>
+                    <div class="review-guide">국소명 · 거점 · 충전기 수 · 충전기 번호 · 장소. 사진에서 읽지 않습니다.</div>
+                    <div style="font-size:14px;line-height:1.7;">
+                        국소명 ${state.station || ''}<br>
+                        거점 ${state.selectedZoneIdx + 1}<br>
+                        충전기수 ${count}대<br>
+                        충전기번호 ${numbers}<br>
+                        비고 ${zone.name || ''}
+                    </div>
+                </div>`;
+                body.innerHTML = autoCard + blocks.map((block) => {
                     const type = photoTypes.find((p) => p.id === block.id);
                     const shots = photosOf(block.id);
                     return `<div class="review-block">
@@ -3054,10 +3071,9 @@
                     return `<div class="review-block"><h4>${type.label} · ${photosOf(id).length}장</h4><div class="review-thumbs">${thumbsOf(id)}</div></div>`;
                 }).join('');
                 go.classList.remove('hidden');
-                go.textContent = '확인한 글자만 저장';
+                go.textContent = '이 거점 저장';
             }
             overlay.classList.remove('hidden');
-            if (!(mode === 'missing' || missing.length)) readZonePhotosIntoFields();
         }
 
         function layoutSquareGuide() {

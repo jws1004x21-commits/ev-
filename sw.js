@@ -1,4 +1,4 @@
-// v4.25: only confirmed readings are written into the daily log
+// v4.26: known zone fields save automatically, photo readings are typed
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
