@@ -1,4 +1,4 @@
-// v4.51: native camera burst reopen; lightbox swipe between photos
+// v4.52: built-in canvas picture map (no external map tiles/API)
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

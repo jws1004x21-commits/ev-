@@ -11,7 +11,6 @@
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -36,36 +35,34 @@
         .header .subtitle { font-size: 11px; color: #888; margin-top: 2px; }
 
         .container { padding: 12px; max-width: 500px; margin: 0 auto; }
-        #routeMap {
+        #routeMapCard.hidden { display: none !important; }
+        #routeMapCanvas {
             width: 100%;
-            height: 420px;
-            min-height: 420px;
-            border-radius: 14px;
-            margin-bottom: 12px;
-            border: 1px solid #333;
-            z-index: 1;
-            background: #1a1a2e;
-            position: relative;
+            height: 380px;
+            display: block;
+            border-radius: 12px;
+            background: #0b1220;
+            border: 1px solid #2a3550;
+            touch-action: manipulation;
         }
-        #routeMap.hidden { display: none !important; }
-        #routeMap .map-loading {
-            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-            color: #ccc; font-size: 14px; padding: 16px; text-align: center; z-index: 2;
-            background: #1a1a2e;
-        }
-        .leaflet-container { font: inherit; }
-        .leaflet-popup-content { margin: 10px 12px; color: #111; font-size: 13px; line-height: 1.45; }
-        .leaflet-popup-content .map-pop-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-        .leaflet-popup-content button, .leaflet-popup-content a.btn {
+        #routeMapMeta {
             font-size: 12px;
-            padding: 6px 8px;
-            border-radius: 8px;
-            border: none;
-            background: #1e3a5f;
-            color: #fff;
-            text-decoration: none;
-            display: inline-block;
+            color: #aaa;
+            margin-top: 8px;
+            line-height: 1.45;
         }
+        #routeMapPick {
+            margin-top: 8px;
+            padding: 10px;
+            border-radius: 10px;
+            background: #16213e;
+            border: 1px solid #2a3550;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        #routeMapPick.hidden { display: none; }
+        #routeMapPick .map-pop-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        #routeMapPick .map-pop-btns .btn { font-size: 12px; padding: 8px 10px; }
 
         .stats-grid {
             display: grid;
@@ -1102,7 +1099,7 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.51</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.52</div>
     </div>
     <div id="updateBanner" class="update-banner">
         새 버전이 있습니다. 지금 강제 새로고침 하세요. (안 바뀌면 이 버튼)
@@ -1117,7 +1114,7 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">버전이 안 바뀌면 이 버튼을 누르세요. 상단이 <b>v4.51</b>이어야 최신입니다.</div>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">버전이 안 바뀌면 이 버튼을 누르세요. 상단이 <b>v4.52</b>이어야 최신입니다.</div>
                     <button type="button" class="btn btn-secondary btn-small" style="margin-top:10px;" onclick="openManual()">📖 앱 사용설명서</button>
                 </div>
             </div>
@@ -1274,9 +1271,9 @@
                 <div class="card-header">🗺️ 지역 동선</div>
                 <div class="card-body">
                     <div class="info-box">
-                        <div class="text"><b>전국</b> 또는 지역을 고르면 그림 지도·목록으로 볼 수 있습니다. 앱 안 지도는 <b>구글맵 API가 아닙니다</b>(무료 지도 타일). 길안내는 <b>카카오·네이버</b>를 씁니다.</div>
+                        <div class="text"><b>전국</b> 또는 지역을 고르면 <b>앱 안 그림 지도</b>가 바로 뜹니다(인터넷 지도 API 없음). 길안내는 점을 눌러 <b>카카오·네이버</b>로 갑니다.</div>
                     </div>
-                    <div class="legend">🟠 남음 &nbsp; 🟢 완료 &nbsp; 🔵 현재 위치 · 구글맵 API 키 없음</div>
+                    <div class="legend">🟠 남음 &nbsp; 🟢 완료 &nbsp; 🔵 현재 위치 · 점 클릭</div>
                     <div class="form-group">
                         <label class="form-label">표시</label>
                         <select class="form-select" id="routeViewMode">
@@ -1339,7 +1336,14 @@
                     <button class="btn btn-secondary" id="routeDownloadBtn" disabled>📥 엑셀로 내려받기</button>
                 </div>
             </div>
-            <div id="routeMap" class="hidden"></div>
+            <div class="card hidden" id="routeMapCard">
+                <div class="card-header">그림 지도 (앱 내장 · 외부맵 API 없음)</div>
+                <div class="card-body" style="padding-top:8px;">
+                    <canvas id="routeMapCanvas" width="640" height="380" aria-label="지역 그림 지도"></canvas>
+                    <div id="routeMapMeta">지역을 고르면 여기에 충전소 위치가 점으로 표시됩니다.</div>
+                    <div id="routeMapPick" class="hidden"></div>
+                </div>
+            </div>
             <div id="routeList"></div>
         </div>
 
@@ -1617,7 +1621,7 @@
 
     <script src="station_data.js"></script>
     <script>
-        const APP_VERSION = '4.51';
+        const APP_VERSION = '4.52';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
 
@@ -2673,165 +2677,224 @@
                 .flatMap((region) => collectRegionStations(region));
         }
 
-        let routeLeafletMap = null;
-        let leafletLoadPromise = null;
         let routeMapToken = 0;
+        let routeMapHits = [];
 
-        function loadLeaflet() {
-            if (window.L) return Promise.resolve(window.L);
-            if (leafletLoadPromise) return leafletLoadPromise;
-            const urls = [
-                'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
-                'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-            ];
-            leafletLoadPromise = new Promise((resolve, reject) => {
-                let i = 0;
-                const tryNext = () => {
-                    if (window.L) return resolve(window.L);
-                    if (i >= urls.length) return reject(new Error('지도 라이브러리 로드 실패'));
-                    const s = document.createElement('script');
-                    s.src = urls[i++];
-                    s.crossOrigin = '';
-                    s.onload = () => (window.L ? resolve(window.L) : tryNext());
-                    s.onerror = () => tryNext();
-                    document.head.appendChild(s);
-                };
-                tryNext();
-            });
-            return leafletLoadPromise;
+        // 시/군 대략 좌표(앱 내장). 외부 지도 API/타일 없이 그림 지도를 바로 그림.
+        const CITY_GEO = {
+            '강진군': [34.642, 126.767], '고흥군': [34.611, 127.285], '공주시': [36.447, 127.119],
+            '광양시': [34.941, 127.696], '광주 광산구': [35.140, 126.793], '광주 남구': [35.133, 126.902],
+            '광주 동구': [35.146, 126.923], '광주 북구': [35.174, 126.912], '광주 서구': [35.152, 126.890],
+            '괴산군': [36.816, 127.787], '군산시': [35.968, 126.737], '금산군': [36.109, 127.488],
+            '김제시': [35.804, 126.881], '나주시': [35.016, 126.711], '남원시': [35.416, 127.390],
+            '논산시': [36.187, 127.099], '단양군': [36.985, 128.365], '당진시': [36.890, 126.646],
+            '대전 대덕구': [36.347, 127.416], '대전 동구': [36.312, 127.455], '대전 서구': [36.355, 127.384],
+            '대전 유성구': [36.362, 127.356], '대전 중구': [36.325, 127.421], '목포시': [34.812, 126.392],
+            '무안군': [34.990, 126.482], '보령시': [36.333, 126.613], '부여군': [36.276, 126.910],
+            '서귀포시': [33.254, 126.560], '서산시': [36.785, 126.450], '서천군': [36.080, 126.692],
+            '세종시': [36.480, 127.289], '순천시': [34.951, 127.487], '아산시': [36.790, 127.002],
+            '여수시': [34.760, 127.662], '영광군': [35.277, 126.512], '영암군': [34.800, 126.697],
+            '예산군': [36.681, 126.845], '옥천군': [36.306, 127.571], '완도군': [34.312, 126.755],
+            '완주군': [35.905, 127.162], '음성군': [36.940, 127.690], '익산시': [35.948, 126.958],
+            '장성군': [35.302, 126.785], '장흥군': [34.682, 126.907], '전주시 덕진구': [35.848, 127.120],
+            '전주시 완산구': [35.812, 127.132], '정읍시': [35.570, 126.856], '제주시': [33.500, 126.532],
+            '제천시': [37.133, 128.191], '증평군': [36.785, 127.581], '진천군': [36.855, 127.436],
+            '창원시 마산회원구': [35.221, 128.579], '천안시 동남구': [36.807, 127.150], '천안시 서북구': [36.879, 127.120],
+            '청양군': [36.459, 126.802], '청주시 상당구': [36.590, 127.505], '청주시 서원구': [36.612, 127.460],
+            '청주시 청원구': [36.700, 127.480], '청주시 흥덕구': [36.644, 127.420], '충주시': [36.991, 127.926],
+            '태안군': [36.745, 126.298], '홍성군': [36.601, 126.661], '화순군': [35.064, 126.987]
+        };
+
+        function cityGeoOf(city) {
+            if (!city) return null;
+            if (CITY_GEO[city]) return { lat: CITY_GEO[city][0], lng: CITY_GEO[city][1] };
+            const key = Object.keys(CITY_GEO).find((k) => city.indexOf(k) >= 0 || k.indexOf(city) >= 0);
+            return key ? { lat: CITY_GEO[key][0], lng: CITY_GEO[key][1] } : null;
+        }
+
+        function projectKorea(lat, lng, w, h, pad) {
+            const minLat = 33.05; const maxLat = 38.7; const minLng = 125.05; const maxLng = 129.7;
+            const p = pad || 18;
+            const x = ((lng - minLng) / (maxLng - minLng)) * (w - p * 2) + p;
+            const y = (1 - (lat - minLat) / (maxLat - minLat)) * (h - p * 2) + p;
+            return { x, y };
         }
 
         function clearRouteMap() {
             routeMapToken += 1;
-            if (routeLeafletMap) {
-                try { routeLeafletMap.remove(); } catch (err) {}
-                routeLeafletMap = null;
-            }
-            const el = document.getElementById('routeMap');
-            if (el) {
-                el.classList.add('hidden');
-                el.innerHTML = '';
+            routeMapHits = [];
+            const card = document.getElementById('routeMapCard');
+            const pick = document.getElementById('routeMapPick');
+            if (card) card.classList.add('hidden');
+            if (pick) {
+                pick.classList.add('hidden');
+                pick.innerHTML = '';
             }
         }
 
-        function paintRouteMarkers(map, items) {
-            const bounds = [];
-            items.forEach((it) => {
-                if (!Number.isFinite(it.lat) || !Number.isFinite(it.lng)) return;
-                const done = it.done >= it.total && it.total;
-                const color = done ? '#22c55e' : '#f97316';
-                const addr = it.address || it.name;
-                const marker = L.circleMarker([it.lat, it.lng], {
-                    radius: 7,
-                    color: '#0f0f1a',
-                    weight: 1,
-                    fillColor: color,
-                    fillOpacity: 0.9
-                });
-                marker.bindPopup(
-                    `<b>${it.name}</b><br>${it.region || ''} · ${it.city || ''}<br>${addr || ''}<br>거점 ${it.done}/${it.total}`
-                    + `<div class="map-pop-btns">`
-                    + `<button type="button" onclick='jumpToStation(${JSON.stringify(it.region)}, ${JSON.stringify(it.city)}, ${JSON.stringify(it.name)})'>점검</button>`
-                    + `<button type="button" onclick='copyText(${JSON.stringify(addr)})'>주소 복사</button>`
-                    + `<a class="btn" href="${kakaoMapUrl(addr)}" target="_blank" rel="noopener">카카오</a>`
-                    + `<a class="btn" href="${naverMapUrl(addr)}" target="_blank" rel="noopener">네이버</a>`
-                    + `</div>`
-                );
-                marker.addTo(map);
-                bounds.push([it.lat, it.lng]);
+        function prepareMapPoints(items) {
+            return items.map((it, idx) => {
+                let lat = Number(it.lat);
+                let lng = Number(it.lng);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                    const city = cityGeoOf(it.city);
+                    if (city) {
+                        // 같은 시군 점이 겹치지 않게 아주 조금 흩뿌림
+                        const jitter = ((idx % 9) - 4) * 0.012;
+                        lat = city.lat + jitter;
+                        lng = city.lng + (((idx * 3) % 9) - 4) * 0.012;
+                    }
+                }
+                return {
+                    ...it,
+                    lat,
+                    lng,
+                    doneAll: it.done >= it.total && it.total
+                };
+            }).filter((it) => Number.isFinite(it.lat) && Number.isFinite(it.lng));
+        }
+
+        function drawRouteCanvas(points) {
+            const canvas = document.getElementById('routeMapCanvas');
+            const meta = document.getElementById('routeMapMeta');
+            if (!canvas) return;
+            const dpr = Math.min(2, window.devicePixelRatio || 1);
+            const cssW = canvas.clientWidth || 640;
+            const cssH = 380;
+            canvas.width = Math.round(cssW * dpr);
+            canvas.height = Math.round(cssH * dpr);
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            const w = cssW;
+            const h = cssH;
+            ctx.clearRect(0, 0, w, h);
+            const g = ctx.createLinearGradient(0, 0, w, h);
+            g.addColorStop(0, '#0b1220');
+            g.addColorStop(1, '#152238');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, w, h);
+            // 바다/육지 느낌의 단순 한반도 실루엣
+            ctx.fillStyle = '#1d3a2f';
+            ctx.beginPath();
+            const land = [
+                [126.1, 37.8], [127.0, 38.3], [128.4, 38.4], [129.3, 37.5], [129.2, 36.0],
+                [129.1, 35.1], [128.0, 34.7], [126.9, 34.3], [126.2, 34.7], [126.0, 35.8],
+                [126.3, 36.8], [126.1, 37.8]
+            ];
+            land.forEach(([lng, lat], i) => {
+                const p = projectKorea(lat, lng, w, h, 10);
+                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
             });
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#2f6b55';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            // 제주
+            ctx.beginPath();
+            const jj = projectKorea(33.4, 126.5, w, h, 10);
+            ctx.arc(jj.x, jj.y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#1d3a2f';
+            ctx.fill();
+            ctx.stroke();
+
+            routeMapHits = [];
+            points.forEach((it) => {
+                const p = projectKorea(it.lat, it.lng, w, h, 10);
+                const r = it.doneAll ? 5.5 : 6.5;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+                ctx.fillStyle = it.doneAll ? '#22c55e' : '#f97316';
+                ctx.fill();
+                ctx.strokeStyle = '#0b1220';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                routeMapHits.push({ x: p.x, y: p.y, r: r + 8, item: it });
+            });
+
             const here = typeof gpsLatLng === 'function' ? gpsLatLng() : null;
             if (here && Number.isFinite(here.lat)) {
-                L.circleMarker([here.lat, here.lng], {
-                    radius: 9,
-                    color: '#1d4ed8',
-                    weight: 2,
-                    fillColor: '#60a5fa',
-                    fillOpacity: 1
-                }).bindPopup('현재 위치').addTo(map);
-                bounds.push([here.lat, here.lng]);
+                const p = projectKorea(here.lat, here.lng, w, h, 10);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+                ctx.fillStyle = '#60a5fa';
+                ctx.fill();
+                ctx.strokeStyle = '#1d4ed8';
+                ctx.lineWidth = 2;
+                ctx.stroke();
             }
-            return bounds;
+
+            const left = points.filter((p) => !p.doneAll).length;
+            const done = points.length - left;
+            if (meta) {
+                meta.textContent = `표시 ${points.length}곳 · 🟠남음 ${left} · 🟢완료 ${done} · 점을 누르면 상세 · 외부 지도 API 없이 앱에서 직접 그립니다.`;
+            }
+        }
+
+        function showMapPick(it) {
+            const box = document.getElementById('routeMapPick');
+            if (!box || !it) return;
+            const addr = it.address || it.name;
+            box.classList.remove('hidden');
+            box.innerHTML = `<b>${it.name}</b><br>${it.region || ''} · ${it.city || ''}<br>${addr || ''}<br>거점 ${it.done}/${it.total}`
+                + `<div class="map-pop-btns">`
+                + `<button type="button" class="btn btn-primary" onclick='jumpToStation(${JSON.stringify(it.region)}, ${JSON.stringify(it.city)}, ${JSON.stringify(it.name)})'>점검</button>`
+                + `<button type="button" class="btn btn-secondary" onclick='copyText(${JSON.stringify(addr)})'>주소 복사</button>`
+                + `<a class="btn btn-secondary" href="${kakaoMapUrl(addr)}" target="_blank" rel="noopener">카카오맵</a>`
+                + `<a class="btn btn-secondary" href="${naverMapUrl(addr)}" target="_blank" rel="noopener">네이버맵</a>`
+                + `</div>`;
+        }
+
+        function bindRouteMapCanvas() {
+            const canvas = document.getElementById('routeMapCanvas');
+            if (!canvas || canvas.dataset.bound === '1') return;
+            canvas.dataset.bound = '1';
+            canvas.addEventListener('click', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                let best = null;
+                let bestD = 1e9;
+                routeMapHits.forEach((hit) => {
+                    const d = Math.hypot(hit.x - x, hit.y - y);
+                    if (d <= hit.r && d < bestD) {
+                        best = hit;
+                        bestD = d;
+                    }
+                });
+                if (best) showMapPick(best.item);
+            });
         }
 
         async function showRouteMap(items) {
             const mode = (document.getElementById('routeViewMode') || {}).value || 'map';
-            const mapEl = document.getElementById('routeMap');
-            if (!mapEl || mode === 'list') {
+            const card = document.getElementById('routeMapCard');
+            if (!card || mode === 'list') {
                 clearRouteMap();
                 return;
             }
             const token = ++routeMapToken;
-            mapEl.classList.remove('hidden');
-            if (routeLeafletMap) {
-                try { routeLeafletMap.remove(); } catch (err) {}
-                routeLeafletMap = null;
-            }
-            mapEl.innerHTML = '<div class="map-loading">그림 지도 불러오는 중…<br><span style="font-size:12px;color:#888">구글맵 API 아님 · 카카오/네이버로 길안내</span></div>';
-            try {
-                await loadLeaflet();
-            } catch (err) {
-                mapEl.innerHTML = '<div class="map-loading">그림 지도를 불러오지 못했습니다.<br>아래 목록에서 카카오·네이버맵으로 확인하세요.</div>';
-                return;
-            }
-            if (token !== routeMapToken) return;
-            mapEl.innerHTML = '';
-            routeLeafletMap = L.map(mapEl, { zoomControl: true }).setView([36.35, 127.7], 7);
-            // 국내 모바일에서 타일 차단될 수 있어 여러 소스 시도
-            const tileLayers = [
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                    maxZoom: 18, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO'
-                }),
-                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 18, attribution: '&copy; OpenStreetMap'
-                })
-            ];
-            let tileIdx = 0;
-            tileLayers[0].addTo(routeLeafletMap);
-            tileLayers[0].on('tileerror', () => {
-                if (tileIdx >= tileLayers.length - 1 || !routeLeafletMap) return;
-                routeLeafletMap.removeLayer(tileLayers[tileIdx]);
-                tileIdx += 1;
-                tileLayers[tileIdx].addTo(routeLeafletMap);
-            });
-            setTimeout(() => { if (routeLeafletMap && token === routeMapToken) routeLeafletMap.invalidateSize(); }, 100);
-            setTimeout(() => { if (routeLeafletMap && token === routeMapToken) routeLeafletMap.invalidateSize(); }, 500);
+            card.classList.remove('hidden');
+            bindRouteMapCanvas();
+            // 시군 좌표로 즉시 그림 (인터넷/API 불필요)
+            let points = prepareMapPoints(items || []);
+            drawRouteCanvas(points);
             const hint = document.getElementById('routeGpsHint');
-            const setHint = (have, total, missing) => {
-                if (!hint) return;
-                if (missing > 0) hint.textContent = `지도 좌표 맞추는 중… ${have}/${total}곳 (남은 ${missing})`;
-                else if (!have) hint.textContent = '지도는 떴습니다. 좌표를 못 받아 점은 아직 없습니다. 인터넷·스크립트 배포를 확인하세요.';
-                else hint.textContent = `지도에 ${have}곳 표시 · 🟠남음 🟢완료 🔵현재위치 · 손가락으로 확대/축소`;
-            };
-            const repaint = () => {
-                if (token !== routeMapToken || !routeLeafletMap) return;
-                routeLeafletMap.eachLayer((layer) => {
-                    if (layer instanceof L.CircleMarker) routeLeafletMap.removeLayer(layer);
+            if (hint) hint.textContent = '그림 지도는 앱 내장입니다. 정확한 도로 안내는 점 눌러 카카오/네이버로 가세요.';
+            // 가능하면 주소 좌표도 받아 더 정확히 다시 그림
+            try {
+                await ensureStationGeo(items || [], {
+                    maxRounds: 8,
+                    onProgress: () => {
+                        if (token !== routeMapToken) return;
+                        points = prepareMapPoints(items || []);
+                        drawRouteCanvas(points);
+                    }
                 });
-                const bounds = paintRouteMarkers(routeLeafletMap, items);
-                if (bounds.length) routeLeafletMap.fitBounds(bounds, { padding: [28, 28], maxZoom: items.length > 80 ? 9 : 12 });
-            };
-            // 캐시된 좌표로 바로 표시
-            await ensureStationGeo(items, { maxRounds: 0 });
-            setHint(items.filter((it) => Number.isFinite(it.lat)).length, items.length, items.filter((it) => !Number.isFinite(it.lat)).length);
-            repaint();
-            let lastPaintAt = 0;
-            await ensureStationGeo(items, {
-                maxRounds: 40,
-                onProgress: (have, total, missing) => {
-                    if (token !== routeMapToken || !routeLeafletMap) return;
-                    setHint(have, total, missing);
-                    const now = Date.now();
-                    if (missing > 0 && now - lastPaintAt < 900) return;
-                    lastPaintAt = now;
-                    repaint();
-                }
-            });
-            if (token !== routeMapToken || !routeLeafletMap) return;
-            const have = items.filter((it) => Number.isFinite(it.lat)).length;
-            setHint(have, items.length, items.length - have);
-            repaint();
-            setTimeout(() => { if (routeLeafletMap) routeLeafletMap.invalidateSize(); }, 250);
+            } catch (err) {}
+            if (token !== routeMapToken) return;
+            points = prepareMapPoints(items || []);
+            drawRouteCanvas(points);
         }
 
         async function applyRouteView(items, listHtml) {
@@ -6443,7 +6506,14 @@
                 loadCachedProgress();
                 renderRoutePlan();
                 fetchTeamProgress(false);
-                setTimeout(() => { if (routeLeafletMap) routeLeafletMap.invalidateSize(); }, 300);
+                setTimeout(() => {
+                    const canvas = document.getElementById('routeMapCanvas');
+                    if (canvas && !document.getElementById('routeMapCard').classList.contains('hidden')) {
+                        // 탭 전환 후 다시 그려 크기 맞춤
+                        const items = (routePlan && (routePlan.teams[0] || routePlan.allItems)) || [];
+                        if (items.length) drawRouteCanvas(prepareMapPoints(items));
+                    }
+                }, 250);
             }
             if (tab === 'history') {
                 fetchTeamProgress(false).catch(() => {});
@@ -6469,7 +6539,7 @@
             try {
                 add(!!APP_VERSION, '앱 버전 v' + APP_VERSION);
                 add(typeof clearFieldValue === 'function', '사진 삭제 시 용량·제조번호 초기화 로직');
-                add(typeof showRouteMap === 'function' && typeof loadLeaflet === 'function', '그림 지도 함수');
+                add(typeof showRouteMap === 'function' && typeof drawRouteCanvas === 'function', '그림 지도(앱 내장 캔버스)');
 
                 const m1 = pickClearMeter('제조번호 0252508 기타');
                 const m2 = pickClearMeter('NO. 1250033');
@@ -6491,17 +6561,20 @@
                 add(!!isZip, '일지 엑셀 생성 (' + (bytes ? bytes.length : 0) + ' bytes, 양식 열: 국소명·거점·충전기수·충전기번호·MCCB·접지·계량기·비고)');
 
                 try {
-                    await loadLeaflet();
-                    add(!!window.L, '지도 라이브러리(Leaflet) 로드');
+                    const sample = prepareMapPoints([
+                        { name: '테스트A', city: '대전 서구', region: '충청권', done: 0, total: 1, address: '대전' },
+                        { name: '테스트B', city: '전주시 완산구', region: '호남권', done: 1, total: 1, address: '전주' }
+                    ]);
+                    add(sample.length === 2, '그림 지도 좌표 샘플 ' + sample.length + '곳');
+                    const card = document.getElementById('routeMapCard');
+                    if (card) {
+                        card.classList.remove('hidden');
+                        bindRouteMapCanvas();
+                        drawRouteCanvas(sample);
+                        add(true, '홈에서 그림 지도 미리보기 표시');
+                    } else add(false, 'routeMapCard 없음');
                 } catch (err) {
-                    add(false, '지도 라이브러리 로드 실패 · ' + (err && err.message ? err.message : err));
-                }
-
-                try {
-                    const tileRes = await fetch('https://a.basemaps.cartocdn.com/light_all/6/55/25.png', { cache: 'no-store' });
-                    add(tileRes.ok, '지도 타일 응답 ' + tileRes.status + (tileRes.ok ? '' : ' · 동선 탭에서 한번 더 확인'));
-                } catch (err) {
-                    note('지도 타일 직접 확인 불가(네트워크). 동선 → 전국/지역 → 그림 지도로 확인하세요.');
+                    add(false, '그림 지도 테스트 실패 · ' + (err && err.message ? err.message : err));
                 }
 
                 const file = new File([bytes], '홈테스트_점검일지_' + date + '.xlsx', {
