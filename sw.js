@@ -1,5 +1,5 @@
-// v4.73: MCCB and meter numbers read only from close-up photos
-const SW_VER = '4.73';
+// v4.74: daily log matches the measurement form; plate meter numbers keep dashes
+const SW_VER = '4.74';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
