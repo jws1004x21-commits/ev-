@@ -1,5 +1,5 @@
 /**
- * 충전소 점검앱 v12 — Google Apps Script
+ * 충전소 점검앱 v13 — Google Apps Script
  *
  * 사용법:
  * 1. 구글 시트 → 확장 프로그램 → Apps Script
@@ -11,6 +11,8 @@
  *
  * 저장 위치:
  * 내 드라이브 / 전기차충전소점검_대전팀 / 점검사진 / 지역 / 시군 / 충전소 / 거점1_장소이름
+ * 추가 거점 폴더는 추가_장소이름, 증설 폴더는 증설_장소이름
+ * 추가·증설 목록은 시트 탭 "추가거점"
  */
 
 var ROOT_FOLDER_NAME = '전기차충전소점검_대전팀';
@@ -25,10 +27,22 @@ function setupDrive() {
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action;
   var p = e.parameter || {};
-  var payload = { ok: true, version: 'v12', message: '충전소 점검 서버 정상' };
+  var payload = { ok: true, version: 'v13', message: '충전소 점검 서버 정상' };
   if (action === 'progress') {
     payload.progress = loadProgress_();
     payload.locks = loadLocks_();
+    try {
+      payload.extras = loadExtras_();
+    } catch (err) {
+      payload.extras = [];
+    }
+  }
+  if (action === 'saveExtra') {
+    try {
+      payload.saved = saveExtra_(p);
+    } catch (err) {
+      payload.saved = { ok: false, error: String(err) };
+    }
   }
   if (action === 'record') {
     payload.record = loadRecord_(p);
@@ -60,8 +74,19 @@ function doGet(e) {
   return json_(payload);
 }
 
+function inspectionSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var active = ss.getActiveSheet();
+  if (active && active.getName() !== '추가거점') return active;
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getName() !== '추가거점') return sheets[i];
+  }
+  return active;
+}
+
 function loadProgress_() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var sheet = inspectionSheet_();
   var values = sheet.getDataRange().getValues();
   var out = [];
   for (var i = 1; i < values.length; i++) {
@@ -102,7 +127,7 @@ function doPost(e) {
     var action = data.action || 'complete';
 
     if (action === 'ping') {
-      return json_({ ok: true, version: 'v12' });
+      return json_({ ok: true, version: 'v13' });
     }
 
     if (action === 'photo') {
@@ -115,7 +140,7 @@ function doPost(e) {
     }
 
     var folder = ensureZoneFolder_(data);
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var sheet = inspectionSheet_();
     ensureHeader_(sheet);
     var photoCount = folderFileCount_(folder);
     var rowValues = [
@@ -204,7 +229,7 @@ function folderFileCount_(folder) {
 function loadRecord_(p) {
   var station = String(p.station || '');
   var zone = String(p.zone || '');
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var sheet = inspectionSheet_();
   var row = findRow_(sheet, station, zone);
   var rec = { found: false, station: station, zone: zone, photos: [] };
   if (row) {
@@ -350,7 +375,88 @@ function zoneFolderName_(data) {
     var tail = String(matched[2] || '').trim();
     return tail ? ('거점' + matched[1] + '_' + tail) : ('거점' + matched[1]);
   }
+  var added = zone.match(/^(추가|증설)\s*:\s*(.*)$/);
+  if (added) {
+    var place = String(added[2] || '').trim();
+    return place ? (added[1] + '_' + place) : added[1];
+  }
   return zone || '거점';
+}
+
+function extrasSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('추가거점');
+  if (!sheet) {
+    var current = ss.getActiveSheet();
+    sheet = ss.insertSheet('추가거점');
+    sheet.appendRow(['id', 'kind', 'region', 'city', 'station', 'name', 'chargers', 'maker', 'zoneId', 'needsSeparate', 'note', 'addedBy', 'addedAt']);
+    sheet.getRange(1, 1, 1, 13).setFontWeight('bold');
+    if (current) ss.setActiveSheet(current);
+  }
+  return sheet;
+}
+
+function loadExtras_() {
+  var sheet = extrasSheet_();
+  var values = sheet.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < values.length; i++) {
+    if (!values[i][0]) continue;
+    var when = values[i][12];
+    var whenStr = when instanceof Date
+      ? Utilities.formatDate(when, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+      : String(when || '');
+    out.push({
+      id: String(values[i][0]),
+      kind: String(values[i][1] || 'zone'),
+      region: String(values[i][2] || ''),
+      city: String(values[i][3] || ''),
+      station: String(values[i][4] || ''),
+      name: String(values[i][5] || ''),
+      chargers: Number(values[i][6]) || 0,
+      maker: String(values[i][7] || ''),
+      zoneId: String(values[i][8] || ''),
+      needsSeparate: String(values[i][9]) === '1',
+      note: String(values[i][10] || ''),
+      addedBy: String(values[i][11] || ''),
+      addedAt: whenStr
+    });
+  }
+  return out;
+}
+
+function saveExtra_(p) {
+  var id = String(p.id || '').trim();
+  var station = String(p.station || '').trim();
+  var name = String(p.name || '').trim();
+  if (!id || !station || !name) return { ok: false, reason: 'missing' };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var sheet = extrasSheet_();
+    var values = sheet.getDataRange().getValues();
+    for (var i = 1; i < values.length; i++) {
+      if (String(values[i][0]) === id) return { ok: true, duplicate: true };
+    }
+    sheet.appendRow([
+      id,
+      String(p.kind || 'zone'),
+      String(p.region || ''),
+      String(p.city || ''),
+      station,
+      name.substring(0, 40),
+      Number(p.chargers) || 0,
+      String(p.maker || '').substring(0, 40),
+      String(p.zoneId || ''),
+      String(p.needsSeparate || '') === '1' ? '1' : '',
+      String(p.note || '').substring(0, 80),
+      String(p.addedBy || '').substring(0, 40),
+      String(p.addedAt || '')
+    ]);
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function childFolder_(parent, name) {

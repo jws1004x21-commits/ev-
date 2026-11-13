@@ -1,5 +1,5 @@
-// v4.71: force reload unregisters SW before reading version.json
-const SW_VER = '4.71';
+// v4.73: MCCB and meter numbers read only from close-up photos
+const SW_VER = '4.73';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.71">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.73">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -289,6 +289,8 @@
         .zone-card .zone-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
         .zone-card .zone-info { font-size: 11px; color: #888; }
         .zone-card .zone-done-who { font-size: 13px; font-weight: 700; color: #fde68a; margin-top: 6px; }
+        .zone-card.added { border-color: #38bdf8; }
+        .zone-card .badge.add { background: #38bdf8; color: #082f49; }
         .zone-card .badge {
             display: inline-block;
             background: #facc15;
@@ -300,6 +302,17 @@
             margin-bottom: 8px;
             letter-spacing: -0.02em;
         }
+        .zone-add { margin-top: 12px; }
+        .zone-add-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .zone-add-hint { font-size: 12px; color: #aaa; margin-top: 8px; line-height: 1.45; }
+        .zone-add-form {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            background: #111827;
+        }
+        .zone-add-status { font-size: 12px; color: #86efac; margin-top: 8px; line-height: 1.45; }
         .update-banner {
             display: none;
             background: #1d4ed8;
@@ -1217,10 +1230,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.71</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.73</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전 있음 · 상단이 v4.71이어야 최신
+        새 버전 있음 · 상단이 v4.73이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1232,8 +1245,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.71&fresh=1">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.71</b>이어야 최신입니다. 강제 새로고침이 안 되면 위 <b>브라우저에서 최신 페이지 열기</b>를 누르세요.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.73&fresh=1">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.73</b>이어야 최신입니다. 강제 새로고침이 안 되면 위 <b>브라우저에서 최신 페이지 열기</b>를 누르세요.</div>
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
                         <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
@@ -1311,6 +1324,46 @@
                         <div class="card-header">거점 선택</div>
                         <div class="card-body">
                             <div class="zone-grid" id="zoneGrid"></div>
+                            <div class="zone-add">
+                                <div class="zone-add-actions">
+                                    <button type="button" class="btn btn-secondary btn-small" id="addZoneBtn">＋ 거점 추가</button>
+                                    <button type="button" class="btn btn-secondary btn-small" id="addChargersBtn" disabled>선택 거점에 충전기 추가</button>
+                                </div>
+                                <div class="zone-add-hint">명단에 없는 장소는 거점 추가. 같은 장소에 대수만 늘었으면 그 거점을 고른 뒤 충전기 추가.</div>
+                                <div id="addZoneForm" class="zone-add-form hidden">
+                                    <div class="form-group">
+                                        <label class="form-label">새 거점 이름</label>
+                                        <input type="text" class="form-input" id="addZoneName" placeholder="예: 205동 지상 주차장" maxlength="40">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">충전기 대수</label>
+                                        <input type="number" class="form-input" id="addZoneChargers" min="1" inputmode="numeric" placeholder="2">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">제조사</label>
+                                        <input type="text" class="form-input" id="addZoneMaker" placeholder="비우면 이 충전소 제조사">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">메모 (선택)</label>
+                                        <input type="text" class="form-input" id="addZoneNote" placeholder="증설, 명단에 없음" maxlength="80">
+                                    </div>
+                                    <button type="button" class="btn btn-primary btn-small" id="addZoneSave">이 거점 넣기</button>
+                                    <button type="button" class="btn btn-secondary btn-small" id="addZoneCancel">취소</button>
+                                </div>
+                                <div id="addChargersForm" class="zone-add-form hidden">
+                                    <div class="form-group">
+                                        <label class="form-label">이 장소에 추가된 대수</label>
+                                        <input type="number" class="form-input" id="addChargerCount" min="1" inputmode="numeric" placeholder="2">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">메모 (선택)</label>
+                                        <input type="text" class="form-input" id="addChargerNote" placeholder="같은 장소에 증설" maxlength="80">
+                                    </div>
+                                    <button type="button" class="btn btn-primary btn-small" id="addChargerSave">대수 반영</button>
+                                    <button type="button" class="btn btn-secondary btn-small" id="addChargerCancel">취소</button>
+                                </div>
+                                <div id="zoneAddStatus" class="zone-add-status"></div>
+                            </div>
                             <div id="serialList" class="serial-list hidden">
                                 <div style="font-weight:600;margin-bottom:6px;">📋 충전기 시리얼</div>
                                 <div id="serialItems"></div>
@@ -1822,9 +1875,9 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
-    <script src="station_data.js?v=4.71"></script>
+    <script src="station_data.js?v=4.73"></script>
     <script>
-        const APP_VERSION = '4.71';
+        const APP_VERSION = '4.73';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
@@ -1902,6 +1955,8 @@
             inspector: '',
             teamProgress: [],
             zoneLocks: [],
+            extraZones: [],
+            expansionInspect: false,
             editing: false,
             originalDate: ''
         };
@@ -2156,6 +2211,7 @@
                         station: state.station,
                         selectedZone: state.selectedZone,
                         selectedZoneIdx: state.selectedZoneIdx,
+                        expansionInspect: !!state.expansionInspect,
                         memo: (document.getElementById('memoInput') || {}).value || '',
                         meters: readMeterFields(),
                         inspector: state.inspector,
@@ -2178,6 +2234,7 @@
             state.station = w.station || '';
             state.selectedZone = w.selectedZone;
             state.selectedZoneIdx = w.selectedZoneIdx || 0;
+            state.expansionInspect = !!w.expansionInspect;
             state.photoData = w.photoData || {};
             if (w.inspector && !state.inspector) state.inspector = w.inspector;
             syncInspectorFields(state.inspector || '');
@@ -2214,12 +2271,7 @@
                 if (data) {
                     document.getElementById('stationName').textContent = state.station;
                     document.getElementById('stationAddress').textContent = data.address;
-                    const totalChargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
-                    document.getElementById('stationSummary').textContent =
-                        `거점 ${data.zones.length}개, 총 ${totalChargers}대`;
-                    renderZones(data.zones);
-                    document.getElementById('stationInfo').classList.remove('hidden');
-                    if (state.selectedZone) selectZone(state.selectedZone, state.selectedZoneIdx || 0);
+                    refreshOpenStation(true);
                 }
             }
         }
@@ -2356,8 +2408,9 @@
                 return;
             }
             const files = items.map((item, i) => dataUrlToFile(item.data, exportPhotoName(item, i)));
-            const zipName = `${state.station || '충전소'}_거점${(state.selectedZoneIdx || 0) + 1}_점검사진.zip`;
-            const zoneFolder = folderSafe('거점' + ((state.selectedZoneIdx || 0) + 1) + '_' + ((state.selectedZone && state.selectedZone.name) || ''));
+            const place = currentLocationFields();
+            const zipName = `${state.station || '충전소'}_${place.zoneFolder || '거점'}_점검사진.zip`;
+            const zoneFolder = folderSafe(place.zoneFolder || '거점');
             const zipBytes = buildZip(items.map((item, i) => ({
                 name: zoneFolder + '/' + exportPhotoName(item, i),
                 bytes: dataUrlToBytes(item.data)
@@ -2456,6 +2509,7 @@
         }
 
         function loadState() {
+            loadExtraZones();
             const saved = localStorage.getItem('inspectionStateV2');
             if (!saved) return;
             const parsed = JSON.parse(saved);
@@ -2472,6 +2526,135 @@
             delete parsed.photos;
             delete parsed.selectedZone;
             state = { ...state, ...parsed, photoData: {} };
+            loadExtraZones();
+        }
+
+        function loadExtraZones() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem('extraZonesV1') || '[]');
+                state.extraZones = Array.isArray(parsed) ? parsed : [];
+            } catch (err) {
+                state.extraZones = [];
+            }
+        }
+
+        function saveExtraZones() {
+            try { localStorage.setItem('extraZonesV1', JSON.stringify(state.extraZones || [])); } catch (err) {}
+        }
+
+        const extraPushTried = new Set();
+
+        function extraQuery(item) {
+            const parts = {
+                id: item.id,
+                kind: item.kind || 'zone',
+                region: item.region || '',
+                city: item.city || '',
+                station: item.station || '',
+                name: item.name || '',
+                chargers: item.chargers || 0,
+                maker: item.maker || '',
+                zoneId: item.zoneId || '',
+                needsSeparate: item.needsSeparate ? '1' : '',
+                note: item.note || '',
+                addedBy: item.addedBy || '',
+                addedAt: item.addedAt || ''
+            };
+            return Object.keys(parts).map((k) => k + '=' + encodeURIComponent(parts[k] == null ? '' : parts[k])).join('&');
+        }
+
+        function mergeServerExtras(rows) {
+            const byId = new Map((state.extraZones || []).map((e) => [e.id, e]));
+            rows.forEach((row) => {
+                if (!row || !row.id) return;
+                const prev = byId.get(row.id);
+                byId.set(row.id, Object.assign({}, prev || {}, row, { synced: true, serials: (prev && prev.serials) || row.serials || [] }));
+            });
+            state.extraZones = [...byId.values()];
+            saveExtraZones();
+        }
+
+        async function pushOneExtra(item, quiet) {
+            if (!item || !item.id || item.synced) return;
+            extraPushTried.add(item.id);
+            const status = document.getElementById('zoneAddStatus');
+            try {
+                const res = await googleJsonp('action=saveExtra&' + extraQuery(item), 12000);
+                if (res.ok && res.data && res.data.saved && res.data.saved.ok) {
+                    item.synced = true;
+                    saveExtraZones();
+                    if (!quiet && status) status.textContent = '넣었습니다. 다른 폰도 동기화하면 이 거점이 보입니다.';
+                    return;
+                }
+            } catch (err) {}
+            if (!quiet && status) status.textContent = '이 폰에는 넣었습니다. 다른 폰에 보이게 하려면 구글 스크립트를 최신으로 다시 배포하세요.';
+        }
+
+        async function pushLocalExtras() {
+            const pending = (state.extraZones || []).filter((item) => item && item.id && !item.synced && !extraPushTried.has(item.id));
+            for (let i = 0; i < pending.length; i++) await pushOneExtra(pending[i], true);
+        }
+
+        function officialZones(region, city, station) {
+            const data = STATION_DATA[region] && STATION_DATA[region][city] && STATION_DATA[region][city][station];
+            return data && data.zones ? data.zones : [];
+        }
+
+        function extraRecordsFor(region, city, station) {
+            return (state.extraZones || []).filter((e) => e.region === region && e.city === city && e.station === station);
+        }
+
+        function extraBuckets(region, city, station, zoneId) {
+            const rows = extraRecordsFor(region, city, station).filter((e) => e.kind === 'chargers' && String(e.zoneId) === String(zoneId));
+            const sum = (list) => list.reduce((s, e) => s + (Number(e.chargers) || 0), 0);
+            return {
+                withBase: sum(rows.filter((e) => !e.needsSeparate)),
+                separate: sum(rows.filter((e) => e.needsSeparate))
+            };
+        }
+
+        function zonesForStation(region, city, station) {
+            const extras = extraRecordsFor(region, city, station);
+            const chargerAdds = extras.filter((e) => e.kind === 'chargers');
+            const sumFor = (id) => chargerAdds.filter((e) => String(e.zoneId) === String(id)).reduce((s, e) => s + (Number(e.chargers) || 0), 0);
+            const zones = officialZones(region, city, station).map((z) => Object.assign({}, z, {
+                added: false,
+                extraChargers: sumFor(z.id)
+            }));
+            extras.filter((e) => e.kind === 'zone').forEach((e) => {
+                const name = String(e.name || '').trim();
+                if (!name || zones.some((z) => String(z.name).trim() === name)) return;
+                zones.push({
+                    id: e.id,
+                    name,
+                    chargers: Number(e.chargers) || 0,
+                    serials: e.serials || [],
+                    maker: e.maker || '',
+                    added: true,
+                    extraChargers: sumFor(e.id)
+                });
+            });
+            return zones;
+        }
+
+        function stationChargerTotal(region, city, station) {
+            return zonesForStation(region, city, station).reduce((sum, z) => sum + (Number(z.chargers) || 0) + (Number(z.extraChargers) || 0), 0);
+        }
+
+        function newExtraId() {
+            return 'add-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        }
+
+        function setZoneAddStatus(text) {
+            const el = document.getElementById('zoneAddStatus');
+            if (el) el.textContent = text || '';
+        }
+
+        function closeAddForms() {
+            const zoneForm = document.getElementById('addZoneForm');
+            const chargerForm = document.getElementById('addChargersForm');
+            if (zoneForm) zoneForm.classList.add('hidden');
+            if (chargerForm) chargerForm.classList.add('hidden');
         }
 
         function saveState() {
@@ -2504,7 +2687,9 @@
                     mccb: h.mccb,
                     meterNo: h.meterNo,
                     chargerNo: h.chargerNo,
-                    upload: h.upload
+                    upload: h.upload,
+                    added: !!h.added,
+                    expansion: !!h.expansion
                 })),
                 todayInspected: state.todayInspected,
                 weekInspected: state.weekInspected,
@@ -2580,7 +2765,7 @@
                 if (!map.has(key)) map.set(key, row);
             });
             (state.allHistory || []).forEach((h) => {
-                const zone = `거점${h.zoneIndex}: ${h.zoneName}`;
+                const zone = zoneLabel(h);
                 const key = `${h.station}|${zone}`;
                 if (!map.has(key)) {
                     map.set(key, {
@@ -2655,9 +2840,9 @@
                 Object.keys(STATION_DATA[region] || {}).forEach((city) => {
                     Object.keys(STATION_DATA[region][city] || {}).forEach((station) => {
                         stations += 1;
-                        (STATION_DATA[region][city][station].zones || []).forEach((z) => {
+                        zonesForStation(region, city, station).forEach((z) => {
                             zones += 1;
-                            chargers += Number(z.chargers) || 0;
+                            chargers += (Number(z.chargers) || 0) + (Number(z.extraChargers) || 0);
                         });
                     });
                 });
@@ -2676,7 +2861,7 @@
                 const region = row.region || findStationRegion(row.city, row.station);
                 if (!region || !done[region]) return;
                 done[region].chargers += chargersForRow(row);
-                done[region].zones += 1;
+                if (String(row.zone || '').indexOf('증설:') !== 0) done[region].zones += 1;
             });
             return Object.keys(targets).sort((a, b) => a.localeCompare(b, 'ko')).map((region) => {
                 const t = targets[region];
@@ -3383,8 +3568,7 @@
                 ? stations.filter(s => s.toLowerCase().includes(filter.toLowerCase()))
                 : stations;
             filtered.forEach(station => {
-                const data = STATION_DATA[state.region][state.city][station];
-                const chargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
+                const chargers = stationChargerTotal(state.region, state.city, station);
                 stationSelect.innerHTML += `<option value="${station}">${station} (${chargers}대)</option>`;
             });
         }
@@ -3396,45 +3580,210 @@
         document.getElementById('stationSelect').addEventListener('change', (e) => {
             state.station = e.target.value;
             state.selectedZone = null;
+            closeAddForms();
+            setZoneAddStatus('');
             if (state.station && STATION_DATA[state.region][state.city][state.station]) {
-                const data = STATION_DATA[state.region][state.city][state.station];
-                document.getElementById('stationName').textContent = state.station;
-                document.getElementById('stationAddress').textContent = data.address;
-                const totalChargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
-                document.getElementById('stationSummary').textContent =
-                    `거점 ${data.zones.length}개, 총 ${totalChargers}대`;
-                renderZones(data.zones);
-                document.getElementById('stationInfo').classList.remove('hidden');
+                refreshOpenStation(false);
             } else {
                 document.getElementById('stationInfo').classList.add('hidden');
             }
             document.getElementById('startBtn').disabled = true;
+            const addChargersBtn = document.getElementById('addChargersBtn');
+            if (addChargersBtn) addChargersBtn.disabled = true;
         });
+
+        function refreshOpenStation(keepSelection) {
+            const data = STATION_DATA[state.region] && STATION_DATA[state.region][state.city]
+                && STATION_DATA[state.region][state.city][state.station];
+            if (!data) return;
+            const zones = zonesForStation(state.region, state.city, state.station);
+            const total = zones.reduce((sum, z) => sum + (Number(z.chargers) || 0) + (Number(z.extraChargers) || 0), 0);
+            document.getElementById('stationName').textContent = state.station;
+            document.getElementById('stationAddress').textContent = data.address || '';
+            document.getElementById('stationSummary').textContent = `거점 ${zones.length}개, 총 ${total}대`;
+            renderZones(zones);
+            document.getElementById('stationInfo').classList.remove('hidden');
+            if (!keepSelection) return;
+            const selectedId = state.selectedZone && state.selectedZone.id;
+            const idx = zones.findIndex((z) => String(z.id) === String(selectedId));
+            if (idx >= 0) selectZone(zones[idx], idx);
+        }
+
+        function bindZoneAddControls() {
+            const addZoneBtn = document.getElementById('addZoneBtn');
+            const addChargersBtn = document.getElementById('addChargersBtn');
+            if (!addZoneBtn || addZoneBtn.dataset.bound) return;
+            addZoneBtn.dataset.bound = '1';
+            addZoneBtn.addEventListener('click', () => {
+                document.getElementById('addChargersForm').classList.add('hidden');
+                const form = document.getElementById('addZoneForm');
+                form.classList.remove('hidden');
+                const maker = document.getElementById('addZoneMaker');
+                if (maker && !maker.value) {
+                    const first = officialZones(state.region, state.city, state.station)[0];
+                    if (first && first.maker) maker.value = first.maker;
+                }
+                document.getElementById('addZoneName').focus();
+            });
+            document.getElementById('addZoneCancel').addEventListener('click', () => {
+                document.getElementById('addZoneForm').classList.add('hidden');
+            });
+            document.getElementById('addZoneSave').addEventListener('click', () => saveAddedZone());
+            addChargersBtn.addEventListener('click', () => {
+                if (!state.selectedZone) {
+                    alert('충전기를 추가할 거점을 먼저 고르세요.');
+                    return;
+                }
+                document.getElementById('addZoneForm').classList.add('hidden');
+                document.getElementById('addChargersForm').classList.remove('hidden');
+                document.getElementById('addChargerCount').focus();
+            });
+            document.getElementById('addChargerCancel').addEventListener('click', () => {
+                document.getElementById('addChargersForm').classList.add('hidden');
+            });
+            document.getElementById('addChargerSave').addEventListener('click', () => saveAddedChargers());
+        }
+
+        function positiveCount(value) {
+            const n = Number(value);
+            if (!Number.isInteger(n) || n < 1) return 0;
+            return n;
+        }
+
+        function saveAddedZone() {
+            const name = String((document.getElementById('addZoneName').value || '')).trim();
+            const chargers = positiveCount(document.getElementById('addZoneChargers').value);
+            const makerInput = String((document.getElementById('addZoneMaker').value || '')).trim();
+            const note = String((document.getElementById('addZoneNote').value || '')).trim();
+            if (!state.station) {
+                alert('충전소를 먼저 고르세요.');
+                return;
+            }
+            if (!name) {
+                alert('거점 이름을 입력하세요.');
+                return;
+            }
+            if (!chargers) {
+                alert('충전기 대수는 1 이상의 정수로 입력하세요.');
+                return;
+            }
+            const zones = zonesForStation(state.region, state.city, state.station);
+            if (zones.some((z) => String(z.name).trim() === name)) {
+                alert('이 충전소에 같은 이름 거점이 있습니다. 다른 이름으로 구분하세요.');
+                return;
+            }
+            const first = officialZones(state.region, state.city, state.station)[0];
+            const item = {
+                id: newExtraId(),
+                kind: 'zone',
+                region: state.region,
+                city: state.city,
+                station: state.station,
+                name,
+                chargers,
+                maker: makerInput || (first && first.maker) || '',
+                serials: [],
+                note,
+                addedBy: currentInspectorName(),
+                addedAt: new Date().toISOString().slice(0, 10),
+                synced: false
+            };
+            state.extraZones.push(item);
+            saveExtraZones();
+            document.getElementById('addZoneName').value = '';
+            document.getElementById('addZoneChargers').value = '';
+            document.getElementById('addZoneNote').value = '';
+            document.getElementById('addZoneForm').classList.add('hidden');
+            setZoneAddStatus('이 폰에 거점을 넣었습니다.');
+            refreshOpenStation(false);
+            const merged = zonesForStation(state.region, state.city, state.station);
+            const idx = merged.findIndex((z) => z.id === item.id);
+            if (idx >= 0) selectZone(merged[idx], idx);
+            renderStationList(document.getElementById('stationSearch').value || '');
+            document.getElementById('stationSelect').value = state.station;
+            pushOneExtra(item);
+            renderRoutePlan().catch(() => {});
+        }
+
+        function saveAddedChargers() {
+            const zone = state.selectedZone;
+            const chargers = positiveCount(document.getElementById('addChargerCount').value);
+            const note = String((document.getElementById('addChargerNote').value || '')).trim();
+            if (!zone) {
+                alert('거점을 먼저 고르세요.');
+                return;
+            }
+            if (!chargers) {
+                alert('추가 대수는 1 이상의 정수로 입력하세요.');
+                return;
+            }
+            const done = zoneDoneInfo(state.station, state.city, zone, state.selectedZoneIdx);
+            const item = {
+                id: newExtraId(),
+                kind: 'chargers',
+                region: state.region,
+                city: state.city,
+                station: state.station,
+                name: zone.name,
+                chargers,
+                maker: zone.maker || '',
+                zoneId: zone.id,
+                needsSeparate: !!done.done,
+                note,
+                addedBy: currentInspectorName(),
+                addedAt: new Date().toISOString().slice(0, 10),
+                synced: false
+            };
+            state.extraZones.push(item);
+            saveExtraZones();
+            document.getElementById('addChargerCount').value = '';
+            document.getElementById('addChargerNote').value = '';
+            document.getElementById('addChargersForm').classList.add('hidden');
+            setZoneAddStatus(done.done
+                ? '이미 끝난 거점입니다. 늘어난 대수만 증설분 점검으로 찍으세요.'
+                : '이번 점검 대수에 증설분을 포함했습니다. 기존 거점 번호는 그대로입니다.');
+            const keepId = zone.id;
+            refreshOpenStation(false);
+            const merged = zonesForStation(state.region, state.city, state.station);
+            const idx = merged.findIndex((z) => String(z.id) === String(keepId));
+            if (idx >= 0) selectZone(merged[idx], idx);
+            renderStationList(document.getElementById('stationSearch').value || '');
+            document.getElementById('stationSelect').value = state.station;
+            pushOneExtra(item);
+            renderRoutePlan().catch(() => {});
+        }
 
         function renderZones(zones) {
             const grid = document.getElementById('zoneGrid');
             grid.innerHTML = '';
             zones.forEach((zone, idx) => {
                 const info = zoneDoneInfo(state.station, state.city, zone, idx);
+                const pending = needsExpansionInspect(state.station, state.city, zone);
                 const busy = zoneLockInfo(state.station, state.city, zone, idx);
                 const card = document.createElement('div');
-                card.className = `zone-card ${info.done ? 'completed' : ''} ${busy && !busy.mine && !info.done ? 'busy' : ''}`;
+                card.className = `zone-card ${zone.added ? 'added' : ''} ${info.done && !pending ? 'completed' : ''} ${busy && !busy.mine && !info.done ? 'busy' : ''}`;
                 const who = [info.who, info.date].filter(Boolean).join(' · ');
+                const extra = Number(zone.extraChargers) || 0;
+                const countText = extra ? `${zone.chargers}대 + 증설 ${extra}대` : `${zone.chargers}대`;
                 let badge = '';
-                if (info.done) badge = '<div class="badge">이미 완료</div>';
-                else if (busy && !busy.mine) badge = `<div class="badge busy">점검 중 · ${busy.inspector || ''}</div>`;
-                else if (busy && busy.mine) badge = '<div class="badge busy">내가 점검 중</div>';
+                if (zone.added && !(info.done && !pending)) badge = '<div class="badge add">추가</div>';
+                if (info.done && !pending) badge += '<div class="badge">이미 완료</div>';
+                else if (pending) badge += '<div class="badge add">증설 남음</div>';
+                else if (busy && !busy.mine) badge += `<div class="badge busy">점검 중 · ${htmlEscape(busy.inspector || '')}</div>`;
+                else if (busy && busy.mine) badge += '<div class="badge busy">내가 점검 중</div>';
                 card.innerHTML = `
                     ${badge}
-                    <div class="zone-title">거점${idx + 1}</div>
-                    <div class="zone-info">${zone.name}</div>
-                    <div class="zone-info">${zone.chargers}대 · ${zone.maker || '제조사 미상'}</div>
-                    ${info.done ? `<div class="zone-done-who">${who || '다른 사람이 이미 찍었습니다'}</div>` : ''}
-                    ${!info.done && busy && !busy.mine ? `<div class="zone-done-who">${busy.inspector}님이 찍고 있습니다</div>` : ''}
+                    <div class="zone-title">${zone.added ? '추가 거점' : ('거점' + (idx + 1))}</div>
+                    <div class="zone-info">${htmlEscape(zone.name)}</div>
+                    <div class="zone-info">${countText} · ${htmlEscape(zone.maker || '제조사 미상')}</div>
+                    ${info.done && !pending ? `<div class="zone-done-who">${htmlEscape(who || '다른 사람이 이미 찍었습니다')}</div>` : ''}
+                    ${pending ? '<div class="zone-done-who">늘어난 충전기만 남았습니다</div>' : ''}
+                    ${!info.done && busy && !busy.mine ? `<div class="zone-done-who">${htmlEscape(busy.inspector || '')}님이 찍고 있습니다</div>` : ''}
                 `;
                 card.onclick = () => selectZone(zone, idx);
                 grid.appendChild(card);
             });
+            bindZoneAddControls();
         }
 
         function selectZone(zone, idx) {
@@ -3454,11 +3803,18 @@
                 serialList.classList.add('hidden');
             }
             const info = zoneDoneInfo(state.station, state.city, zone, idx);
+            const pending = needsExpansionInspect(state.station, state.city, zone);
             const busy = zoneLockInfo(state.station, state.city, zone, idx);
             const startBtn = document.getElementById('startBtn');
             const warn = document.getElementById('zoneDoneWarn');
+            const addChargersBtn = document.getElementById('addChargersBtn');
+            if (addChargersBtn) addChargersBtn.disabled = false;
             startBtn.disabled = false;
-            if (info.done) {
+            if (info.done && pending) {
+                warn.classList.remove('hidden');
+                warn.innerHTML = '이 거점 점검은 이미 끝났습니다.<br>늘어난 충전기만 증설분으로 찍으세요.<br>끝난 점검을 고치려면 아래 내역에서 수정하세요.';
+                startBtn.textContent = '증설분 점검';
+            } else if (info.done) {
                 const who = [info.who, info.date].filter(Boolean).join(' · ');
                 warn.classList.remove('hidden');
                 warn.innerHTML = `이미 완료된 거점입니다${who ? `<br>${who}` : ''}<br>다른 사람이 찍은 것과 섞이지 않게, 수정만 하세요.`;
@@ -3498,7 +3854,7 @@
         }
 
         function currentZoneKey() {
-            return [state.station, state.selectedZone && state.selectedZone.id, state.selectedZoneIdx].join('|');
+            return [state.station, state.selectedZone && state.selectedZone.id, state.selectedZoneIdx, state.expansionInspect ? 'exp' : ''].join('|');
         }
 
         document.getElementById('startBtn').addEventListener('click', async () => {
@@ -3516,6 +3872,21 @@
                 return;
             }
             const info = zoneDoneInfo(state.station, state.city, zone, state.selectedZoneIdx);
+            if (info.done && needsExpansionInspect(state.station, state.city, zone)) {
+                state.editing = false;
+                state.originalDate = '';
+                state.expansionInspect = true;
+                state.photoData = {};
+                photoTypes.forEach((p) => { state.photoData[p.id] = []; });
+                document.getElementById('memoInput').value = '';
+                clearMeterFields();
+                inspectZoneKey = currentZoneKey();
+                document.getElementById('uploadStatus').textContent = '';
+                showInspectScreen();
+                persistWorking();
+                return;
+            }
+            state.expansionInspect = false;
             if (info.done) {
                 const who = [info.who, info.date].filter(Boolean).join(' · ');
                 if (!confirm(`이미 완료된 거점입니다${who ? ` (${who})` : ''}.\n수정으로 들어가면 같은 줄을 덮어씁니다.`)) return;
@@ -3568,18 +3939,25 @@
             persistWorking();
         });
 
+        function inspectChargerCount(zone) {
+            if (!zone) return 0;
+            const buckets = extraBuckets(state.region, state.city, state.station, zone.id);
+            if (state.expansionInspect) return buckets.separate;
+            return (Number(zone.chargers) || 0) + buckets.withBase;
+        }
+
         function chargerNoDefault() {
-            const zones = STATION_DATA[state.region]
-                && STATION_DATA[state.region][state.city]
-                && STATION_DATA[state.region][state.city][state.station]
-                && STATION_DATA[state.region][state.city][state.station].zones;
+            const zones = zonesForStation(state.region, state.city, state.station);
             const zone = state.selectedZone;
-            if (!zones || !zone) return '';
+            if (!zones.length || !zone) return '';
+            const buckets = extraBuckets(state.region, state.city, state.station, zone.id);
+            if (state.expansionInspect) return buckets.separate ? ('증설 ' + buckets.separate + '대') : '';
             let start = 1;
             for (let i = 0; i < (state.selectedZoneIdx || 0); i++) start += Number(zones[i].chargers) || 0;
             const count = Number(zone.chargers) || 1;
             const end = start + count - 1;
-            return start === end ? String(start) : (start + '~' + end);
+            const main = start === end ? String(start) : (start + '~' + end);
+            return buckets.withBase ? (main + ' +증설 ' + buckets.withBase + '대') : main;
         }
 
         function showInspectScreen() {
@@ -3587,9 +3965,12 @@
             document.getElementById('inspectScreen').classList.remove('hidden');
             document.getElementById('completedSection').classList.add('hidden');
             const zone = state.selectedZone;
+            const placeLabel = state.expansionInspect
+                ? ('증설 · ' + (zone.name || ''))
+                : (zone.added ? ('추가 · ' + (zone.name || '')) : ('거점' + (state.selectedZoneIdx + 1)));
             document.getElementById('inspectTitle').textContent =
-                `${state.editing ? '수정 · ' : ''}${state.station} - 거점${state.selectedZoneIdx + 1}`;
-            document.getElementById('chargerCount').textContent = zone.chargers;
+                `${state.editing ? '수정 · ' : ''}${state.station} - ${placeLabel}`;
+            document.getElementById('chargerCount').textContent = inspectChargerCount(zone);
             document.getElementById('makerInfo').textContent = zone.maker || '미상';
             document.getElementById('editBanner').classList.toggle('hidden', !state.editing);
             document.getElementById('completeZoneBtn').textContent = state.editing ? '수정 저장' : '이 거점 점검 완료';
@@ -3631,8 +4012,7 @@
             stationSel.innerHTML = '';
             if (record.region && record.city && STATION_DATA[record.region][record.city]) {
                 Object.keys(STATION_DATA[record.region][record.city]).sort().forEach((station) => {
-                    const data = STATION_DATA[record.region][record.city][station];
-                    const chargers = data.zones.reduce((sum, z) => sum + z.chargers, 0);
+                    const chargers = stationChargerTotal(record.region, record.city, station);
                     stationSel.innerHTML += `<option value="${station}">${station} (${chargers}대)</option>`;
                 });
             }
@@ -3650,17 +4030,26 @@
                 return;
             }
             state.editing = true;
+            state.expansionInspect = !!(record.expansion || String(record.zoneId || '').indexOf('expand-') === 0);
             state.region = record.region;
             state.city = record.city;
             state.station = record.station;
             restoreLocationSelects(record);
-            let idx = stationData.zones.findIndex((z) => z.id === record.zoneId);
-            if (idx < 0 && record.zoneIndex) idx = record.zoneIndex - 1;
-            if (idx < 0) idx = 0;
-            state.selectedZone = stationData.zones[idx];
+            const zones = zonesForStation(record.region, record.city, record.station);
+            const lookId = state.expansionInspect ? String(record.zoneId || '').replace(/^expand-/, '') : record.zoneId;
+            let idx = zones.findIndex((z) => String(z.id) === String(lookId));
+            if (idx < 0 && record.zoneName) idx = zones.findIndex((z) => z.name === record.zoneName);
+            if (idx < 0 && !record.added && !state.expansionInspect && record.zoneIndex) idx = record.zoneIndex - 1;
+            if (idx < 0 || !zones[idx]) {
+                state.editing = false;
+                state.expansionInspect = false;
+                alert('이 거점을 목록에서 찾지 못했습니다.');
+                return;
+            }
+            state.selectedZone = zones[idx];
             state.selectedZoneIdx = idx;
             document.getElementById('stationInfo').classList.remove('hidden');
-            renderZones(stationData.zones);
+            renderZones(zones);
             selectZone(state.selectedZone, idx);
             state.photoData = {};
             photoTypes.forEach((p) => { state.photoData[p.id] = []; });
@@ -3673,7 +4062,7 @@
                 state.editing = false;
                 alert(`${lock.lockedBy || '다른 사람'}님이 이 거점을 수정 중입니다.\n끝나면 들어가세요.`);
                 try { await fetchTeamProgress(true); } catch (err) {}
-                renderZones(stationData.zones);
+                renderZones(zonesForStation(state.region, state.city, state.station));
                 selectZone(state.selectedZone, idx);
                 return;
             }
@@ -3684,12 +4073,11 @@
         }
 
         async function loadDriveRecord() {
-            const zone = zoneLabel({ zoneIndex: state.selectedZoneIdx + 1, zoneName: state.selectedZone.name });
-            const folder = zoneFolderName(state.selectedZoneIdx, state.selectedZone.name);
+            const loc = currentLocationFields();
             const q = 'action=record'
                 + '&station=' + encodeURIComponent(state.station)
-                + '&zone=' + encodeURIComponent(zone)
-                + '&zoneFolder=' + encodeURIComponent(folder)
+                + '&zone=' + encodeURIComponent(loc.zone || '')
+                + '&zoneFolder=' + encodeURIComponent(loc.zoneFolder || '')
                 + '&region=' + encodeURIComponent(state.region)
                 + '&city=' + encodeURIComponent(state.city);
             const res = await googleJsonp(q, 15000);
@@ -3776,12 +4164,18 @@
         function currentLocationFields() {
             const zone = state.selectedZone;
             const idx = state.selectedZoneIdx || 0;
+            const record = {
+                zoneName: zone ? zone.name : '',
+                zoneIndex: idx + 1,
+                added: !!(zone && zone.added) && !state.expansionInspect,
+                expansion: !!state.expansionInspect
+            };
             return {
                 region: state.region,
                 city: state.city,
                 station: state.station,
-                zone: `거점${idx + 1}: ${zone ? zone.name : ''}`,
-                zoneFolder: zoneFolderName(idx, zone && zone.name)
+                zone: zoneLabel(record),
+                zoneFolder: folderForLabel(record)
             };
         }
 
@@ -3933,6 +4327,12 @@
             set('meterInsul', m.insul);
             set('logMccb', m.mccb);
             set('logMeterNo', m.meterNo);
+            ['logMccb', 'logMeterNo'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (String(el.value || '').trim()) el.dataset.touched = '1';
+                else delete el.dataset.touched;
+            });
             set('logChargerNo', m.chargerNo);
             updateMeterHint();
         }
@@ -4029,7 +4429,8 @@
         function buildEmergencyFolder() {
             const p = emergencyPlace();
             const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '_').trim();
-            return safe(p.date) + '/' + safe(p.city) + '/' + safe(p.station) + '/' + safe('거점' + p.zoneIdx + '_' + p.zone);
+            const folder = (currentLocationFields().zoneFolder) || ('거점' + p.zoneIdx + '_' + p.zone);
+            return safe(p.date) + '/' + safe(p.city) + '/' + safe(p.station) + '/' + safe(folder);
         }
 
         function buildEmergencyChecklist() {
@@ -4609,11 +5010,52 @@
         }
 
         function clearPhotoFilledMeter() {
+            const el = document.getElementById('logMeterNo');
+            if (el && el.dataset.touched === '1') return;
             clearFieldValue('logMeterNo');
         }
 
         function clearPhotoFilledMccb() {
+            const el = document.getElementById('logMccb');
+            if (el && el.dataset.touched === '1') return;
             clearFieldValue('logMccb');
+        }
+
+        function closeReadId(photoId) {
+            return photoId === 'mccbClose' ? 'logMccb' : 'logMeterNo';
+        }
+
+        function markCloseFieldTouched(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (String(el.value || '').trim()) el.dataset.touched = '1';
+            else delete el.dataset.touched;
+            delete el.dataset.fromPhoto;
+            delete el.dataset.auto;
+        }
+
+        function closeFieldLocked(id) {
+            const el = document.getElementById(id);
+            if (!el) return false;
+            if (el.dataset.touched === '1') return true;
+            return !!(String(el.value || '').trim() && el.dataset.fromPhoto !== '1');
+        }
+
+        function usableCloseShots(photoId) {
+            return photosOf(photoId).filter((item) => item.data && !item.blurry);
+        }
+
+        function applyCloseRead(id, value) {
+            if (closeFieldLocked(id)) return 'kept';
+            const el = document.getElementById(id);
+            const current = el && el.dataset.fromPhoto === '1' ? String(el.value || '').trim() : '';
+            if (!value) return current ? 'kept' : 'empty';
+            if (!current || current === value) {
+                setReadValue(id, value, true);
+                return 'set';
+            }
+            clearFieldValue(id);
+            return 'conflict';
         }
 
         function setReadValue(id, value, force) {
@@ -4635,108 +5077,92 @@
         }
 
         async function refreshClosePhotoFields(photoId) {
-            if (photoId === 'mccbClose') {
-                const shots = photosOf('mccbClose').filter((item) => item.data);
-                clearPhotoFilledMccb();
-                updateMeterHint();
-                persistWorking();
-                if (!shots.length) return;
-                const mccb = await ocrCloseValue(shots[shots.length - 1].data, 'mccb');
-                if (!photosOf('mccbClose').some((item) => item.data)) return;
-                if (mccb) setReadValue('logMccb', mccb, true);
-                else clearPhotoFilledMccb();
+            const id = closeReadId(photoId);
+            if (closeFieldLocked(id)) {
                 updateMeterHint();
                 persistWorking();
                 return;
             }
-            if (photoId === 'meterClose') {
-                const shots = photosOf('meterClose').filter((item) => item.data);
-                clearPhotoFilledMeter();
+            const shots = usableCloseShots(photoId);
+            if (!shots.length) {
+                clearFieldValue(id);
                 updateMeterHint();
                 persistWorking();
-                if (!shots.length) return;
-                const meter = await ocrCloseValue(shots[shots.length - 1].data, 'meter');
-                if (!photosOf('meterClose').some((item) => item.data)) return;
-                if (meter) setReadValue('logMeterNo', meter, true);
-                else clearPhotoFilledMeter();
-                updateMeterHint();
-                persistWorking();
+                return;
             }
+            try {
+                const value = await ocrCloseValue(shots[shots.length - 1].data, photoId === 'mccbClose' ? 'mccb' : 'meter');
+                if (closeFieldLocked(id) || !usableCloseShots(photoId).length) return;
+                if (value) setReadValue(id, value, true);
+                else clearFieldValue(id);
+            } catch (err) {}
+            updateMeterHint();
+            persistWorking();
         }
 
         async function readMccbAndMeter() {
             const sub = document.getElementById('reviewSub');
-            if (sub) sub.textContent = 'MCCB용량·계량기번호 확대 사진부터 읽는 중...';
-            const mccbShots = photosOf('mccbClose').filter((item) => item.data).slice(-1)
-                .concat(photosOf('panel').filter((item) => item.data).slice(-1));
-            // 제조번호는 7번 확대 사진만 사용. 다른 사진 번호가 섞이지 않게 함.
-            const meterShots = photosOf('meterClose').filter((item) => item.data).slice(-1);
-            if (!mccbShots.length && !meterShots.length) {
-                if (sub) sub.textContent = 'MCCB용량·계량기 제조번호는 숫자만 크게 확대해 찍으면 칸에 들어갑니다. 없으면 직접 적으세요.';
-                return;
-            }
+            if (sub) sub.textContent = '6번 MCCB·7번 제조번호 사진만 읽는 중...';
+            const jobs = [
+                ['mccbClose', 'logMccb', 'mccb', 'MCCB'],
+                ['meterClose', 'logMeterNo', 'meter', '제조번호']
+            ];
             try {
-                let mccb = '';
-                let meter = '';
-                for (let i = 0; i < mccbShots.length && !mccb; i++) {
-                    mccb = await ocrCloseValue(mccbShots[i].data, 'mccb');
-                    if (!mccb) mccb = pickClearMccb(await ocrCanvas(await cropRegion(mccbShots[i].data, 0.08, 0.40, 0.40, 0.30, 3), 7), true);
-                }
-                for (let i = 0; i < meterShots.length && !meter; i++) {
-                    meter = await ocrCloseValue(meterShots[i].data, 'meter');
-                }
                 const notes = [];
-                if (mccbShots.length && photosOf('mccbClose').some((item) => item.data)) {
-                    if (mccb) {
-                        if (setReadValue('logMccb', mccb, true)) notes.push('MCCB ' + mccb);
-                    } else clearPhotoFilledMccb();
-                } else if (mccb && setReadValue('logMccb', mccb)) notes.push('MCCB ' + mccb);
-                if (meterShots.length) {
-                    if (meter) {
-                        if (setReadValue('logMeterNo', meter, true)) notes.push('제조번호 ' + meter);
-                    } else clearPhotoFilledMeter();
+                let blurryOnly = false;
+                for (let i = 0; i < jobs.length; i++) {
+                    const photoId = jobs[i][0];
+                    const fieldId = jobs[i][1];
+                    const kind = jobs[i][2];
+                    const label = jobs[i][3];
+                    const field = document.getElementById(fieldId);
+                    const existing = field ? String(field.value || '').trim() : '';
+                    const all = photosOf(photoId).filter((item) => item.data);
+                    const shots = all.filter((item) => !item.blurry);
+                    if (all.length && !shots.length) blurryOnly = true;
+                    if (closeFieldLocked(fieldId) || (existing && field.dataset.fromPhoto === '1')) {
+                        if (existing) notes.push(label + ' ' + existing);
+                        continue;
+                    }
+                    if (!shots.length) continue;
+                    const value = await ocrCloseValue(shots[shots.length - 1].data, kind);
+                    if (closeFieldLocked(fieldId)) continue;
+                    if (value && setReadValue(fieldId, value, true)) notes.push(label + ' ' + value);
                 }
+                updateMeterHint();
                 persistWorking();
                 if (!sub) return;
-                sub.textContent = notes.length
-                    ? '사진에서 넣음: ' + notes.join(', ') + '. 사진과 다르면 그 칸만 고치세요.'
-                    : '용량·제조번호가 확실하지 않으면 빈칸입니다. 6·7번으로 숫자만 크게 다시 찍거나 직접 적으세요.';
+                if (notes.length) sub.textContent = '6·7번 사진에서 넣음: ' + notes.join(', ') + '. 다르면 그 칸만 고치세요.';
+                else if (blurryOnly) sub.textContent = '흐린 사진은 읽지 않았습니다. 숫자만 크게 다시 찍거나 직접 적으세요.';
+                else sub.textContent = '6·7번 사진에서만 읽습니다. 확실하지 않으면 빈칸이니 직접 적으세요.';
             } catch (err) {
-                if (sub) sub.textContent = '판독에 실패했습니다. MCCB와 계량기 제조번호만 직접 적으세요.';
+                if (sub) sub.textContent = '판독에 실패했습니다. 이전 값은 유지합니다. MCCB와 계량기 제조번호만 직접 적으세요.';
             }
         }
 
-        async function readCloseShotNow(photoId, dataUrl) {
+        async function readCloseShotNow(photoId, dataUrl, blurry) {
+            const id = closeReadId(photoId);
+            const label = photoId === 'mccbClose' ? 'MCCB' : '제조번호';
             try {
-                if (photoId === 'mccbClose') {
-                    clearPhotoFilledMccb();
-                    showCameraWarn('MCCB 용량 읽는 중…');
-                    const mccb = await ocrCloseValue(dataUrl, 'mccb');
-                    if (mccb && setReadValue('logMccb', mccb, true)) {
-                        persistWorking();
-                        updateMeterHint();
-                        showCameraWarn('MCCB ' + mccb + ' 넣었습니다.');
-                    } else {
-                        persistWorking();
-                        updateMeterHint();
-                        showCameraWarn('용량이 한 개로 안 보입니다. 50A·75A만 크게 다시 찍으세요.');
-                    }
-                } else if (photoId === 'meterClose') {
-                    clearPhotoFilledMeter();
-                    showCameraWarn('제조번호 읽는 중… 잠시만요.');
-                    const meter = await ocrCloseValue(dataUrl, 'meter');
-                    if (meter && setReadValue('logMeterNo', meter, true)) {
-                        persistWorking();
-                        updateMeterHint();
-                        showCameraWarn('제조번호 ' + meter + ' 넣었습니다. 사진과 다르면 칸에서 고치세요.');
-                    } else {
-                        persistWorking();
-                        updateMeterHint();
-                        showCameraWarn('제조번호가 확실하지 않아 비웠습니다. 번호만 더 크게 찍거나 직접 적으세요.');
-                    }
+                if (blurry) {
+                    showCameraWarn('흐린 사진은 읽지 않았습니다. 이미 넣은 값은 그대로입니다.');
+                    return;
                 }
+                if (closeFieldLocked(id)) {
+                    showCameraWarn('직접 적은 값은 유지합니다. 사진 값으로 바꾸려면 칸을 비우세요.');
+                    return;
+                }
+                showCameraWarn(label + ' 읽는 중…');
+                const value = await ocrCloseValue(dataUrl, photoId === 'mccbClose' ? 'mccb' : 'meter');
+                const result = applyCloseRead(id, value);
+                persistWorking();
+                updateMeterHint();
+                if (result === 'set') showCameraWarn(label + ' ' + value + ' 넣었습니다. 사진과 다르면 칸에서 고치세요.');
+                else if (result === 'conflict') showCameraWarn('방금 사진의 숫자가 이전과 다릅니다. 칸을 비웠으니 맞는 숫자를 직접 적으세요.');
+                else if (result === 'kept') showCameraWarn('이번 사진에서는 숫자를 확정하지 못했습니다. 이전 값은 그대로입니다.');
+                else showCameraWarn('숫자가 확실하지 않아 비워 두었습니다. 숫자만 크게 다시 찍거나 직접 적으세요.');
             } catch (err) {
-                showCameraWarn('판독 실패. 숫자만 크게 다시 찍거나 직접 적으세요.');
+                showCameraWarn('판독 실패. 이전 값은 유지합니다. 필요하면 직접 적으세요.');
             }
         }
 
@@ -4777,15 +5203,6 @@
                     ['insulation', (pass) => {
                         const found = agreedValue(pickSmallReading(pass.contrast, 2000), pickSmallReading(pass.binary, 2000), 1);
                         remember('meterInsul', '절연', found, setMeterAuto('meterInsul', found));
-                    }],
-                    ['panel', (pass) => {
-                        const found = agreedMccb(pass.contrast, pass.binary);
-                        remember('logMccb', 'MCCB', found, setMeterAuto('logMccb', found));
-                    }],
-                    ['charger', (pass) => {
-                        // 충전기 사진에서는 제조번호를 넣지 않음. 명판 확대(7번)만 사용.
-                        const mccb = agreedMccb(pass.contrast, pass.binary);
-                        remember('logMccb', 'MCCB', mccb, setMeterAuto('logMccb', mccb));
                     }]
                 ];
                 let skippedBlur = false;
@@ -4840,7 +5257,8 @@
                 go.classList.add('hidden');
             } else {
                 const zone = state.selectedZone || {};
-                const count = zone.chargers || 0;
+                const count = inspectChargerCount(zone);
+                const place = currentLocationFields();
                 const numbers = (document.getElementById('logChargerNo') || {}).value || chargerNoDefault();
                 const fieldInput = (id, label, ph) => {
                     const src = document.getElementById(id);
@@ -4864,8 +5282,8 @@
                 const chargerEl = document.getElementById('logChargerNo');
                 if (chargerEl && !chargerEl.value) chargerEl.value = numbers;
                 const blocks = [
-                    { id: 'mccbClose', guide: '거점 ' + (state.selectedZoneIdx + 1) + ' · 충전기 ' + count + '대. 용량은 거의 50A·75A입니다. 그 글자만 화면 절반 이상 크게 찍으세요.', fields: [['logMccb', '이 거점 MCCB용량', '50A 또는 75A']], also: 'panel' },
-                    { id: 'meterClose', guide: '계량기 전체보다 명판의 「제조번호」만 화면 절반 이상 크게 찍으세요. 화질개선·과도한 확대보다 또렷한 원본이 더 잘 읽힙니다. 다르면 이 칸만 고치세요.', fields: [['logMeterNo', '이 거점 제조번호', '명판 제조번호'], ['meterGround', '접지저항', '없으면 비워 두세요']], also: 'charger' }
+                    { id: 'mccbClose', guide: place.zone + ' · 충전기 ' + count + '대. 6번 사진만 읽습니다. 배전반 사진은 용량에 넣지 않습니다.', fields: [['logMccb', '이 거점 MCCB용량', '50A 또는 75A']] },
+                    { id: 'meterClose', guide: '7번 사진의 제조번호만 읽습니다. 충전기·전체 사진은 이 칸에 넣지 않습니다. 다르면 이 칸만 고치세요.', fields: [['logMeterNo', '이 거점 제조번호', '명판 제조번호'], ['meterGround', '접지저항', '없으면 비워 두세요']] }
                 ];
                 title.textContent = '이 거점 MCCB · 계량기 제조번호';
                 sub.textContent = '국소명·거점·충전기 수·번호·장소는 자동입니다. MCCB·제조번호는 숫자만 확대해 찍으세요.';
@@ -4873,11 +5291,11 @@
                     <h4>자동으로 시트에 들어갑니다</h4>
                     <div class="review-guide">국소명 · 거점 · 충전기 수 · 충전기 번호 · 장소. 사진에서 읽지 않습니다.</div>
                     <div style="font-size:14px;line-height:1.7;">
-                        국소명 ${state.station || ''}<br>
-                        거점 ${state.selectedZoneIdx + 1}<br>
+                        국소명 ${htmlEscape(state.station || '')}<br>
+                        거점 ${htmlEscape(place.zone || '')}<br>
                         충전기수 ${count}대<br>
-                        충전기번호 ${numbers}<br>
-                        비고 ${zone.name || ''}
+                        충전기번호 ${htmlEscape(numbers)}<br>
+                        비고 ${htmlEscape(zone.name || '')}
                     </div>
                 </div>`;
                 body.innerHTML = autoCard + blocks.map((block) => {
@@ -4886,7 +5304,7 @@
                     const alsoThumbs = block.also && photosOf(block.also).length ? '<div class="review-thumbs" style="margin-top:6px;">' + thumbsOf(block.also) + '</div>' : '';
                     return `<div class="review-block">
                         <h4>${type.label} · ${shots.length}장</h4>
-                        <div class="review-guide">${block.guide}</div>
+                        <div class="review-guide">${htmlEscape(block.guide)}</div>
                         <div class="review-thumbs">${thumbsOf(block.id)}</div>
                         ${alsoThumbs}
                         <div class="meter-grid" style="margin-top:8px;">${block.fields.map((f) => fieldInput(f[0], f[1], f[2])).join('')}</div>
@@ -5335,7 +5753,7 @@
                 if (blurry) showCameraWarn('숫자가 흐릴 수 있습니다. 다시 찍어 주세요.');
                 else if (photoId === 'mccbClose' || photoId === 'meterClose') showCameraWarn('폰에 저장 · 숫자 읽는 중…');
                 else showCameraWarn('폰에 저장됨 · 거점 완료 시 드라이브로 올라갑니다.');
-                if (photoId === 'mccbClose' || photoId === 'meterClose') readCloseShotNow(photoId, full);
+                if (photoId === 'mccbClose' || photoId === 'meterClose') readCloseShotNow(photoId, full, blurry);
             }
             if (navigator.vibrate) navigator.vibrate(50);
             persistWorking();
@@ -5776,7 +6194,16 @@
         }
 
         function zoneLabel(record) {
-            return `거점${record.zoneIndex}: ${record.zoneName}`;
+            if (record && record.expansion) return `증설: ${record.zoneName || ''}`;
+            if (record && record.added) return `추가: ${record.zoneName || ''}`;
+            return `거점${record.zoneIndex}: ${record.zoneName || ''}`;
+        }
+
+        function folderForLabel(record) {
+            const name = String((record && record.zoneName) || '').trim();
+            if (record && record.expansion) return name ? `증설_${name}` : '증설';
+            if (record && record.added) return name ? `추가_${name}` : '추가';
+            return zoneFolderName(((Number(record && record.zoneIndex) || 1) - 1), name);
         }
 
         async function maybeComplete() {
@@ -5835,6 +6262,7 @@
             delete e.target.dataset.auto;
             delete e.target.dataset.fromPhoto;
             if (dest) delete dest.dataset.fromPhoto;
+            if (id === 'logMccb' || id === 'logMeterNo') markCloseFieldTouched(id);
             updateMeterHint();
             persistWorking();
         });
@@ -5873,12 +6301,15 @@
             btn.disabled = true;
 
             const photoCount = totalPhotoCount();
+            const inspectedCount = inspectChargerCount(zone);
             const record = {
                 station: state.station,
-                zoneId: zone.id,
+                zoneId: state.expansionInspect ? ('expand-' + zone.id) : zone.id,
                 zoneName: zone.name,
                 zoneIndex: state.selectedZoneIdx + 1,
-                chargers: zone.chargers,
+                chargers: inspectedCount,
+                added: !!(zone.added) && !state.expansionInspect,
+                expansion: !!state.expansionInspect,
                 maker: zone.maker,
                 serials: zone.serials,
                 time: new Date().toLocaleTimeString(),
@@ -5933,11 +6364,14 @@
                     status.textContent = driveCountLine({ total: drive.total, sent: drive.sent, fail: record.driveFail, folder: folder.count });
                 }
 
-                const already = !state.editing && isZoneDone(state.station, state.city, zone, state.selectedZoneIdx);
+                const already = !state.editing && (state.expansionInspect
+                    ? expansionCovered(state.station, state.city, zone)
+                    : isZoneDone(state.station, state.city, zone, state.selectedZoneIdx));
                 if (already) {
                     record.upload = `시트에 이미 있는 거점 (중복 생략) · 드라이브 ${record.driveOk}장`;
                 } else {
                     status.textContent = state.editing ? '구글 시트 같은 줄을 수정 중...' : '구글 시트에 기록 중...';
+                    const loc = currentLocationFields();
                     await postGoogle({
                         action: state.editing ? 'update' : 'complete',
                         date: state.editing ? (state.originalDate || record.date) : record.date,
@@ -5946,7 +6380,9 @@
                         region: record.region,
                         city: record.city,
                         station: record.station,
-                        zone: zoneLabel(record),
+                        zone: loc.zone,
+                        zoneFolder: loc.zoneFolder,
+                        zoneLabel: loc.zone,
                         chargers: record.chargers,
                         maker: record.maker || '',
                         gps: record.gps ? `${record.gps.lat}, ${record.gps.lng}` : '',
@@ -5996,12 +6432,13 @@
             } else {
                 state.completedZones.push(record);
                 state.allHistory.push(record);
-                state.todayInspected += zone.chargers;
-                state.weekInspected += zone.chargers;
-                state.totalInspected += zone.chargers;
+                state.todayInspected += inspectedCount;
+                state.weekInspected += inspectedCount;
+                state.totalInspected += inspectedCount;
             }
             state.editing = false;
             state.originalDate = '';
+            state.expansionInspect = false;
             state.selectedZone = null;
             state.photoData = {};
             saveState();
@@ -6012,7 +6449,9 @@
 
             document.getElementById('inspectScreen').classList.add('hidden');
             document.getElementById('selectScreen').classList.remove('hidden');
-            renderZones(STATION_DATA[state.region][state.city][state.station].zones);
+            refreshOpenStation(false);
+            const addChargersBtn = document.getElementById('addChargersBtn');
+            if (addChargersBtn) addChargersBtn.disabled = true;
             btn.textContent = '이 거점 점검 완료';
             status.textContent = '';
 
@@ -6042,10 +6481,11 @@
         });
         document.getElementById('saveToPhoneBtn').addEventListener('click', savePhotosToPhone);
         document.getElementById('memoInput').addEventListener('input', persistWorking);
-        ['meterV220', 'meterV380', 'meterGround', 'meterInsul'].forEach((id) => {
+        ['meterV220', 'meterV380', 'meterGround', 'meterInsul', 'logMccb', 'logMeterNo'].forEach((id) => {
             const el = document.getElementById(id);
             if (!el) return;
             el.addEventListener('input', () => {
+                if (id === 'logMccb' || id === 'logMeterNo') markCloseFieldTouched(id);
                 updateMeterHint();
                 persistWorking();
             });
@@ -6063,7 +6503,7 @@
                 <div class="completed-item">
                     <span class="check">✓</span>
                     <div>
-                        <div style="font-weight:500;">${item.station} - 거점${item.zoneIndex}</div>
+                        <div style="font-weight:500;">${htmlEscape(item.station)} - ${htmlEscape(zoneLabel(item).replace(/: .*$/, '') || ('거점' + item.zoneIndex))}</div>
                         <div style="font-size:11px;color:#888;">
                             ${item.zoneName} (${item.chargers}대) · ${item.time}
                             <br><b style="color:${item.driveFail ? '#fdba74' : '#86efac'}">${
@@ -6091,7 +6531,7 @@
                     <div class="date">${item.date} ${item.time}</div>
                     <div class="station">${item.station}</div>
                     <div class="detail">
-                        거점${item.zoneIndex}: ${item.zoneName} (${item.chargers}대)
+                        ${htmlEscape(zoneLabel(item))} (${item.chargers}대)
                         ${item.photoCount ? ` · 사진 ${item.photoCount}장` : ''}
                         ${item.upload ? `<br>☁️ ${item.upload}` : ''}
                         ${item.memo ? '<br>📝 ' + item.memo : ''}
@@ -6116,9 +6556,41 @@
         }
 
         function parseSheetZone(label) {
-            const m = String(label || '').match(/^거점\s*(\d+)\s*:\s*(.*)$/);
-            if (m) return { zoneIndex: Number(m[1]), zoneName: m[2].trim() };
-            return { zoneIndex: 0, zoneName: String(label || '').trim() };
+            const raw = String(label || '');
+            const m = raw.match(/^거점\s*(\d+)\s*:\s*(.*)$/);
+            if (m) return { zoneIndex: Number(m[1]), zoneName: m[2].trim(), kind: 'base' };
+            const added = raw.match(/^(추가|증설)\s*:\s*(.*)$/);
+            if (added) return { zoneIndex: added[1] === '증설' ? 9000 : 8000, zoneName: added[2].trim(), kind: added[1] };
+            return { zoneIndex: 0, zoneName: raw.trim(), kind: '' };
+        }
+
+        function rowMatchesZone(rowZone, zone, idx) {
+            const label = String(rowZone || '');
+            if (!zone) return false;
+            if (zone.added) return label === ('추가: ' + zone.name);
+            if (label.indexOf('추가:') === 0 || label.indexOf('증설:') === 0) return false;
+            const parsed = parseSheetZone(label);
+            const official = '거점' + (idx + 1) + ': ' + (zone.name || '');
+            if (label === official) return true;
+            if (parsed.zoneName && parsed.zoneName === zone.name && parsed.kind !== '추가' && parsed.kind !== '증설') return true;
+            if (parsed.zoneIndex && idx >= 0 && parsed.zoneIndex === idx + 1 && parsed.kind !== '추가' && parsed.kind !== '증설') return true;
+            return false;
+        }
+
+        function expansionCovered(station, city, zone) {
+            if (!zone) return false;
+            const label = '증설: ' + (zone.name || '');
+            const id = 'expand-' + zone.id;
+            const localHit = (h) => h.station === station && cityMatches(h.city, city) && (h.zoneId === id || (h.expansion && h.zoneName === zone.name));
+            if ((state.allHistory || []).some(localHit) || (state.completedZones || []).some(localHit)) return true;
+            return (state.teamProgress || []).some((row) => row.station === station && cityMatches(row.city, city) && String(row.zone) === label);
+        }
+
+        function needsExpansionInspect(station, city, zone, region) {
+            if (!zone || !station) return false;
+            const buckets = extraBuckets(region || state.region, city, station, zone.id);
+            if (!buckets.separate) return false;
+            return !expansionCovered(station, city, zone);
         }
 
         function isZoneDone(station, city, zone, idx) {
@@ -6126,13 +6598,10 @@
         }
 
         function zoneLockInfo(station, city, zone, idx) {
-            const label = `거점${idx + 1}: ${zone && zone.name ? zone.name : ''}`;
             const lock = (state.zoneLocks || []).find((row) => {
                 if (row.station !== station) return false;
                 if (city && row.city && !cityMatches(row.city, city)) return false;
-                const parsed = parseSheetZone(row.zone);
-                return row.zone === label || (parsed.zoneName && zone && parsed.zoneName === zone.name) ||
-                    (parsed.zoneIndex && idx >= 0 && parsed.zoneIndex === idx + 1);
+                return rowMatchesZone(row.zone, zone, idx);
             });
             if (!lock) return null;
             const mine = !!(lock.inspector && lock.inspector === currentInspectorName());
@@ -6141,7 +6610,12 @@
 
         function zoneDoneInfo(station, city, zone, idx) {
             const zoneId = zone && zone.id;
-            const hit = (h) => h.station === station && h.zoneId === zoneId && cityMatches(h.city, city);
+            const hit = (h) => {
+                if (h.station !== station || !cityMatches(h.city, city)) return false;
+                if (zone && zone.added) return h.zoneId === zoneId || (h.added && h.zoneName === zone.name);
+                if (h.expansion || String(h.zoneId || '').indexOf('expand-') === 0) return false;
+                return h.zoneId === zoneId;
+            };
             const local = (state.allHistory || []).find(hit) || (state.completedZones || []).find(hit);
             if (local) {
                 return { done: true, who: local.inspector || '', date: local.date || '', source: 'local' };
@@ -6149,9 +6623,7 @@
             const team = (state.teamProgress || []).find((row) => {
                 if (row.station !== station) return false;
                 if (!cityMatches(row.city, city)) return false;
-                const parsed = parseSheetZone(row.zone);
-                return (parsed.zoneName && zone && parsed.zoneName === zone.name) ||
-                    (parsed.zoneIndex && idx >= 0 && parsed.zoneIndex === idx + 1);
+                return rowMatchesZone(row.zone, zone, idx);
             });
             if (team) {
                 return { done: true, who: team.inspector || '', date: team.date || '', source: 'team' };
@@ -6164,14 +6636,15 @@
             if (!stations) return [];
             return Object.keys(stations).map((name) => {
                 const data = stations[name];
-                const zoneRows = data.zones.map((z, idx) => {
+                const zoneRows = zonesForStation(region, city, name).map((z, idx) => {
                     const info = zoneDoneInfo(name, city, z, idx);
+                    const pending = needsExpansionInspect(name, city, z, region);
                     return {
                         id: z.id,
                         name: z.name,
                         idx,
-                        chargers: z.chargers,
-                        done: info.done,
+                        chargers: (Number(z.chargers) || 0) + (Number(z.extraChargers) || 0),
+                        done: info.done && !pending,
                         who: info.who,
                         date: info.date,
                         busy: zoneLockInfo(name, city, z, idx)
@@ -6301,13 +6774,11 @@
             }
             updateStats();
             renderRoutePlan();
+            if (Array.isArray(probe.data.extras)) mergeServerExtras(probe.data.extras);
+            pushLocalExtras();
             if (state.station && STATION_DATA[state.region] && STATION_DATA[state.region][state.city] && STATION_DATA[state.region][state.city][state.station]) {
-                const data = STATION_DATA[state.region][state.city][state.station];
                 const inspectHidden = document.getElementById('inspectScreen').classList.contains('hidden');
-                if (inspectHidden) {
-                    renderZones(data.zones);
-                    if (state.selectedZone) selectZone(state.selectedZone, state.selectedZoneIdx);
-                }
+                if (inspectHidden) refreshOpenStation(true);
             }
             const logBox = document.getElementById('dailyLog');
             if (logBox && logBox.dataset.open === '1') renderDailyLog();
@@ -6989,7 +7460,8 @@
         function jumpToZone(region, city, station, zoneIdx) {
             jumpToStation(region, city, station);
             const data = STATION_DATA[region] && STATION_DATA[region][city] && STATION_DATA[region][city][station];
-            if (data && data.zones[zoneIdx]) selectZone(data.zones[zoneIdx], zoneIdx);
+            const zones = zonesForStation(region, city, station);
+            if (zones[zoneIdx]) selectZone(zones[zoneIdx], zoneIdx);
         }
 
         function showTab(tab, el) {
@@ -7505,8 +7977,8 @@
             const headers = ['날짜', '시간', '지역', '시군', '충전소', '거점', '충전기수', '제조사', '점검자', 'GPS', '메모', '사진수', '드라이브전송', '드라이브실패', '전압220', '전압380', '접지저항', '절연저항', '사진폴더'];
             const rows = items.map((it) => {
                 const r = it.record;
-                const zone = `거점${r.zoneIndex}: ${r.zoneName}`;
-                const folder = ['사진', folderSafe(r.city), folderSafe(r.station), folderSafe('거점' + r.zoneIndex + '_' + r.zoneName)].join('/');
+                const zone = zoneLabel(r);
+                const folder = zoneDir(r);
                 return [
                     r.date, r.time, r.region, r.city, r.station, zone,
                     r.chargers, r.maker || '', r.inspector || '',
@@ -7521,7 +7993,7 @@
         }
 
         function zoneDir(record) {
-            return ['사진', folderSafe(record.city), folderSafe(record.station), folderSafe('거점' + record.zoneIndex + '_' + record.zoneName)].join('/');
+            return ['사진', folderSafe(record.city), folderSafe(record.station), folderSafe(folderForLabel(record))].join('/');
         }
 
         function htmlEscape(text) {
@@ -7570,7 +8042,7 @@
                             '<figure><a href="' + relSrc(p.path) + '"><img src="' + relSrc(p.path) + '" alt="' + htmlEscape(p.label) + '"></a><figcaption>' + htmlEscape(p.label) + '</figcaption></figure>'
                         ).join('');
                         const missing = shots.length ? '' : '<p>이 폰에 원본이 없는 사진입니다. 구글 드라이브의 거점 폴더에서 받으세요.</p>';
-                        body += '<section><h4>거점' + r.zoneIndex + ' ' + htmlEscape(r.zoneName || '') + '</h4>'
+                        body += '<section><h4>' + htmlEscape(zoneLabel(r)) + '</h4>'
                             + '<p>' + htmlEscape(r.date) + ' ' + htmlEscape(r.time || '') + ' · ' + (r.chargers || 0) + '대 · ' + htmlEscape(r.inspector || '') + ' · 사진 ' + shots.length + '장</p>'
                             + '<p class="path">폴더: ' + htmlEscape(dir) + '</p>'
                             + '<p>' + htmlEscape(r.memo || '') + '</p>'
@@ -7598,7 +8070,7 @@
         }
 
         async function fetchDrivePhoto(photo, record) {
-            const folder = '거점' + (record.zoneIndex || 1) + '_' + (record.zoneName || '');
+            const folder = folderForLabel(record);
             const q = 'action=file'
                 + '&id=' + encodeURIComponent(photo.driveId || '')
                 + '&filename=' + encodeURIComponent(photo.filename || '')
@@ -7744,7 +8216,7 @@
                 return;
             }
             const bundle = await buildDailyBundle(pack);
-            const list = bundle.items.map((it) => (it.record.city || '') + ' ' + it.record.station + ' 거점' + it.record.zoneIndex).join('\n');
+            const list = bundle.items.map((it) => (it.record.city || '') + ' ' + it.record.station + ' ' + zoneLabel(it.record)).join('\n');
             const text = bundle.stamp + ' 점검 ' + bundle.items.length + '곳\n' + list + '\n\n압축 안의 점검일지.jpg 가 일지 양식입니다. 사진 폴더는 시군/충전소/거점 입니다.';
             const shared = await shareOrSaveFile(bundle.zipFile, text);
             if (!shared) {
@@ -7780,7 +8252,7 @@
             const headers = ['날짜', '시간', '지역', '시군', '충전소', '거점', '충전기수', '제조사', '점검자', 'GPS', '메모', '사진수'];
             const rows = state.allHistory.map(h => [
                 h.date, h.time, h.region, h.city, h.station,
-                `거점${h.zoneIndex}: ${h.zoneName}`,
+                zoneLabel(h),
                 h.chargers, h.maker || '', h.inspector || '',
                 h.gps ? `${h.gps.lat},${h.gps.lng}` : '',
                 h.memo || '', h.photoCount || 0
