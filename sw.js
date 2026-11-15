@@ -1,5 +1,5 @@
-// v4.76: in-app camera saves a still photo, focuses before the shot, labels screen-only zoom
-const SW_VER = '4.76';
+// v4.77: phone-camera shots stay in the app and no longer trigger a per-photo download prompt
+const SW_VER = '4.77';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });

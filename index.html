@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.76">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.77">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1311,10 +1311,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.76</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.77</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전 있음 · 상단이 v4.76이어야 최신
+        새 버전 있음 · 상단이 v4.77이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1326,8 +1326,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.76&fresh=1">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.76</b>이어야 최신입니다. 강제 새로고침이 안 되면 위 <b>브라우저에서 최신 페이지 열기</b>를 누르세요.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.77&fresh=1">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.77</b>이어야 최신입니다. 강제 새로고침이 안 되면 위 <b>브라우저에서 최신 페이지 열기</b>를 누르세요.</div>
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
                         <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
@@ -1964,9 +1964,9 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
-    <script src="station_data.js?v=4.76"></script>
+    <script src="station_data.js?v=4.77"></script>
     <script>
-        const APP_VERSION = '4.76';
+        const APP_VERSION = '4.77';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
@@ -3200,7 +3200,7 @@
             '무안군': [34.990, 126.482], '보령시': [36.333, 126.613], '부여군': [36.276, 126.910],
             '서귀포시': [33.254, 126.560], '서산시': [36.785, 126.450], '서천군': [36.080, 126.692],
             '세종시': [36.480, 127.289], '순천시': [34.951, 127.487], '아산시': [36.790, 127.002],
-            '여수시': [34.760, 127.662], '영광군': [35.277, 126.512], '영암군': [34.800, 126.697],
+            '여수시': [34.770, 127.662], '영광군': [35.277, 126.512], '영암군': [34.800, 126.697],
             '예산군': [36.681, 126.845], '옥천군': [36.306, 127.571], '완도군': [34.312, 126.755],
             '완주군': [35.905, 127.162], '음성군': [36.940, 127.690], '익산시': [35.948, 126.958],
             '장성군': [35.302, 126.785], '장흥군': [34.682, 126.907], '전주시 덕진구': [35.848, 127.120],
@@ -6309,15 +6309,6 @@
             if (!list.length) {
                 stopNativeBurst();
                 return;
-            }
-            const type = photoTypes.find((p) => p.id === currentPhotoId);
-            if (type && list.length && !isIosPhone()) {
-                let n = nextShotIndex(type);
-                list.forEach((file) => {
-                    if (!file.type.startsWith('image/')) return;
-                    downloadFileToPhone(new File([file], photoFilename(type, n), { type: file.type || 'image/jpeg' }));
-                    n += 1;
-                });
             }
             await addFiles(list, false);
             // 폰카메라는 OS 확인 화면을 없앨 수 없어, 확인 후 바로 다시 열어 연속 촬영처럼 만듦.
