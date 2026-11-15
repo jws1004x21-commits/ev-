@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.74">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.76">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -614,6 +614,24 @@
             z-index: 600;
             overflow: hidden;
             touch-action: none;
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+            grid-template-areas:
+                "title"
+                "warn"
+                "stage"
+                "sheet"
+                "tools"
+                "bottom";
+        }
+        .live-camera video,
+        .live-camera-gesture,
+        .live-camera-frame,
+        .live-camera-flash,
+        .live-camera-focus,
+        .cam-edge {
+            grid-area: stage;
         }
         .live-camera video {
             position: absolute;
@@ -631,6 +649,19 @@
             z-index: 1;
             touch-action: none;
         }
+        .live-camera-focus {
+            position: absolute;
+            width: 68px;
+            height: 68px;
+            margin: -34px 0 0 -34px;
+            border: 2px solid #fde68a;
+            border-radius: 6px;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0;
+        }
+        .live-camera-focus.on { opacity: 1; }
         .live-camera-frame {
             position: absolute;
             inset: 0;
@@ -652,19 +683,15 @@
         .live-camera-square::before,
         .live-camera-square::after { content: none; }
         .live-camera-top {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            padding: 12px 12px;
-            padding-top: calc(12px + env(safe-area-inset-top, 0px));
+            grid-area: title;
+            position: relative;
+            padding: 8px 12px 4px;
+            padding-top: calc(8px + env(safe-area-inset-top, 0px));
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+            flex-direction: column;
+            background: #000;
             color: #fff;
-            z-index: 2;
-            gap: 8px;
+            gap: 2px;
         }
         .cam-title-btn {
             width: 100%;
@@ -675,28 +702,34 @@
         }
         .cam-edge {
             position: absolute;
-            top: 46%;
+            top: 50%;
+            transform: translateY(-50%);
             z-index: 2;
-            width: 34px;
-            height: 64px;
+            width: 28px;
+            height: 48px;
             border: none;
-            border-radius: 12px;
-            background: rgba(0,0,0,0.28);
+            border-radius: 10px;
+            background: rgba(0,0,0,0.35);
             color: #fff;
-            font-size: 30px;
-            line-height: 64px;
+            font-size: 26px;
+            line-height: 48px;
         }
-        .cam-edge.prev { left: 4px; }
-        .cam-edge.next { right: 4px; }
+        .cam-edge.prev { left: 2px; }
+        .cam-edge.next { right: 2px; }
         .live-camera-sheet {
-            position: absolute;
-            left: 10px;
-            right: 10px;
-            bottom: 108px;
+            grid-area: sheet;
+            position: relative;
+            left: auto;
+            right: auto;
+            bottom: auto;
             z-index: 3;
-            background: rgba(10,10,10,0.88);
-            border-radius: 16px;
-            padding: 8px;
+            max-height: 28vh;
+            overflow: auto;
+            background: #111;
+            border-radius: 12px;
+            margin: 0 8px 6px;
+            padding: 6px;
+            touch-action: pan-y;
         }
         .live-camera-sheet.hidden { display: none; }
         .live-camera-sheet .live-camera-types,
@@ -725,22 +758,25 @@
             justify-content: center;
         }
         .live-camera-tools {
-            position: absolute;
-            top: calc(64px + env(safe-area-inset-top, 0px));
-            left: 8px;
-            right: 8px;
+            grid-area: tools;
+            position: relative;
+            top: auto;
+            left: auto;
+            right: auto;
             display: flex;
             justify-content: center;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 6px;
             z-index: 2;
+            padding: 0 8px 6px;
+            background: #000;
         }
         .live-camera-tools button {
             height: 36px;
             padding: 0 10px;
             border: none;
             border-radius: 10px;
-            background: rgba(40,40,40,0.92);
+            background: #2a2a2a;
             color: #eee;
             font-size: 12px;
             font-weight: 700;
@@ -756,16 +792,13 @@
         }
         .live-camera-flash.on { opacity: 0.7; }
         .live-camera-types {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 148px;
+            position: static;
             display: flex;
             gap: 6px;
             overflow-x: auto;
-            padding: 0 12px 6px;
-            z-index: 2;
+            padding: 0 4px 4px;
             -webkit-overflow-scrolling: touch;
+            touch-action: pan-x;
         }
         .live-camera-types button {
             flex: 0 0 auto;
@@ -782,20 +815,21 @@
             font-weight: 700;
         }
         .live-camera-bottom {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            padding: 12px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+            grid-area: bottom;
+            position: relative;
+            left: auto;
+            right: auto;
+            bottom: auto;
+            padding: 6px 16px calc(10px + env(safe-area-inset-bottom, 0px));
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+            background: #000;
             z-index: 2;
         }
         .live-camera-bottom .cam-side {
             width: 64px;
-            height: 64px;
+            height: 56px;
             border: none;
             border-radius: 12px;
             background: #333;
@@ -804,8 +838,8 @@
             font-weight: 700;
         }
         .live-camera-bottom .cam-shutter {
-            width: 76px;
-            height: 76px;
+            width: 72px;
+            height: 72px;
             border: 6px solid #fff;
             border-radius: 50%;
             background: #ef4444;
@@ -813,55 +847,103 @@
         }
         .live-camera-bottom .cam-shutter:disabled { opacity: 0.5; }
         .live-camera-film {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 148px;
+            position: static;
             display: flex;
             gap: 6px;
             overflow-x: auto;
-            padding: 0 12px 8px;
-            z-index: 2;
+            padding: 4px;
             -webkit-overflow-scrolling: touch;
-            min-height: 58px;
+            min-height: 0;
+            touch-action: pan-x;
         }
         .live-camera-film img {
-            width: 54px;
-            height: 54px;
+            width: 48px;
+            height: 48px;
             object-fit: cover;
             border-radius: 8px;
             border: 2px solid #fff;
             flex-shrink: 0;
             background: #222;
         }
-        .live-camera-types { position: static; }
         .live-camera-thumb-wrap {
             width: 64px;
-            height: 64px;
+            height: 56px;
             padding: 0;
             border: none;
             background: transparent;
             position: relative;
         }
         .live-camera-thumb {
-            width: 64px;
-            height: 64px;
+            width: 56px;
+            height: 56px;
             object-fit: cover;
             border-radius: 10px;
             background: #222;
             border: 1px solid #444;
         }
         .live-camera-hint {
-            position: absolute;
-            left: 48px;
-            right: 48px;
-            bottom: calc(92px + env(safe-area-inset-bottom, 0px));
             text-align: center;
             color: #ddd;
             font-size: 12px;
-            z-index: 2;
-            text-shadow: 0 1px 4px #000;
+            line-height: 1.3;
             pointer-events: none;
+        }
+        @media (orientation: landscape) {
+            .live-camera {
+                grid-template-columns: 96px minmax(0, 1fr) 104px;
+                grid-template-rows: auto auto auto minmax(0, 1fr);
+                grid-template-areas:
+                    "title title title"
+                    "warn warn warn"
+                    "sheet sheet sheet"
+                    "tools stage rail";
+            }
+            .live-camera-bottom { grid-area: rail; }
+            .live-camera-top {
+                flex-direction: row;
+                align-items: center;
+                gap: 8px;
+                padding: 4px 10px;
+                padding-left: calc(8px + env(safe-area-inset-left, 0px));
+                padding-right: calc(8px + env(safe-area-inset-right, 0px));
+            }
+            .cam-title-btn { width: auto; flex: 0 1 auto; text-align: left; }
+            .live-camera-top .cam-title,
+            .live-camera-top .cam-count { text-align: left; }
+            .cam-title-btn { display: flex; align-items: baseline; gap: 8px; }
+            .live-camera-hint {
+                flex: 1;
+                min-width: 0;
+                text-align: right;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .live-camera-sheet {
+                max-height: 104px;
+                margin: 0 8px 4px;
+            }
+            .live-camera-sheet .live-camera-film img { width: 40px; height: 40px; }
+            .live-camera-sheet .live-camera-types { flex-wrap: nowrap; justify-content: flex-start; }
+            .live-camera-tools {
+                flex-direction: column;
+                align-items: stretch;
+                justify-content: center;
+                padding: 8px 6px;
+                padding-left: calc(6px + env(safe-area-inset-left, 0px));
+            }
+            .live-camera-tools button { font-size: 11px; padding: 0 4px; }
+            .live-camera-bottom {
+                flex-direction: column;
+                justify-content: center;
+                gap: 8px;
+                padding: 8px 6px;
+                padding-right: calc(6px + env(safe-area-inset-right, 0px));
+            }
+            .live-camera-bottom .cam-shutter { width: 64px; height: 64px; }
+            .live-camera-bottom .cam-side,
+            .live-camera-thumb-wrap { width: 64px; height: 44px; }
+            .live-camera-thumb { width: 44px; height: 44px; }
         }
 
         .lightbox-actions .btn {
@@ -1099,16 +1181,15 @@
             min-height: 16px;
         }
         .live-camera-warn {
-            position: absolute;
-            left: 12px;
-            right: 12px;
-            top: calc(78px + env(safe-area-inset-top, 0px));
+            grid-area: warn;
+            position: relative;
             z-index: 4;
+            margin: 0 8px 4px;
             background: #7c2d12;
             color: #ffedd5;
-            padding: 10px 12px;
+            padding: 8px 12px;
             border-radius: 10px;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
             text-align: center;
         }
@@ -1230,10 +1311,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.74</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.76</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전 있음 · 상단이 v4.74이어야 최신
+        새 버전 있음 · 상단이 v4.76이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1245,8 +1326,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.74&fresh=1">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.74</b>이어야 최신입니다. 강제 새로고침이 안 되면 위 <b>브라우저에서 최신 페이지 열기</b>를 누르세요.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.76&fresh=1">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.76</b>이어야 최신입니다. 강제 새로고침이 안 되면 위 <b>브라우저에서 최신 페이지 열기</b>를 누르세요.</div>
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
                         <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
@@ -1669,11 +1750,13 @@
             <div class="live-camera-square" id="liveCameraSquare"></div>
         </div>
         <div class="live-camera-flash" id="liveCameraFlash"></div>
+        <div class="live-camera-focus" id="liveCameraFocus"></div>
         <div class="live-camera-top">
             <button type="button" class="cam-title-btn" id="liveCameraTitleBtn">
                 <div class="cam-title" id="liveCameraTitle">촬영</div>
                 <div class="cam-count" id="liveCameraCount">0장 · 눌러서 항목</div>
             </button>
+            <div class="live-camera-hint" id="liveCameraHint">좌우로 넘기면 다음 항목</div>
         </div>
         <button type="button" class="cam-edge prev" id="liveCameraPrev" aria-label="이전 항목">‹</button>
         <button type="button" class="cam-edge next" id="liveCameraNext" aria-label="다음 항목">›</button>
@@ -1684,7 +1767,6 @@
             <button type="button" id="liveCameraNative">폰카메라</button>
         </div>
         <div class="live-camera-warn hidden" id="liveCameraWarn"></div>
-        <div class="live-camera-hint" id="liveCameraHint">좌우로 넘기면 다음 항목</div>
         <div id="liveCameraSheet" class="live-camera-sheet hidden">
             <div class="live-camera-types" id="liveCameraTypes"></div>
             <div class="live-camera-film" id="liveCameraFilm"></div>
@@ -1882,9 +1964,9 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
-    <script src="station_data.js?v=4.74"></script>
+    <script src="station_data.js?v=4.76"></script>
     <script>
-        const APP_VERSION = '4.74';
+        const APP_VERSION = '4.76';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
@@ -2509,6 +2591,7 @@
                 if (document.visibilityState === 'visible') {
                     checkAppVersion();
                     fetchTeamProgress(false).catch(() => {});
+                    setTimeout(() => recoverLiveCamera(), 350);
                 }
             });
             const reloadBtn = document.getElementById('updateReloadBtn');
@@ -4247,6 +4330,12 @@
         let cameraZoom = 1;
         let torchOn = false;
         let cameraSquare = false;
+        let cameraGen = 0;
+        let cameraOpenTask = null;
+        let cameraRecovering = false;
+        let cameraReadyAt = 0;
+        let softZoomWarned = false;
+        let focusTapWarned = false;
 
         function isFullShot(photoId) {
             return photoId === 'overview';
@@ -5491,8 +5580,11 @@
         }
 
         function refreshZoomButtons() {
-            const label = '줌+ ' + cameraZoom.toFixed(1);
-            document.getElementById('liveCameraZoomIn').textContent = label;
+            const hardware = cameraZoomRange().hardware;
+            const zoomIn = document.getElementById('liveCameraZoomIn');
+            const zoomOut = document.getElementById('liveCameraZoomOut');
+            if (zoomOut) zoomOut.textContent = hardware ? '줌-' : '축소';
+            if (zoomIn) zoomIn.textContent = (hardware ? '줌 ' : '화면확대 ') + cameraZoom.toFixed(1);
         }
 
         function cameraZoomRange() {
@@ -5518,10 +5610,15 @@
         async function applyCameraZoom(value) {
             const range = cameraZoomRange();
             const next = Math.min(range.max, Math.max(range.min, Number(value) || range.min));
+            const prev = cameraZoom;
             cameraZoom = next;
             refreshZoomButtons();
             if (!range.hardware) {
                 applyViewScale();
+                if (!softZoomWarned && next >= 1.8 && prev < 1.8) {
+                    softZoomWarned = true;
+                    showCameraWarn('화면만 확대됩니다. 숫자 촬영은 확대를 낮추고 가까이 대세요.');
+                }
                 return;
             }
             zoomPending = cameraZoom;
@@ -5578,42 +5675,243 @@
         }
 
         function openNativeCamera() {
-            if (cameraStream) {
-                shutterBusy = false;
-                torchOn = false;
-                const video = document.getElementById('liveCameraVideo');
-                cameraZoom = 1;
-                if (video) video.style.transform = '';
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach((t) => t.stop());
-                    cameraStream = null;
-                }
-                if (video) video.srcObject = null;
-                document.getElementById('liveCamera').classList.add('hidden');
-                document.getElementById('liveCameraShutter').disabled = false;
-            }
+            cameraGen += 1;
+            shutterBusy = false;
+            torchOn = false;
+            const video = document.getElementById('liveCameraVideo');
+            cameraZoom = 1;
+            if (video) video.style.transform = '';
+            releaseCameraStream();
+            document.getElementById('liveCamera').classList.add('hidden');
+            document.getElementById('liveCameraShutter').disabled = false;
             nativeBurst = true;
             nativePickPending = true;
             showCameraWarn('연속 촬영: 사용/확인 누르면 바로 다음 촬영이 열립니다. 그만하려면 카메라에서 뒤로/취소.');
             document.getElementById('cameraInput').click();
         }
 
+        function releaseCameraStream() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach((t) => t.stop());
+                cameraStream = null;
+            }
+            const video = document.getElementById('liveCameraVideo');
+            if (video) video.srcObject = null;
+        }
+
         function stopLiveCamera() {
+            cameraGen += 1;
             shutterBusy = false;
             torchOn = false;
             stopNativeBurst();
             const video = document.getElementById('liveCameraVideo');
             cameraZoom = 1;
             if (video) video.style.transform = '';
-            if (cameraStream) {
-                cameraStream.getTracks().forEach((t) => t.stop());
-                cameraStream = null;
-            }
-            if (video) video.srcObject = null;
+            releaseCameraStream();
             document.getElementById('liveCamera').classList.add('hidden');
             document.getElementById('liveCameraShutter').disabled = false;
             const warn = document.getElementById('liveCameraWarn');
             if (warn) warn.classList.add('hidden');
+            const ring = document.getElementById('liveCameraFocus');
+            if (ring) ring.classList.remove('on');
+        }
+
+        function liveCameraOpen() {
+            const cam = document.getElementById('liveCamera');
+            return !!(cam && !cam.classList.contains('hidden'));
+        }
+
+        function cameraPreviewDead() {
+            if (Date.now() - cameraReadyAt < 900) return false;
+            const track = cameraTrack();
+            const video = document.getElementById('liveCameraVideo');
+            if (!track || track.readyState !== 'live' || track.muted) return true;
+            if (!video || video.readyState < 2 || !video.videoWidth) return true;
+            return false;
+        }
+
+        function watchCameraTrack(track) {
+            if (!track) return;
+            track.onended = () => recoverLiveCamera();
+            track.onmute = () => setTimeout(() => recoverLiveCamera(), 500);
+        }
+
+        async function primeCameraTrack(track) {
+            if (!track || !track.getCapabilities || !track.applyConstraints) return;
+            const caps = track.getCapabilities() || {};
+            const advanced = [];
+            const focus = caps.focusMode || [];
+            const exposure = caps.exposureMode || [];
+            if (focus.indexOf('continuous') >= 0) advanced.push({ focusMode: 'continuous' });
+            if (exposure.indexOf('continuous') >= 0) advanced.push({ exposureMode: 'continuous' });
+            if (!advanced.length) return;
+            try { await track.applyConstraints({ advanced }); } catch (err) {}
+        }
+
+        async function focusBeforeShot() {
+            const track = cameraTrack();
+            if (!track || !track.applyConstraints) return;
+            const modes = cameraCaps().focusMode || [];
+            try {
+                if (modes.indexOf('single-shot') >= 0) {
+                    await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+                } else if (modes.indexOf('continuous') >= 0) {
+                    await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+                } else return;
+                await waitMs(220);
+            } catch (err) {}
+        }
+
+        function showFocusRing(clientX, clientY) {
+            const ring = document.getElementById('liveCameraFocus');
+            const stage = document.getElementById('liveCameraGesture');
+            if (!ring || !stage) return;
+            const rect = stage.getBoundingClientRect();
+            ring.style.left = (clientX - rect.left) + 'px';
+            ring.style.top = (clientY - rect.top) + 'px';
+            ring.classList.add('on');
+            clearTimeout(showFocusRing.timer);
+            showFocusRing.timer = setTimeout(() => ring.classList.remove('on'), 650);
+        }
+
+        async function focusAtPoint(clientX, clientY, target) {
+            showFocusRing(clientX, clientY);
+            const track = cameraTrack();
+            if (!track || !track.applyConstraints) return;
+            const caps = cameraCaps();
+            const rect = target.getBoundingClientRect();
+            const x = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+            const y = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
+            const advanced = [];
+            if (caps.pointsOfInterest) advanced.push({ pointsOfInterest: [{ x: x, y: y }] });
+            const modes = caps.focusMode || [];
+            if (modes.indexOf('single-shot') >= 0) advanced.push({ focusMode: 'single-shot' });
+            else if (modes.indexOf('continuous') >= 0) advanced.push({ focusMode: 'continuous' });
+            if (!advanced.length) {
+                if (!focusTapWarned) {
+                    focusTapWarned = true;
+                    showCameraWarn('이 폰은 눌러도 초점이 안 갑니다. 숫자가 흐리면 가까이 다시 대세요.');
+                }
+                return;
+            }
+            try {
+                await track.applyConstraints({ advanced: advanced });
+            } catch (err) {
+                if (!focusTapWarned) {
+                    focusTapWarned = true;
+                    showCameraWarn('이 폰은 눌러도 초점이 안 갑니다. 숫자가 흐리면 가까이 다시 대세요.');
+                }
+            }
+        }
+
+        function snapPhotoRange(range, value) {
+            if (!range || !Number.isFinite(range.max)) return value;
+            let v = Math.min(range.max, Math.max(range.min || 0, value));
+            const step = Number(range.step) || 1;
+            if (step > 0) v = (range.min || 0) + Math.round((v - (range.min || 0)) / step) * step;
+            return Math.min(range.max, Math.max(range.min || 0, v));
+        }
+
+        function stillEdgeLimit() {
+            const id = currentPhotoId;
+            if (id === 'mccbClose' || id === 'meterClose') return 3200;
+            if (id === 'voltage' || id === 'resistance' || id === 'insulation') return 2560;
+            return 2048;
+        }
+
+        async function takePhotoBlob(track) {
+            const shot = new ImageCapture(track);
+            let settings;
+            try {
+                const caps = await shot.getPhotoCapabilities();
+                const limit = stillEdgeLimit();
+                if (caps.imageWidth && caps.imageHeight && caps.imageWidth.max && caps.imageHeight.max) {
+                    const longEdge = Math.max(caps.imageWidth.max, caps.imageHeight.max);
+                    const scale = Math.min(1, limit / longEdge);
+                    settings = {
+                        imageWidth: snapPhotoRange(caps.imageWidth, caps.imageWidth.max * scale),
+                        imageHeight: snapPhotoRange(caps.imageHeight, caps.imageHeight.max * scale)
+                    };
+                }
+            } catch (err) {}
+            try {
+                if (settings) return await shot.takePhoto(settings);
+            } catch (err) {}
+            return shot.takePhoto();
+        }
+
+        function cropBlobCenter(blob, zoom) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                const url = URL.createObjectURL(blob);
+                img.onload = () => {
+                    const scale = Math.max(1, zoom);
+                    const sw = img.width / scale;
+                    const sh = img.height / scale;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(sw));
+                    canvas.height = Math.max(1, Math.round(sh));
+                    canvas.getContext('2d').drawImage(
+                        img,
+                        (img.width - sw) / 2,
+                        (img.height - sh) / 2,
+                        sw,
+                        sh,
+                        0,
+                        0,
+                        canvas.width,
+                        canvas.height
+                    );
+                    URL.revokeObjectURL(url);
+                    canvas.toBlob((out) => resolve(out || blob), 'image/jpeg', 0.92);
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(blob);
+                };
+                img.src = url;
+            });
+        }
+
+        async function captureStillBlob(video) {
+            const track = cameraTrack();
+            const range = cameraZoomRange();
+            if (track && typeof ImageCapture === 'function') {
+                try {
+                    const blob = await takePhotoBlob(track);
+                    if (blob && blob.size) {
+                        if (!range.hardware && cameraZoom > 1.05) return cropBlobCenter(blob, cameraZoom);
+                        return blob;
+                    }
+                } catch (err) {}
+            }
+            await focusBeforeShot();
+            const canvas = captureCanvasFromVideo(video);
+            return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+        }
+
+        async function recoverLiveCamera() {
+            if (cameraRecovering || shutterBusy || cameraOpenTask || !liveCameraOpen() || !currentPhotoId) return;
+            if (!cameraPreviewDead()) return;
+            cameraRecovering = true;
+            const photoId = currentPhotoId;
+            const zoom = cameraZoom;
+            const wantTorch = torchOn;
+            try {
+                cameraGen += 1;
+                releaseCameraStream();
+                if (cameraOpenTask) {
+                    try { await cameraOpenTask; } catch (err) {}
+                }
+                await startLiveCamera(photoId);
+                if (liveCameraOpen() && zoom > 1.05) await applyCameraZoom(zoom);
+                if (liveCameraOpen() && wantTorch) {
+                    torchOn = false;
+                    await toggleTorch();
+                }
+            } finally {
+                cameraRecovering = false;
+            }
         }
 
         function captureCanvasFromVideo(video) {
@@ -5661,21 +5959,29 @@
             });
         }
 
-        async function startLiveCamera(photoId) {
+        function startLiveCamera(photoId) {
             stopNativeBurst();
             currentPhotoId = photoId;
             cameraSquare = false;
-            if (cameraStream && !document.getElementById('liveCamera').classList.contains('hidden')) {
+            if (cameraStream && liveCameraOpen() && !cameraPreviewDead()) {
                 updateLiveCameraHud();
-                return;
+                return Promise.resolve();
             }
+            if (cameraOpenTask) return cameraOpenTask;
+            cameraOpenTask = openLiveCameraStream().finally(() => { cameraOpenTask = null; });
+            return cameraOpenTask;
+        }
+
+        async function openLiveCameraStream() {
+            const gen = cameraGen + 1;
+            cameraGen = gen;
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 document.getElementById('cameraInput').click();
                 return;
             }
             const tries = [
-                { video: { facingMode: { exact: 'environment' }, width: { ideal: 1920 } }, audio: false },
-                { video: { facingMode: { ideal: 'environment' } }, audio: false },
+                { video: { facingMode: { exact: 'environment' }, width: { ideal: 2560 }, height: { ideal: 1440 } }, audio: false },
+                { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
                 { video: true, audio: false }
             ];
             let stream = null;
@@ -5687,50 +5993,73 @@
                     stream = null;
                 }
             }
+            if (gen !== cameraGen) {
+                if (stream) stream.getTracks().forEach((t) => t.stop());
+                return;
+            }
             if (!stream) {
                 document.getElementById('cameraInput').click();
                 return;
             }
-            if (cameraStream) stopLiveCamera();
+            releaseCameraStream();
             cameraStream = stream;
             torchOn = false;
+            const track = cameraTrack();
+            watchCameraTrack(track);
+            await primeCameraTrack(track);
+            if (gen !== cameraGen) {
+                releaseCameraStream();
+                return;
+            }
             const video = document.getElementById('liveCameraVideo');
             video.setAttribute('playsinline', 'true');
             video.muted = true;
             video.srcObject = stream;
             video.onresize = () => layoutSquareGuide();
-            try { await video.play(); } catch (err) {}
-            cameraZoom = cameraZoomRange().min;
-            applyViewScale();
-            document.getElementById('liveCameraThumb').removeAttribute('src');
             document.getElementById('liveCamera').classList.remove('hidden');
+            try { await video.play(); } catch (err) {}
+            if (gen !== cameraGen) {
+                releaseCameraStream();
+                document.getElementById('liveCamera').classList.add('hidden');
+                return;
+            }
+            cameraZoom = cameraZoomRange().min;
+            cameraReadyAt = Date.now();
+            applyViewScale();
+            refreshZoomButtons();
+            document.getElementById('liveCameraThumb').removeAttribute('src');
             updateLiveCameraHud();
         }
 
         async function captureLiveShot() {
             if (shutterBusy || !cameraStream) return;
             const video = document.getElementById('liveCameraVideo');
-            if (!video.videoWidth) return;
+            if (!video.videoWidth) {
+                if (cameraPreviewDead()) recoverLiveCamera();
+                return;
+            }
             shutterBusy = true;
             document.getElementById('liveCameraShutter').disabled = true;
             const flash = document.getElementById('liveCameraFlash');
             flash.classList.add('on');
             setTimeout(() => flash.classList.remove('on'), 80);
             try {
-                const canvas = captureCanvasFromVideo(video);
-                const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
-                if (blob) {
-                    const file = new File([blob], 'shot.jpg', { type: 'image/jpeg' });
+                const blob = await captureStillBlob(video);
+                if (blob && blob.size) {
+                    const file = new File([blob], 'shot.jpg', { type: blob.type || 'image/jpeg' });
                     const added = await addFiles([file], false);
                     if (added > 0) {
-                        document.getElementById('liveCameraThumb').src = URL.createObjectURL(blob);
+                        const thumb = document.getElementById('liveCameraThumb');
+                        if (thumb.src && thumb.src.startsWith('blob:')) URL.revokeObjectURL(thumb.src);
+                        thumb.src = URL.createObjectURL(blob);
                         updateLiveCameraHud();
                         if (navigator.vibrate) navigator.vibrate(40);
                     }
                 }
             } finally {
                 shutterBusy = false;
-                document.getElementById('liveCameraShutter').disabled = false;
+                const shutter = document.getElementById('liveCameraShutter');
+                if (shutter) shutter.disabled = false;
             }
         }
 
@@ -5947,19 +6276,12 @@
             const step = Math.max(0.12, (range.max - range.min) / 10);
             applyCameraZoom(cameraZoom + (e.deltaY < 0 ? step : -step));
         }, { passive: false });
-        liveVideo.addEventListener('click', async (e) => {
+        liveVideo.addEventListener('click', (e) => {
             if (camIgnoreClick) {
                 camIgnoreClick = false;
                 return;
             }
-            const caps = cameraCaps();
-            if (!caps.pointsOfInterest) return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / rect.width;
-            const y = (e.clientY - rect.top) / rect.height;
-            try {
-                await cameraTrack().applyConstraints({ advanced: [{ pointsOfInterest: [{ x, y }] }] });
-            } catch (err) {}
+            focusAtPoint(e.clientX, e.clientY, e.currentTarget);
         });
         document.getElementById('liveCameraThumbBtn').addEventListener('click', openLastCameraShot);
         document.getElementById('liveCameraFilm').addEventListener('click', (e) => {

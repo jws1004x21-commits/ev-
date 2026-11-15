@@ -1,5 +1,5 @@
-// v4.74: daily log matches the measurement form; plate meter numbers keep dashes
-const SW_VER = '4.74';
+// v4.76: in-app camera saves a still photo, focuses before the shot, labels screen-only zoom
+const SW_VER = '4.76';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
