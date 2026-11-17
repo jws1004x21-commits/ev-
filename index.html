@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>충전소 점검</title>
-    <link rel="manifest" href="/ev-/manifest.json?v=4.77">
+    <link rel="manifest" href="/ev-/manifest.json?v=4.78">
     <link rel="icon" href="/ev-/icon-192.png">
     <link rel="apple-touch-icon" href="/ev-/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1311,10 +1311,10 @@
 <body>
     <div class="header">
         <h1>🔌 충전소 점검</h1>
-        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.77</div>
+        <div class="subtitle" id="appSubtitle">대전팀 26하반기 정기점검 v4.78</div>
     </div>
     <div id="updateBanner" class="update-banner">
-        새 버전 있음 · 상단이 v4.77이어야 최신
+        새 버전 있음 · 상단이 v4.78이어야 최신
         <button type="button" id="updateReloadBtn">강제 새로고침</button>
     </div>
 
@@ -1326,8 +1326,8 @@
                     <input type="text" class="form-input" id="homeInspector" placeholder="본인 이름을 적으세요" autocomplete="name">
                     <div id="inspectorNeed" class="inspector-need">이름을 적어야 점검을 시작하고 완료할 수 있습니다.</div>
                     <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="forceAppReload()">🔄 최신 앱으로 강제 새로고침</button>
-                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.77&fresh=1">브라우저에서 최신 페이지 열기</a>
-                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.77</b>이어야 최신입니다. 강제 새로고침이 안 되면 위 <b>브라우저에서 최신 페이지 열기</b>를 누르세요.</div>
+                    <a class="btn btn-secondary" style="margin-top:8px;display:block;text-align:center;text-decoration:none;" id="openFreshLink" href="https://jws1004x21-commits.github.io/ev-/index.html?v=4.78&fresh=1">브라우저에서 최신 페이지 열기</a>
+                    <div style="font-size:12px;color:#aaa;margin-top:6px;">상단이 <b>v4.78</b>이어야 최신입니다. 강제 새로고침이 안 되면 위 <b>브라우저에서 최신 페이지 열기</b>를 누르세요.</div>
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-secondary btn-small" onclick="openManual()">📖 설명서</button>
                         <button type="button" class="btn btn-secondary btn-small" onclick="openEmergencyMode()" style="border-color:#b45309;color:#fdba74;">🆘 비상모드</button>
@@ -1476,16 +1476,12 @@
                         <div id="zonePhotoTotal" class="drive-count">사진 0장 · 찍으면 폰에 저장 · 완료 시 드라이브</div>
                         <div id="checklist"></div>
                         <div class="form-group" style="margin-top:16px;">
-                            <label class="form-label">이 거점 기온·접지저항·MCCB·계량기번호 · 다른 거점 값을 넣지 마세요</label>
+                            <label class="form-label">이 거점 접지저항·MCCB·계량기번호 · 다른 거점 값을 넣지 마세요</label>
                             <div class="meter-grid">
                                 <div class="form-group hidden">
                                     <input type="number" id="meterV220">
                                     <input type="number" id="meterV380">
                                     <input type="number" id="meterInsul">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">기온 (℃)</label>
-                                    <input type="text" class="form-input" id="logTemp" inputmode="decimal" placeholder="예: 23">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">MCCB용량</label>
@@ -1648,7 +1644,7 @@
                         <input type="date" class="form-input" id="logDate">
                     </div>
                     <div id="dailyLog" class="daily-log"></div>
-                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">일지 열: 국소명, 거점, 기온, 충전기수, 충전기번호, MCCB용량, 접지저항, 계량기번호, 비고</div>
+                    <div style="font-size:12px;color:#aaa;margin:8px 0 12px;">일지 열: 국소명, 거점, 충전기수, 충전기번호, MCCB용량, 접지저항, 계량기번호, 비고</div>
                     <button class="btn btn-secondary btn-small" onclick="exportTodayPack()" style="margin-bottom:8px;">📁 오늘 폴더로 저장 (시군/충전소/거점)</button>
                     <button class="btn btn-secondary btn-small" onclick="exportTodayReport()" style="margin-bottom:8px;">📤 오늘 점검 카톡으로 보내기 (zip)</button>
                     <button class="btn btn-secondary btn-small" onclick="exportData()" style="margin-bottom:12px;">📋 전체 기록만 엑셀</button>
@@ -1876,7 +1872,7 @@
                 <h3>4. 거점 완료 = 구글 연동</h3>
                 <ol>
                     <li><b>이 거점 점검 완료</b>를 누릅니다.</li>
-                    <li>확인 화면에서 기온·접지저항·MCCB·제조번호를 봅니다. 제조번호는 <b>08-47-0019049</b>처럼 대시를 남깁니다.</li>
+                    <li>확인 화면에서 접지저항·MCCB·제조번호를 봅니다. 제조번호는 <b>08-47-0019049</b>처럼 대시를 남깁니다.</li>
                     <li><b>이 거점 저장</b> → 사진이 드라이브로 올라가고, 시트에 기록이 들어갑니다.</li>
                 </ol>
                 <div class="tip">드라이브 경로: 내 드라이브 / 전기차충전소점검_대전팀 / 점검사진 / 지역 / 시군 / 충전소 / 거점폴더</div>
@@ -1887,7 +1883,7 @@
                 <ol>
                     <li>아래 메뉴 <b>내역</b>으로 갑니다.</li>
                     <li><b>동기화 후 오늘 점검일지</b> → 구글 시트 최신으로 맞춤</li>
-                    <li><b>일지 엑셀 내려받기</b> → 기온·MCCB·접지저항·계량기번호가 들어간 측정값 양식</li>
+                    <li><b>일지 엑셀 내려받기</b> → MCCB·접지저항·계량기번호가 들어간 측정값 양식</li>
                     <li><b>오늘 폴더로 저장</b> 또는 <b>카톡으로 보내기</b> → 일지 + <b>사진/시군/충전소/거점</b> 폴더</li>
                 </ol>
                 <div class="tip">거점 완료한 것만 들어갑니다. 드라이브=보관소, 오늘 폴더/카톡 zip=보고용 묶음.</div>
@@ -1964,9 +1960,9 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
-    <script src="station_data.js?v=4.77"></script>
+    <script src="station_data.js?v=4.78"></script>
     <script>
-        const APP_VERSION = '4.77';
+        const APP_VERSION = '4.78';
         const APP_ORIGIN_URL = 'https://jws1004x21-commits.github.io/ev-/';
         // Teams split work ahead of time, so zone locks are off by default.
         const USE_ZONE_LOCK = false;
@@ -4066,8 +4062,6 @@
             document.getElementById('completeZoneBtn').textContent = state.editing ? '수정 저장' : '이 거점 점검 완료';
             const chargerNo = document.getElementById('logChargerNo');
             if (chargerNo && !chargerNo.value) chargerNo.value = chargerNoDefault();
-            const tempEl = document.getElementById('logTemp');
-            if (tempEl && !String(tempEl.value || '').trim()) tempEl.value = todayTempDefault();
             syncInspectorFields(state.inspector || '');
             renderChecklist();
             updateGPSDisplay();
@@ -4146,7 +4140,7 @@
             state.photoData = {};
             photoTypes.forEach((p) => { state.photoData[p.id] = []; });
             document.getElementById('memoInput').value = memoWithoutTemp(record.memo || '');
-            fillMeterFields(Object.assign({}, record, { temp: record.temp || tempFromMemo(record.memo) }));
+            fillMeterFields(record);
             state.originalDate = record.date || '';
             inspectZoneKey = currentZoneKey();
             const lock = await claimZoneLock();
@@ -4182,7 +4176,7 @@
             if (rec.memo) document.getElementById('memoInput').value = memoWithoutTemp(rec.memo);
             if (rec.date) state.originalDate = rec.date;
             if (rec.inspector && !currentInspectorName()) syncInspectorFields(rec.inspector);
-            if (rec.v220 || rec.v380 || rec.ground || rec.insul || rec.mccb || rec.meterNo || rec.chargerNo || tempFromMemo(rec.memo)) {
+            if (rec.v220 || rec.v380 || rec.ground || rec.insul || rec.mccb || rec.meterNo || rec.chargerNo) {
                 const kept = readMeterFields();
                 fillMeterFields({
                     v220: rec.v220 || kept.v220,
@@ -4191,8 +4185,7 @@
                     insul: rec.insul || kept.insul,
                     mccb: rec.mccb || kept.mccb,
                     meterNo: rec.meterNo || kept.meterNo,
-                    chargerNo: rec.chargerNo || kept.chargerNo,
-                    temp: tempFromMemo(rec.memo) || kept.temp
+                    chargerNo: rec.chargerNo || kept.chargerNo
                 });
             }
             (rec.photos || []).forEach((file) => {
@@ -4398,25 +4391,6 @@
             });
         }
 
-        function todayTempDefault() {
-            try {
-                const saved = JSON.parse(localStorage.getItem('tempTodayV1') || 'null');
-                if (saved && saved.date === todayStamp() && saved.value) return String(saved.value);
-            } catch (err) {}
-            return '';
-        }
-
-        function rememberTemp(value) {
-            const v = String(value || '').trim();
-            if (!v) return;
-            try { localStorage.setItem('tempTodayV1', JSON.stringify({ date: todayStamp(), value: v })); } catch (err) {}
-        }
-
-        function tempFromMemo(memo) {
-            const m = String(memo || '').match(/(?:^|\n)\s*기온\s*=\s*(-?\d+(?:\.\d+)?)/);
-            return m ? m[1] : '';
-        }
-
         function memoWithoutTemp(memo) {
             return String(memo || '').split('\n').filter((line) => !/^\s*기온\s*=/.test(line)).join('\n').trim();
         }
@@ -4427,7 +4401,6 @@
                 v380: (document.getElementById('meterV380') || {}).value || '',
                 ground: (document.getElementById('meterGround') || {}).value || '',
                 insul: (document.getElementById('meterInsul') || {}).value || '',
-                temp: (document.getElementById('logTemp') || {}).value || '',
                 mccb: (document.getElementById('logMccb') || {}).value || '',
                 meterNo: normalizeMeterNo((document.getElementById('logMeterNo') || {}).value || ''),
                 chargerNo: (document.getElementById('logChargerNo') || {}).value || ''
@@ -4449,7 +4422,6 @@
             set('meterV380', m.v380);
             set('meterGround', m.ground);
             set('meterInsul', m.insul);
-            set('logTemp', m.temp);
             set('logMccb', m.mccb);
             set('logMeterNo', normalizeMeterNo(m.meterNo));
             ['logMccb', 'logMeterNo'].forEach((id) => {
@@ -5471,10 +5443,10 @@
                 if (chargerEl && !chargerEl.value) chargerEl.value = numbers;
                 const blocks = [
                     { id: 'mccbClose', guide: place.zone + ' · 충전기 ' + count + '대. 6번 사진만 읽습니다. 배전반 사진은 용량에 넣지 않습니다.', fields: [['logMccb', '이 거점 MCCB용량', '50A 또는 75A']] },
-                    { id: 'meterClose', guide: '7번 사진은 08-47-0019049처럼 세 칸이 한 줄로 보이게 찍으세요. 대시까지 제조번호입니다.', fields: [['logMeterNo', '이 거점 제조번호', '08-47-0019049'], ['meterGround', '접지저항', '저항 사진의 숫자'], ['logTemp', '기온 ℃', '예: 23']] }
+                    { id: 'meterClose', guide: '7번 사진은 08-47-0019049처럼 세 칸이 한 줄로 보이게 찍으세요. 대시까지 제조번호입니다.', fields: [['logMeterNo', '이 거점 제조번호', '08-47-0019049'], ['meterGround', '접지저항', '저항 사진의 숫자']] }
                 ];
                 title.textContent = '이 거점 측정값';
-                sub.textContent = '국소명·거점·충전기 수·번호·장소는 자동입니다. 기온·접지저항·MCCB·제조번호를 확인하세요.';
+                sub.textContent = '국소명·거점·충전기 수·번호·장소는 자동입니다. 접지저항·MCCB·제조번호를 확인하세요.';
                 const autoCard = `<div class="review-block">
                     <h4>자동으로 시트에 들어갑니다</h4>
                     <div class="review-guide">국소명 · 거점 · 충전기 수 · 충전기 번호 · 장소. 사진에서 읽지 않습니다.</div>
@@ -6636,12 +6608,11 @@
             const mccb = String((document.getElementById('logMccb') || {}).value || '').trim();
             const meterNo = normalizeMeterNo((document.getElementById('logMeterNo') || {}).value || '');
             const ground = String((document.getElementById('meterGround') || {}).value || '').trim();
-            const temp = String((document.getElementById('logTemp') || {}).value || '').trim();
             const meterEl = document.getElementById('logMeterNo');
             if (meterEl && meterNo) meterEl.value = meterNo;
-            if (!mccb || !meterNo || !ground || !temp) {
+            if (!mccb || !meterNo || !ground) {
                 const sub = document.getElementById('reviewSub');
-                if (sub) sub.textContent = '기온, 접지저항, MCCB용량, 계량기번호를 적어야 일지에 들어갑니다.';
+                if (sub) sub.textContent = '접지저항, MCCB용량, 계량기번호를 적어야 일지에 들어갑니다.';
                 return;
             }
             closeReview();
@@ -6709,10 +6680,9 @@
             }
             const zone = state.selectedZone;
             const meters = readMeterFields();
-            rememberTemp(meters.temp);
             const measured = meterLineForMemo();
             const userMemo = memoWithoutTemp(document.getElementById('memoInput').value.trim());
-            const memo = [userMemo, meters.temp ? ('기온=' + String(meters.temp).trim()) : '', measured].filter(Boolean).join('\n');
+            const memo = [userMemo, measured].filter(Boolean).join('\n');
             const btn = document.getElementById('completeZoneBtn');
             const status = document.getElementById('uploadStatus');
             completingLock = true;
@@ -6745,7 +6715,6 @@
                 insul: meters.insul,
                 mccb: meters.mccb,
                 meterNo: meters.meterNo,
-                temp: String(meters.temp || '').trim(),
                 chargerNo: meters.chargerNo || chargerNoDefault()
             };
 
@@ -6900,12 +6869,11 @@
         });
         document.getElementById('saveToPhoneBtn').addEventListener('click', savePhotosToPhone);
         document.getElementById('memoInput').addEventListener('input', persistWorking);
-        ['meterV220', 'meterV380', 'meterGround', 'meterInsul', 'logMccb', 'logMeterNo', 'logTemp'].forEach((id) => {
+        ['meterV220', 'meterV380', 'meterGround', 'meterInsul', 'logMccb', 'logMeterNo'].forEach((id) => {
             const el = document.getElementById(id);
             if (!el) return;
             el.addEventListener('input', () => {
                 if (id === 'logMccb' || id === 'logMeterNo') markCloseFieldTouched(id);
-                if (id === 'logTemp') rememberTemp(el.value);
                 updateMeterHint();
                 persistWorking();
             });
@@ -7249,7 +7217,7 @@
                     rows.push(row);
                     return;
                 }
-                ['chargers', 'chargerNo', 'mccb', 'ground', 'meterNo', 'temp', 'v220', 'v380', 'place', 'note', 'inspector', 'city'].forEach((k) => {
+                ['chargers', 'chargerNo', 'mccb', 'ground', 'meterNo', 'v220', 'v380', 'place', 'note', 'inspector', 'city'].forEach((k) => {
                     if (!prev[k] && row[k]) prev[k] = row[k];
                 });
             };
@@ -7267,7 +7235,6 @@
                     mccb: row.mccb || '',
                     ground: row.ground || '',
                     meterNo: normalizeMeterNo(row.meterNo || ''),
-                    temp: tempFromMemo(row.memo),
                     v220: row.v220 || '',
                     v380: row.v380 || '',
                     place: remarkForLog(parsed.zoneName, row.memo, kind),
@@ -7290,7 +7257,6 @@
                     mccb: h.mccb || '',
                     ground: h.ground || '',
                     meterNo: normalizeMeterNo(h.meterNo || ''),
-                    temp: h.temp || tempFromMemo(h.memo),
                     v220: h.v220 || '',
                     v380: h.v380 || '',
                     place: remarkForLog(h.zoneName, h.memo, kind),
@@ -7311,7 +7277,6 @@
             return [
                 { key: 'station', title: '국소명', w: 280, merge: true },
                 { key: 'zoneIndex', title: '거점', w: 72 },
-                { key: 'temp', title: '기온', w: 72 },
                 { key: 'chargers', title: '충전기수', w: 96 },
                 { key: 'chargerNo', title: '충전기번호', w: 140 },
                 { key: 'mccb', title: 'MCCB용량', w: 110 },
@@ -8026,7 +7991,7 @@
                 add(plate === '08-47-0019049', '명판 제조번호 08-47-0019049 → ' + (plate || '빈값'));
                 add(sameMeterRead('0019049', '08-47-0019049') && richerMeter('0019049', '08-47-0019049') === '08-47-0019049', '일부 번호는 전체 명판 번호로 유지');
                 add(normalizeMeterNo('08 - 47 - 0019049') === '08-47-0019049', '제조번호 표기 08-47-0019049');
-                add(dailyLogColumns().map((col) => col.title).join(',') === '국소명,거점,기온,충전기수,충전기번호,MCCB용량,접지저항,계량기번호,비고', '일지 열이 측정값 양식과 같음');
+                add(dailyLogColumns().map((col) => col.title).join(',') === '국소명,거점,충전기수,충전기번호,MCCB용량,접지저항,계량기번호,비고', '일지 열이 측정값 양식과 같음');
                 add(pickClearMccb('정격 75A', true) === '75A', 'MCCB 샘플 75A');
                 add(pickClearMccb('50A', true) === '50A', 'MCCB 샘플 50A');
 

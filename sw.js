@@ -1,5 +1,5 @@
-// v4.77: phone-camera shots stay in the app and no longer trigger a per-photo download prompt
-const SW_VER = '4.77';
+// v4.78: daily log matches the paper form, without a temperature column
+const SW_VER = '4.78';
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
